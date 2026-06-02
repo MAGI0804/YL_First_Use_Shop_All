@@ -201,6 +201,15 @@ export const deliverOrder = (params: DeliverOrderParams) => {
   return http.post('/order/deliver', params)
 }
 
+export interface ReceiveOrderParams {
+  order_id: string
+  user_id: number
+}
+
+export const receiveOrder = (params: ReceiveOrderParams) => {
+  return http.post('/order/order_receive', params)
+}
+
 export interface GetAllLabelsParams {
   shopname: string
 }

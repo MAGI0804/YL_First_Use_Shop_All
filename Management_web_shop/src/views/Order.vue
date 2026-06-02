@@ -119,6 +119,7 @@
           <el-button type="primary" link @click="viewDetail(row.orderNo)">查看</el-button>
           <el-button v-if="row.status !== 'canceled' && row.payStatus !== 'paid'" type="warning" link @click="openPaymentDialog(row)">改价</el-button>
           <el-button v-if="row.status === 'pending'" type="success" link @click="shipOrder(row)">发货</el-button>
+          <el-button v-if="row.status === 'shipped'" type="primary" link @click="receiveOrderAction(row)">确认签收</el-button>
           <el-button v-if="row.status === 'delivered' && row.payStatus !== 'paid'" type="success" link @click="confirmPayment(row)">确认支付</el-button>
         </template>
       </el-table-column>
@@ -167,7 +168,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
-import { queryOrders, getToken, batchGetProducts, updatePaymentAmount, confirmOrderPayment, deliverOrder } from '@/api'
+import { queryOrders, getToken, batchGetProducts, updatePaymentAmount, confirmOrderPayment, deliverOrder, receiveOrder } from '@/api'
 
 const router = useRouter()
 const searchOrderNo = ref('')
@@ -535,6 +536,27 @@ const shipOrder = async (row: any) => {
   } catch (error: any) {
     if (error !== 'cancel') {
       ElMessage.error(error.response?.data?.msg || '发货失败')
+    }
+  }
+}
+
+const receiveOrderAction = async (row: any) => {
+  try {
+    await ElMessageBox.confirm(`确认订单 ${row.orderNo} 已签收？`, '确认签收', {
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    await receiveOrder({
+      order_id: row.orderNo,
+      user_id: row.id
+    })
+    localStorage.removeItem(CACHE_KEY)
+    ElMessage.success('订单已签收')
+    fetchOrders()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.msg || '确认签收失败')
     }
   }
 }
