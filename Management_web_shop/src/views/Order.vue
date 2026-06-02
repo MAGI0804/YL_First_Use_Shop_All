@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="order-page">
     <div class="search-bar">
       <el-input
@@ -94,6 +94,18 @@
           ¥{{ row.amount }}
         </template>
       </el-table-column>
+      <el-table-column prop="finalPayAmount" label="实付金额" width="120">
+        <template #default="{ row }">
+          ¥{{ formatMoney(row.finalPayAmount) }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="payStatus" label="支付状态" width="100">
+        <template #default="{ row }">
+          <el-tag :type="getPayStatusType(row.payStatus)" size="small">
+            {{ getPayStatusText(row.payStatus) }}
+          </el-tag>
+        </template>
+      </el-table-column>
       <el-table-column prop="status" label="订单状态" width="100">
         <template #default="{ row }">
           <el-tag :type="getStatusType(row.status)" size="small">
@@ -102,10 +114,12 @@
         </template>
       </el-table-column>
       <el-table-column prop="createTime" label="下单时间" width="180" />
-      <el-table-column label="操作" width="150" fixed="right">
+      <el-table-column label="操作" width="240" fixed="right">
         <template #default="{ row }">
           <el-button type="primary" link @click="viewDetail(row.orderNo)">查看</el-button>
-          <el-button v-if="row.status === 'pending'" type="success" link @click="shipOrder(row.id)">发货</el-button>
+          <el-button v-if="row.status === 'pending' && row.payStatus !== 'paid'" type="warning" link @click="openPaymentDialog(row)">改价</el-button>
+          <el-button v-if="row.status === 'pending' && row.payStatus !== 'paid'" type="success" link @click="confirmPayment(row)">确认支付</el-button>
+          <el-button v-if="row.status === 'pending' && row.payStatus === 'paid'" type="success" link @click="shipOrder(row.id)">发货</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -126,14 +140,34 @@
       <img :src="previewImageUrl" class="preview-image" />
     </div>
   </el-dialog>
-</template>
 
+  <el-dialog v-model="paymentDialogVisible" title="调整实付金额" width="420px" destroy-on-close>
+    <el-form label-width="96px">
+      <el-form-item label="订单金额">
+        <el-input :model-value="formatMoney(paymentForm.orderAmount)" disabled />
+      </el-form-item>
+      <el-form-item label="实付金额">
+        <el-input-number v-model="paymentForm.finalPayAmount" :min="0" :max="paymentForm.orderAmount" :precision="2" style="width: 100%;" />
+      </el-form-item>
+      <el-form-item label="优惠原因">
+        <el-input v-model="paymentForm.discountReason" type="textarea" :rows="3" placeholder="实付金额小于订单金额时必填" />
+      </el-form-item>
+      <el-form-item label="操作人ID">
+        <el-input-number v-model="paymentForm.operatorId" :min="1" :precision="0" style="width: 100%;" />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="paymentDialogVisible = false">取消</el-button>
+      <el-button type="primary" :loading="paymentSubmitting" @click="submitPaymentAmount">保存</el-button>
+    </template>
+  </el-dialog>
+</template>
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
-import { queryOrders, getToken, batchGetProducts } from '@/api'
+import { queryOrders, getToken, batchGetProducts, updatePaymentAmount, confirmOrderPayment } from '@/api'
 
 const router = useRouter()
 const searchOrderNo = ref('')
@@ -146,6 +180,15 @@ const total = ref(0)
 const productMap = ref<Record<string, any>>({})
 const previewImageUrl = ref('')
 const showPreview = ref(false)
+const paymentDialogVisible = ref(false)
+const paymentSubmitting = ref(false)
+const paymentForm = ref({
+  orderNo: '',
+  orderAmount: 0,
+  finalPayAmount: 0,
+  discountReason: '',
+  operatorId: 1
+})
 
 const CACHE_KEY = 'order_first_page_cache'
 const CACHE_EXPIRE = 5 * 60 * 1000 // 5分钟缓存
@@ -233,7 +276,11 @@ const fetchOrders = async () => {
         phone: item.receiver_phone,
         address: `${item.province}${item.city}${item.county}${item.detailed_address}`,
         amount: item.order_amount,
+        finalPayAmount: item.final_pay_amount || item.order_amount,
+        discountAmount: item.discount_amount || 0,
+        discountReason: item.discount_reason || '',
         status: item.status,
+        payStatus: item.pay_status || 'unpaid',
         createTime: item.order_time
       }))
       
@@ -381,6 +428,86 @@ const getStatusText = (status: string) => {
     processing: '售后中'
   }
   return map[status] || status
+}
+
+const getPayStatusType = (status: string) => {
+  const map: Record<string, string> = {
+    unpaid: 'warning',
+    paid: 'success',
+    partial_paid: 'primary'
+  }
+  return map[status] || 'info'
+}
+
+const getPayStatusText = (status: string) => {
+  const map: Record<string, string> = {
+    unpaid: '未支付',
+    paid: '已支付',
+    partial_paid: '部分支付'
+  }
+  return map[status] || status
+}
+
+const formatMoney = (value: number | string | undefined | null) => {
+  const amount = Number(value || 0)
+  return amount.toFixed(2)
+}
+
+const openPaymentDialog = (row: any) => {
+  paymentForm.value = {
+    orderNo: row.orderNo,
+    orderAmount: Number(row.amount || 0),
+    finalPayAmount: Number(row.finalPayAmount || row.amount || 0),
+    discountReason: row.discountReason || '',
+    operatorId: 1
+  }
+  paymentDialogVisible.value = true
+}
+
+const submitPaymentAmount = async () => {
+  if (paymentForm.value.finalPayAmount < paymentForm.value.orderAmount && !paymentForm.value.discountReason.trim()) {
+    ElMessage.warning('实付金额小于订单金额时必须填写优惠原因')
+    return
+  }
+  paymentSubmitting.value = true
+  try {
+    await updatePaymentAmount({
+      order_id: paymentForm.value.orderNo,
+      final_pay_amount: paymentForm.value.finalPayAmount,
+      discount_reason: paymentForm.value.discountReason,
+      operator_id: paymentForm.value.operatorId
+    })
+    localStorage.removeItem(CACHE_KEY)
+    paymentDialogVisible.value = false
+    ElMessage.success('实付金额已更新')
+    fetchOrders()
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.msg || '实付金额更新失败')
+  } finally {
+    paymentSubmitting.value = false
+  }
+}
+
+const confirmPayment = async (row: any) => {
+  try {
+    await ElMessageBox.confirm(`确认订单 ${row.orderNo} 已线下收款？`, '确认支付', {
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    await confirmOrderPayment({
+      order_id: row.orderNo,
+      operator_id: 1,
+      payment_remark: '运营后台确认支付'
+    })
+    localStorage.removeItem(CACHE_KEY)
+    ElMessage.success('支付状态已确认')
+    fetchOrders()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.msg || '确认支付失败')
+    }
+  }
 }
 
 const viewDetail = (orderNo: string) => {

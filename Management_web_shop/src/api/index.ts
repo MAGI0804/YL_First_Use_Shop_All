@@ -28,8 +28,12 @@ export interface OrderItem {
   express_number: string
   logistics_process: any[]
   order_amount: number
+  final_pay_amount?: number
+  discount_amount?: number
+  discount_reason?: string
   order_id: string
   order_time: string
+  pay_status?: string
   process_num: string
   processing_time: string
   product_list: string[]
@@ -127,11 +131,15 @@ export interface OrderDetailData {
   lcid: string
   logistics_process: any[]
   order_amount: number
+  final_pay_amount?: number
+  discount_amount?: number
+  discount_reason?: string
   order_from: string
   order_id: string
   order_time: string
   payment_method: string
   payment_time: string
+  pay_status?: string
   process_num: string
   processing_time: string
   product_list: string[]
@@ -159,6 +167,27 @@ export interface OrderDetailResponse {
 
 export const queryOrderDetail = (params: OrderDetailQueryParams) => {
   return http.post<OrderDetailResponse>('/order/query_order_data', params)
+}
+
+export interface UpdatePaymentAmountParams {
+  order_id: string
+  final_pay_amount: number
+  discount_reason?: string
+  operator_id: number
+}
+
+export const updatePaymentAmount = (params: UpdatePaymentAmountParams) => {
+  return http.post('/order/update_payment_amount', params)
+}
+
+export interface ConfirmPaymentParams {
+  order_id: string
+  operator_id: number
+  payment_remark?: string
+}
+
+export const confirmOrderPayment = (params: ConfirmPaymentParams) => {
+  return http.post('/order/confirm_payment', params)
 }
 
 export interface GetAllLabelsParams {
