@@ -1,0 +1,61 @@
+# Environment files
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Dependencies
+node_modules/
+**/node_modules/
+miniprogram_npm/
+**/miniprogram_npm/
+
+# Build and compiler output
+dist/
+**/dist/
+build/
+**/build/
+coverage/
+**/coverage/
+*.tsbuildinfo
+*.log
+logs/
+**/logs/
+.vite/
+**/.vite/
+
+# IDE and compiler/editor metadata
+.vscode/
+**/.vscode/
+.idea/
+**/.idea/
+.vs/
+**/.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# OS metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Runtime media and generated static resources
+Member_Shop/media/
+Member_Shop/staticfiles/
+Member_Shop/.media/
+Management_web_shop/dist/
+Management_web_shop/img/
+Management_web_shop/public/
+wx_ui_kids/.cloudbase/
+wx_ui_kids/images/
+wx_ui_kids/pages/**/images/
+
+# Local nested plugin repos and copied workspaces
+Management_web_shop/agent-skills/
+Management_web_shop/ui-ux-pro-max-skill/
+Management_web_shop/wx_file/
