@@ -190,6 +190,17 @@ export const confirmOrderPayment = (params: ConfirmPaymentParams) => {
   return http.post('/order/confirm_payment', params)
 }
 
+export interface DeliverOrderParams {
+  order_id: string
+  user_id: number
+  express_company: string
+  express_number: string
+}
+
+export const deliverOrder = (params: DeliverOrderParams) => {
+  return http.post('/order/deliver', params)
+}
+
 export interface GetAllLabelsParams {
   shopname: string
 }

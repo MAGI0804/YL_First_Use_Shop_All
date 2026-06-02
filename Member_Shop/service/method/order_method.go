@@ -1361,6 +1361,13 @@ func ValidatePaymentAdjustment(orderAmount, finalPayAmount float64, discountReas
 	return discountAmount, nil
 }
 
+func ValidateOrderReadyToPay(status string) error {
+	if status != "delivered" {
+		return fmt.Errorf("order must be delivered before payment")
+	}
+	return nil
+}
+
 func UpdatePaymentAmount(orderID string, finalPayAmount float64, discountReason string, operatorID int) (*models.Order, error) {
 	var updatedOrder models.Order
 	err := db.DB.Transaction(func(tx *gorm.DB) error {
@@ -1406,6 +1413,9 @@ func ConfirmOrderPayment(orderID string, operatorID int, paymentRemark string) e
 		}
 		if order.Status == "canceled" {
 			return fmt.Errorf("order status does not allow payment")
+		}
+		if err := ValidateOrderReadyToPay(order.Status); err != nil {
+			return err
 		}
 		finalPayAmount := normalizeFinalPayAmount(order)
 		if _, err := ValidatePaymentAdjustment(order.OrderAmount, finalPayAmount, order.DiscountReason); err != nil {

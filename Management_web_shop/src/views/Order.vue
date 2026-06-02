@@ -117,9 +117,9 @@
       <el-table-column label="操作" width="240" fixed="right">
         <template #default="{ row }">
           <el-button type="primary" link @click="viewDetail(row.orderNo)">查看</el-button>
-          <el-button v-if="row.status === 'pending' && row.payStatus !== 'paid'" type="warning" link @click="openPaymentDialog(row)">改价</el-button>
-          <el-button v-if="row.status === 'pending' && row.payStatus !== 'paid'" type="success" link @click="confirmPayment(row)">确认支付</el-button>
-          <el-button v-if="row.status === 'pending' && row.payStatus === 'paid'" type="success" link @click="shipOrder(row.id)">发货</el-button>
+          <el-button v-if="row.status !== 'canceled' && row.payStatus !== 'paid'" type="warning" link @click="openPaymentDialog(row)">改价</el-button>
+          <el-button v-if="row.status === 'pending'" type="success" link @click="shipOrder(row)">发货</el-button>
+          <el-button v-if="row.status === 'delivered' && row.payStatus !== 'paid'" type="success" link @click="confirmPayment(row)">确认支付</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -167,7 +167,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
-import { queryOrders, getToken, batchGetProducts, updatePaymentAmount, confirmOrderPayment } from '@/api'
+import { queryOrders, getToken, batchGetProducts, updatePaymentAmount, confirmOrderPayment, deliverOrder } from '@/api'
 
 const router = useRouter()
 const searchOrderNo = ref('')
@@ -421,7 +421,7 @@ const getStatusType = (status: string) => {
 
 const getStatusText = (status: string) => {
   const map: Record<string, string> = {
-    pending: '未发货',
+    pending: '待发货',
     shipped: '已发货',
     delivered: '已送达',
     canceled: '已取消',
@@ -490,7 +490,8 @@ const submitPaymentAmount = async () => {
 
 const confirmPayment = async (row: any) => {
   try {
-    await ElMessageBox.confirm(`确认订单 ${row.orderNo} 已线下收款？`, '确认支付', {
+    await ElMessageBox.confirm(`订单 ${row.orderNo} 已签收，确认已完成线下收款？`, '确认支付',
+    {
       confirmButtonText: '确认',
       cancelButtonText: '取消',
       type: 'warning'
@@ -498,7 +499,7 @@ const confirmPayment = async (row: any) => {
     await confirmOrderPayment({
       order_id: row.orderNo,
       operator_id: 1,
-      payment_remark: '运营后台确认支付'
+      payment_remark: '运营后台签收后确认支付'
     })
     localStorage.removeItem(CACHE_KEY)
     ElMessage.success('支付状态已确认')
@@ -514,8 +515,28 @@ const viewDetail = (orderNo: string) => {
   router.push(`/order/${orderNo}`)
 }
 
-const shipOrder = (id: number) => {
-  ElMessage.success('发货成功')
+const shipOrder = async (row: any) => {
+  try {
+    const { value: expressNumber } = await ElMessageBox.prompt(`请输入订单 ${row.orderNo} 的物流单号`, '发货', {
+      confirmButtonText: '发货',
+      cancelButtonText: '取消',
+      inputPattern: /\S+/,
+      inputErrorMessage: '物流单号不能为空'
+    })
+    await deliverOrder({
+      order_id: row.orderNo,
+      user_id: row.id,
+      express_company: 'manual',
+      express_number: expressNumber
+    })
+    localStorage.removeItem(CACHE_KEY)
+    ElMessage.success('发货成功')
+    fetchOrders()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.msg || '发货失败')
+    }
+  }
 }
 </script>
 
