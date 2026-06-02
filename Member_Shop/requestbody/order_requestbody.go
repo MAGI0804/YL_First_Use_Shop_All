@@ -47,6 +47,19 @@ type OrderCreateRequest struct {
 	Remark          string        `json:"remark"`
 }
 
+type UpdatePaymentAmountRequest struct {
+	OrderID        string  `json:"order_id" binding:"required"`
+	FinalPayAmount float64 `json:"final_pay_amount" binding:"required,min=0"`
+	DiscountReason string  `json:"discount_reason"`
+	OperatorID     int     `json:"operator_id" binding:"required"`
+}
+
+type ConfirmPaymentRequest struct {
+	OrderID       string `json:"order_id" binding:"required"`
+	OperatorID    int    `json:"operator_id" binding:"required"`
+	PaymentRemark string `json:"payment_remark"`
+}
+
 type OrderCancelRequest struct {
 	OrderID string `json:"order_id" binding:"required"`
 	UserID  int    `json:"user_id" binding:"required"`

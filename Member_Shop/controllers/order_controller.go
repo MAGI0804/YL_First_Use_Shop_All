@@ -303,14 +303,20 @@ func (oc *OrderController) OrderCreate(c *gin.Context) {
 	log.Printf("上传订单到聚水潭成功: %s", resp)
 
 	responseData := map[string]interface{}{
-		"order_id":        order.OrderID,
-		"user_id":         req.UserID,
-		"receiver_name":   req.ReceiverName,
-		"receiver_phone":  receiverPhoneStr,
-		"express_company": req.ExpressCompany,
-		"express_number":  req.ExpressNumber,
-		"remark":          req.Remark,
-		"sub_order_ids":   order.SubOrderIDs,
+		"order_id":         order.OrderID,
+		"user_id":          req.UserID,
+		"receiver_name":    req.ReceiverName,
+		"receiver_phone":   receiverPhoneStr,
+		"express_company":  req.ExpressCompany,
+		"express_number":   req.ExpressNumber,
+		"remark":           req.Remark,
+		"sub_order_ids":    order.SubOrderIDs,
+		"status":           order.Status,
+		"pay_status":       order.PayStatus,
+		"order_amount":     order.OrderAmount,
+		"final_pay_amount": order.FinalPayAmount,
+		"discount_amount":  order.DiscountAmount,
+		"discount_reason":  order.DiscountReason,
 	}
 	data := map[string]any{
 		"status":   "success",
@@ -498,6 +504,50 @@ func (oc *OrderController) OrderCancel(c *gin.Context) {
 		"status":  "success",
 		"message": "订单取消成功",
 		"data":    map[string]string{"order_id": req.OrderID},
+	}
+	c.JSON(http.StatusOK, msg.SuccessResponse("success", &data))
+}
+
+func (oc *OrderController) UpdatePaymentAmount(c *gin.Context) {
+	var req requestbody.UpdatePaymentAmountRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponse("invalid request", err))
+		return
+	}
+
+	order, err := method.UpdatePaymentAmount(req.OrderID, req.FinalPayAmount, req.DiscountReason, req.OperatorID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr(err.Error()))
+		return
+	}
+
+	data := map[string]any{
+		"order_id":          order.OrderID,
+		"order_amount":      order.OrderAmount,
+		"final_pay_amount":  order.FinalPayAmount,
+		"discount_amount":   order.DiscountAmount,
+		"discount_reason":   order.DiscountReason,
+		"price_adjusted_by": order.PriceAdjustedBy,
+	}
+	c.JSON(http.StatusOK, msg.SuccessResponse("success", &data))
+}
+
+func (oc *OrderController) ConfirmPayment(c *gin.Context) {
+	var req requestbody.ConfirmPaymentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponse("invalid request", err))
+		return
+	}
+
+	if err := method.ConfirmOrderPayment(req.OrderID, req.OperatorID, req.PaymentRemark); err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr(err.Error()))
+		return
+	}
+
+	data := map[string]any{
+		"order_id":    req.OrderID,
+		"pay_status":  "paid",
+		"operator_id": req.OperatorID,
 	}
 	c.JSON(http.StatusOK, msg.SuccessResponse("success", &data))
 }

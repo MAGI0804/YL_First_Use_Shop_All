@@ -63,8 +63,14 @@ func ConvertOrderToMap(order models.Order) map[string]interface{} {
 	result["county"] = order.County
 	result["detailed_address"] = order.DetailedAddress
 	result["order_amount"] = order.OrderAmount
+	result["final_pay_amount"] = normalizeFinalPayAmount(order)
+	result["discount_amount"] = order.DiscountAmount
+	result["discount_reason"] = order.DiscountReason
 	result["status"] = order.Status
 	result["pay_status"] = order.PayStatus
+	result["payment_operator_id"] = order.PaymentOperatorID
+	result["payment_remark"] = order.PaymentRemark
+	result["price_adjusted_by"] = order.PriceAdjustedBy
 
 	if order.ProductList != "" {
 		var productList []string
@@ -539,6 +545,9 @@ func CreateOrder(userID int, receiverName, receiverPhone, province, city, county
 		ProdoctNameList: string(productNamesJSON),
 		ExpressCompany:  expressCompany,
 		ExpressNumber:   expressNumber,
+		FinalPayAmount:  orderAmount,
+		DiscountAmount:  0,
+		DiscountReason:  "",
 		Status:          "pending",
 		PayStatus:       "unpaid",
 		OrderTime:       time.Now(),
@@ -553,7 +562,7 @@ func CreateOrder(userID int, receiverName, receiverPhone, province, city, county
 	var createdSubOrders []models.SubOrder
 
 	if err := db.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Select("order_id", "user_id", "receiver_name", "receiver_phone", "province", "city", "county", "detailed_address", "order_amount", "product_list", "prodoct_name_list", "express_company", "express_number", "status", "pay_status", "order_time", "remarks").Create(&order).Error; err != nil {
+		if err := tx.Select("order_id", "user_id", "receiver_name", "receiver_phone", "province", "city", "county", "detailed_address", "order_amount", "final_pay_amount", "discount_amount", "discount_reason", "product_list", "prodoct_name_list", "express_company", "express_number", "status", "pay_status", "order_time", "remarks").Create(&order).Error; err != nil {
 			return err
 		}
 		if userID > 0 && orderAmount > 0 {
@@ -692,6 +701,8 @@ func CancelOrder(orderID string) error {
 
 // PayOrder 支付订单
 func PayOrder(orderID string) error {
+	return ConfirmOrderPayment(orderID, 0, "")
+
 	var order models.Order
 	if err := db.DB.Where("order_id = ?", orderID).First(&order).Error; err != nil {
 		return err
@@ -1324,4 +1335,99 @@ func subOrderIDUserFallback(subOrder *models.SubOrder) int {
 		return 0
 	}
 	return order.UserID
+}
+
+func normalizeFinalPayAmount(order models.Order) float64 {
+	if order.FinalPayAmount > 0 {
+		return order.FinalPayAmount
+	}
+	if order.OrderAmount > 0 {
+		return order.OrderAmount
+	}
+	return 0
+}
+
+func ValidatePaymentAdjustment(orderAmount, finalPayAmount float64, discountReason string) (float64, error) {
+	if finalPayAmount < 0 {
+		return 0, fmt.Errorf("final pay amount cannot be negative")
+	}
+	if finalPayAmount > orderAmount {
+		return 0, fmt.Errorf("final pay amount cannot exceed order amount")
+	}
+	discountAmount := orderAmount - finalPayAmount
+	if discountAmount > 0 && strings.TrimSpace(discountReason) == "" {
+		return 0, fmt.Errorf("discount reason is required")
+	}
+	return discountAmount, nil
+}
+
+func UpdatePaymentAmount(orderID string, finalPayAmount float64, discountReason string, operatorID int) (*models.Order, error) {
+	var updatedOrder models.Order
+	err := db.DB.Transaction(func(tx *gorm.DB) error {
+		var order models.Order
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("order_id = ?", orderID).First(&order).Error; err != nil {
+			return err
+		}
+		if order.Status == "canceled" {
+			return fmt.Errorf("order is canceled")
+		}
+		if order.PayStatus == "paid" {
+			return fmt.Errorf("order already paid")
+		}
+		discountAmount, err := ValidatePaymentAdjustment(order.OrderAmount, finalPayAmount, discountReason)
+		if err != nil {
+			return err
+		}
+		if err := tx.Model(&order).Updates(map[string]interface{}{
+			"final_pay_amount":  finalPayAmount,
+			"discount_amount":   discountAmount,
+			"discount_reason":   strings.TrimSpace(discountReason),
+			"price_adjusted_by": operatorID,
+			"price_adjusted_at": time.Now(),
+		}).Error; err != nil {
+			return err
+		}
+		return tx.Where("order_id = ?", orderID).First(&updatedOrder).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &updatedOrder, nil
+}
+
+func ConfirmOrderPayment(orderID string, operatorID int, paymentRemark string) error {
+	return db.DB.Transaction(func(tx *gorm.DB) error {
+		var order models.Order
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("order_id = ?", orderID).First(&order).Error; err != nil {
+			return err
+		}
+		if order.PayStatus == "paid" {
+			return fmt.Errorf("order already paid")
+		}
+		if order.Status == "canceled" {
+			return fmt.Errorf("order status does not allow payment")
+		}
+		finalPayAmount := normalizeFinalPayAmount(order)
+		if _, err := ValidatePaymentAdjustment(order.OrderAmount, finalPayAmount, order.DiscountReason); err != nil {
+			return err
+		}
+		if err := tx.Model(&order).Updates(map[string]interface{}{
+			"final_pay_amount":    finalPayAmount,
+			"pay_status":          "paid",
+			"payment_time":        time.Now(),
+			"payment_operator_id": operatorID,
+			"payment_remark":      paymentRemark,
+		}).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&models.SubOrder{}).Where("order_id = ?", orderID).Update("pay_status", "paid").Error; err != nil {
+			return err
+		}
+		if finalPayAmount > 0 && order.UserID > 0 {
+			return tx.Model(&models.Member{}).
+				Where("user_id = ?", order.UserID).
+				Update("total_paid_amount", gorm.Expr("total_paid_amount + ?", finalPayAmount)).Error
+		}
+		return nil
+	})
 }

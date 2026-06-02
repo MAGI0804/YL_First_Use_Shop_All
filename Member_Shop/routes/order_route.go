@@ -40,6 +40,8 @@ func InitOrderRoutes(router *gin.Engine) {
 		orderGroup.POST("change_sub_order_status", orderController.ChangeSubOrderStatus)
 		orderGroup.POST("cancel_sub_order", orderController.SubOrderCancel)
 		orderGroup.POST("return_sub_order", orderController.SubOrderReturn)
+		orderGroup.POST("update_payment_amount", orderController.UpdatePaymentAmount)
+		orderGroup.POST("confirm_payment", orderController.ConfirmPayment)
 		orderGroup.POST("jushuitan_ship_info", orderController.JushuitanShipInfo)
 	}
 }

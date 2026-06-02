@@ -1,0 +1,8 @@
+Youlan Kids Shop update log
+
+2026-06-02
+- Backend transaction loop: added final payment amount, discount amount, discount reason, payment operator, payment remark, and price adjustment audit fields to orders.
+- Backend transaction loop: initialized final_pay_amount from order_amount when an order is created.
+- Backend transaction loop: added /order/update_payment_amount and /order/confirm_payment for operations staff to adjust final amount and confirm offline payment before shipping.
+- Backend transaction loop: changed legacy /order/pay to reuse the offline payment confirmation path.
+- Tests: added payment adjustment validation coverage.
