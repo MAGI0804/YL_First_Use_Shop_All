@@ -29,8 +29,11 @@
             <span class="label-text">下单时间</span>
             <span class="time-text">{{ orderData.order_time }}</span>
           </div>
-          <div v-if="canConfirmPayment" class="order-actions">
-            <el-button type="success" size="small" @click="confirmPayment">确认支付</el-button>
+          <div v-if="hasOrderActions" class="order-actions">
+            <el-button v-if="canAdjustPayment" type="warning" size="small" @click="openPaymentDialog">调整金额</el-button>
+            <el-button v-if="canShipOrder" type="success" size="small" @click="shipOrder">发货</el-button>
+            <el-button v-if="canReceiveOrder" type="primary" size="small" @click="receiveOrderAction">确认签收</el-button>
+            <el-button v-if="canConfirmPayment" type="success" size="small" @click="confirmPayment">确认支付</el-button>
           </div>
         </div>
 
@@ -141,6 +144,27 @@
       </el-card>
     </div>
   </div>
+
+  <el-dialog v-model="paymentDialogVisible" title="调整实付金额" width="420px" destroy-on-close>
+    <el-form label-width="96px">
+      <el-form-item label="订单金额">
+        <el-input :model-value="formatMoney(paymentForm.orderAmount)" disabled />
+      </el-form-item>
+      <el-form-item label="实付金额">
+        <el-input-number v-model="paymentForm.finalPayAmount" :min="0" :max="paymentForm.orderAmount" :precision="2" style="width: 100%;" />
+      </el-form-item>
+      <el-form-item label="优惠原因">
+        <el-input v-model="paymentForm.discountReason" type="textarea" :rows="3" placeholder="实付金额小于订单金额时必填" />
+      </el-form-item>
+      <el-form-item label="操作人ID">
+        <el-input-number v-model="paymentForm.operatorId" :min="1" :precision="0" style="width: 100%;" />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="paymentDialogVisible = false">取消</el-button>
+      <el-button type="primary" :loading="paymentSubmitting" @click="submitPaymentAmount">保存</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
@@ -148,7 +172,7 @@ import { computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, DocumentCopy } from '@element-plus/icons-vue'
-import { queryOrderDetail, getToken, batchGetProducts, confirmOrderPayment } from '@/api'
+import { queryOrderDetail, getToken, batchGetProducts, updatePaymentAmount, confirmOrderPayment, deliverOrder, receiveOrder } from '@/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -156,7 +180,19 @@ const loading = ref(true)
 const orderData = ref<any>({})
 const productList = ref<string[]>([])
 const productMap = ref<Record<string, any>>({})
+const paymentDialogVisible = ref(false)
+const paymentSubmitting = ref(false)
+const paymentForm = ref({
+  orderAmount: 0,
+  finalPayAmount: 0,
+  discountReason: '',
+  operatorId: 1
+})
+const canAdjustPayment = computed(() => Boolean(orderData.value.order_id) && orderData.value.status !== 'canceled' && orderData.value.pay_status !== 'paid')
+const canShipOrder = computed(() => orderData.value.status === 'pending')
+const canReceiveOrder = computed(() => orderData.value.status === 'shipped')
 const canConfirmPayment = computed(() => orderData.value.status === 'delivered' && orderData.value.pay_status !== 'paid')
+const hasOrderActions = computed(() => canAdjustPayment.value || canShipOrder.value || canReceiveOrder.value || canConfirmPayment.value)
 
 const copyOrderId = () => {
   if (orderData.value.order_id) {
@@ -174,7 +210,7 @@ const fetchOrderDetail = async () => {
     
     const requestParams = {
       order_id: orderId,
-      inquired_list: ['order_id', 'order_amount', 'final_pay_amount', 'discount_amount', 'discount_reason', 'pay_status', 'payment_time', 'payment_remark', 'product_list', 'province', 'city', 'county', 'detailed_address', 'status', 'remarks', 'order_time', 'receiver_phone', 'express_company', 'express_number'],
+      inquired_list: ['order_id', 'order_amount', 'final_pay_amount', 'discount_amount', 'discount_reason', 'pay_status', 'payment_time', 'payment_remark', 'product_list', 'province', 'city', 'county', 'detailed_address', 'status', 'remarks', 'order_time', 'receiver_name', 'receiver_phone', 'user_id', 'express_company', 'express_number'],
       shopname: 'youlan_kids'
     }
     console.log('请求参数:', requestParams)
@@ -259,6 +295,82 @@ const formatMoney = (value: number | string | undefined | null) => {
   return Number(value || 0).toFixed(2)
 }
 
+const openPaymentDialog = () => {
+  paymentForm.value = {
+    orderAmount: Number(orderData.value.order_amount || 0),
+    finalPayAmount: Number(orderData.value.final_pay_amount || orderData.value.order_amount || 0),
+    discountReason: orderData.value.discount_reason || '',
+    operatorId: 1
+  }
+  paymentDialogVisible.value = true
+}
+
+const submitPaymentAmount = async () => {
+  if (paymentForm.value.finalPayAmount < paymentForm.value.orderAmount && !paymentForm.value.discountReason.trim()) {
+    ElMessage.warning('实付金额小于订单金额时必须填写优惠原因')
+    return
+  }
+  paymentSubmitting.value = true
+  try {
+    await updatePaymentAmount({
+      order_id: orderData.value.order_id,
+      final_pay_amount: paymentForm.value.finalPayAmount,
+      discount_reason: paymentForm.value.discountReason,
+      operator_id: paymentForm.value.operatorId
+    })
+    paymentDialogVisible.value = false
+    ElMessage.success('实付金额已更新')
+    fetchOrderDetail()
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.msg || '实付金额更新失败')
+  } finally {
+    paymentSubmitting.value = false
+  }
+}
+
+const shipOrder = async () => {
+  try {
+    const { value: expressNumber } = await ElMessageBox.prompt(`请输入订单 ${orderData.value.order_id} 的物流单号`, '发货', {
+      confirmButtonText: '发货',
+      cancelButtonText: '取消',
+      inputPattern: /\S+/,
+      inputErrorMessage: '物流单号不能为空'
+    })
+    await deliverOrder({
+      order_id: orderData.value.order_id,
+      user_id: orderData.value.user_id,
+      express_company: 'manual',
+      express_number: expressNumber
+    })
+    ElMessage.success('发货成功')
+    fetchOrderDetail()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.msg || '发货失败')
+    }
+  }
+}
+
+const receiveOrderAction = async () => {
+  try {
+    await ElMessageBox.confirm(`确认订单 ${orderData.value.order_id} 已签收？`, '确认签收', {
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    await receiveOrder({
+      order_id: orderData.value.order_id,
+      user_id: orderData.value.user_id
+    })
+    ElMessage.success('订单已签收')
+    fetchOrderDetail()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.msg || '确认签收失败')
+    }
+  }
+}
+
 const confirmPayment = async () => {
   try {
     await ElMessageBox.confirm(`订单 ${orderData.value.order_id} 已签收，确认已完成线下收款？`, '确认支付', {
@@ -318,6 +430,8 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
 }
 
 .order-id-section {
@@ -342,6 +456,13 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.order-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 .time-text {
