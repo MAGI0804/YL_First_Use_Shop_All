@@ -1,0 +1,188 @@
+package config
+
+import (
+	"os"
+	"strconv"
+	"strings"
+	"time"
+)
+
+type Config struct {
+	ServerConfig
+	DBConfig
+	JWTConfig
+	WechatConfig
+	SMSConfig
+	JushuitanConfig
+}
+
+type ServerConfig struct {
+	Environment      string
+	Port             string
+	LogDir           string
+	CORSAllowOrigins []string
+}
+
+type DBConfig struct {
+	Driver      string
+	Host        string
+	Port        string
+	Username    string
+	Password    string
+	DBName      string
+	Charset     string
+	RdsPassword string
+	RdsHost     string
+	RdsNum      int
+}
+
+type JWTConfig struct {
+	SecretKey       string
+	AccessTokenTTL  time.Duration
+	RefreshTokenTTL time.Duration
+}
+
+type WechatConfig struct {
+	AppID     string
+	AppSecret string
+	LoginURL  string
+}
+
+type SMSConfig struct {
+	AccessKeyID     string
+	AccessKeySecret string
+	SignName        string
+	TemplateCode    string
+	Endpoint        string
+}
+
+type JushuitanConfig struct {
+	AppKeyTest      string
+	AppSecretTest   string
+	AppKeyProd      string
+	AppSecretProd   string
+	AuthCodeProd    string
+	AccessTokenTest string
+	GetTokenURLTest string
+	GetTokenURLProd string
+	OpenAPIURLTest  string
+	OpenAPIURLProd  string
+}
+
+func LoadConfig() Config {
+	dotEnvPath := os.Getenv("APP_DOTENV_PATH")
+	if dotEnvPath == "" {
+		dotEnvPath = ".env"
+	}
+	loadDotEnv(dotEnvPath)
+
+	return Config{
+		ServerConfig: ServerConfig{
+			Environment:      getEnv("APP_ENV", "development"),
+			Port:             getEnv("APP_PORT", "3088"),
+			LogDir:           getEnv("LOG_DIR", "./logs"),
+			CORSAllowOrigins: splitCSV(getEnv("CORS_ALLOW_ORIGINS", "*")),
+		},
+		DBConfig: DBConfig{
+			Driver:      getEnv("DB_ENGINE", "mysql"),
+			Host:        getEnv("DB_HOST", "127.0.0.1"),
+			Port:        getEnv("DB_PORT", "3306"),
+			Username:    getEnv("DB_USER", "root"),
+			Password:    getEnv("DB_PASSWORD", ""),
+			DBName:      getEnv("DB_NAME", "wechat_member"),
+			Charset:     getEnv("DB_CHARSET", "utf8mb4"),
+			RdsPassword: getEnv("REDIS_PASSWORD", ""),
+			RdsHost:     getEnv("REDIS_ADDR", "127.0.0.1:6379"),
+			RdsNum:      getEnvInt("REDIS_DB", 1),
+		},
+		JWTConfig: JWTConfig{
+			SecretKey:       getEnv("JWT_SECRET", "dev-only-change-me"),
+			AccessTokenTTL:  time.Duration(getEnvInt("JWT_ACCESS_TOKEN_TTL_HOURS", 1)),
+			RefreshTokenTTL: time.Duration(getEnvInt("JWT_REFRESH_TOKEN_TTL_HOURS", 24)),
+		},
+		WechatConfig: WechatConfig{
+			AppID:     getEnv("WECHAT_APP_ID", ""),
+			AppSecret: getEnv("WECHAT_APP_SECRET", ""),
+			LoginURL:  getEnv("WECHAT_LOGIN_URL", "https://api.weixin.qq.com/sns/jscode2session"),
+		},
+		SMSConfig: SMSConfig{
+			AccessKeyID:     getEnv("ALIYUN_SMS_ACCESS_KEY_ID", ""),
+			AccessKeySecret: getEnv("ALIYUN_SMS_ACCESS_KEY_SECRET", ""),
+			SignName:        getEnv("ALIYUN_SMS_SIGN_NAME", ""),
+			TemplateCode:    getEnv("ALIYUN_SMS_TEMPLATE_CODE", ""),
+			Endpoint:        getEnv("ALIYUN_SMS_ENDPOINT", "dysmsapi.aliyuncs.com"),
+		},
+		JushuitanConfig: JushuitanConfig{
+			AppKeyTest:      getEnv("JST_APP_KEY_TEST", ""),
+			AppSecretTest:   getEnv("JST_APP_SECRET_TEST", ""),
+			AppKeyProd:      getEnv("JST_APP_KEY_PROD", ""),
+			AppSecretProd:   getEnv("JST_APP_SECRET_PROD", ""),
+			AuthCodeProd:    getEnv("JST_AUTH_CODE_PROD", ""),
+			AccessTokenTest: getEnv("JST_ACCESS_TOKEN_TEST", ""),
+			GetTokenURLTest: getEnv("JST_GET_TOKEN_URL_TEST", "https://dev-api.jushuitan.com/openWebIsv/auth/getInitToken"),
+			GetTokenURLProd: getEnv("JST_GET_TOKEN_URL_PROD", "https://openapi.jushuitan.com/openWeb/auth/getInitToken"),
+			OpenAPIURLTest:  getEnv("JST_OPEN_API_URL_TEST", "https://dev-api.jushuitan.com"),
+			OpenAPIURLProd:  getEnv("JST_OPEN_API_URL_PROD", "https://openapi.jushuitan.com"),
+		},
+	}
+}
+
+func getEnv(key, defaultValue string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	return value
+}
+
+func getEnvInt(key string, defaultValue int) int {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return defaultValue
+	}
+	return parsed
+}
+
+func splitCSV(value string) []string {
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			result = append(result, part)
+		}
+	}
+	if len(result) == 0 {
+		return []string{"*"}
+	}
+	return result
+}
+
+func loadDotEnv(path string) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+
+	for _, line := range strings.Split(string(content), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		value = strings.Trim(strings.TrimSpace(value), `"'`)
+		if key == "" || os.Getenv(key) != "" {
+			continue
+		}
+		_ = os.Setenv(key, value)
+	}
+}

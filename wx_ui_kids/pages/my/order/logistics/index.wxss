@@ -1,0 +1,181 @@
+/* pages/my/order/logistics/index.wxss */
+
+/* 页面容器 */
+.logistics-container {
+  min-height: 100vh;
+  background-color: #f5f5f5;
+  font-size: 14px;
+  color: #333;
+}
+
+/* 顶部导航栏 */
+.nav-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 44px;
+  background-color: #fff;
+  border-bottom: 1px solid #eee;
+  padding: 0 16px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+}
+
+.nav-back {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-title {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.nav-right {
+  width: 40px;
+}
+
+/* 物流信息区域 */
+.logistics-section {
+  margin-top: 0;
+  padding: 16px;
+  background-color: #fff;
+}
+
+/* 物流头部信息 */
+.logistics-header {
+  padding: 16px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.logistics-company-info,
+.logistics-number-info {
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+}
+
+.company-label,
+.number-label {
+  color: #666;
+  margin-right: 8px;
+}
+
+.company-name,
+.number-value {
+  color: #333;
+  font-weight: 500;
+}
+
+/* 物流进程区域 */
+.logistics-process-section {
+  margin-top: 16px;
+}
+
+.process-title {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 16px;
+}
+
+.process-list {
+  padding-left: 20px;
+  position: relative;
+}
+
+.process-item {
+  position: relative;
+  padding-bottom: 16px;
+}
+
+/* 连接线 */
+.process-line {
+  position: absolute;
+  left: -13px;
+  top: 24px;
+  bottom: 0;
+  width: 2px;
+  background-color: #eee;
+}
+
+/* 时间和位置 */
+.process-time-location {
+  position: relative;
+  padding-bottom: 8px;
+}
+
+.process-time-location::before {
+  content: '';
+  position: absolute;
+  left: -20px;
+  top: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #1989fa;
+}
+
+.process-time {
+  font-size: 12px;
+  color: #999;
+  margin-right: 12px;
+}
+
+.process-location {
+  font-size: 12px;
+  color: #666;
+  background-color: #f0f0f0;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* 描述 */
+.process-description {
+  font-size: 14px;
+  color: #333;
+  line-height: 1.5;
+}
+
+/* 无物流进程 */
+.no-process-section {
+  padding: 40px 0;
+  text-align: center;
+  color: #999;
+}
+
+/* 加载状态 */
+.loading-state {
+  margin-top: 44px;
+  padding: 40px 0;
+  text-align: center;
+  color: #666;
+}
+
+/* 错误状态 */
+.error-state {
+  margin-top: 44px;
+  padding: 40px 0;
+  text-align: center;
+}
+
+.error-text {
+  display: block;
+  margin-bottom: 16px;
+  color: #ff4d4f;
+}
+
+.retry-button {
+  margin-top: 16px;
+  background-color: #1989fa;
+  color: #fff;
+}
+
+.retry-button::after {
+  border: none;
+}

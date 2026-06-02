@@ -1,0 +1,177 @@
+<!--pages/commodity/goods/index.wxml-->
+<view class="goods-container">
+  <view class="loading-container" wx:if="{{loading}}">
+    <view class="spinner"></view>
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <view class="error-container" wx:if="{{error && !loading}}">
+    <text class="error-title">商品加载失败</text>
+    <button class="error-btn" bindtap="navigateBack">返回</button>
+  </view>
+
+  <view class="swiper-container" style="width: 100%; height: 750rpx;">
+    <swiper
+      indicator-dots="{{indicatorDots}}"
+      autoplay="{{autoplay}}"
+      interval="{{interval}}"
+      duration="{{duration}}"
+      current="{{currentSwiper}}"
+      bind:change="swiperChange"
+      indicator-active-color="#fff"
+      style="width: 100%; height: 100%; display: block; box-sizing: border-box; margin: 0; padding: 0">
+      <block wx:for="{{goodsImages}}" wx:key="index">
+        <swiper-item>
+          <image src="{{item}}" mode="aspectFill" class="swiper-image"></image>
+        </swiper-item>
+      </block>
+    </swiper>
+    <!-- 轮播图指示器覆盖层 -->
+    <view class="indicator-overlay">{{currentSwiper + 1}}/{{goodsImages.length}}</view>
+  </view>
+
+  <!-- 商品标题区域 -->
+  <view class="goods-title-container" style="margin-top: 0; position: relative; left: 0rpx; top: 0rpx">
+    <text class="goods-title">{{goodsTitle}}</text>
+    <text class="goods-subtitle">{{goodsSubtitle}}</text>
+  </view>
+
+  <!-- 商品价格区域 -->
+  <view class="goods-price-container" style="position: relative; left: 0rpx; top: 0rpx">
+    <view class="price-box">
+      <text class="current-price">¥{{currentPrice}}</text>
+      <!-- <text class="original-price">¥{{originalPrice}}</text> -->
+    </view>
+    <!-- <view class="discount-tags">
+      <text class="tag">2件9折</text>
+      <text class="tag">1件包邮</text>
+    </view> -->
+  </view>
+
+  <!-- 商品信息区域 -->
+  <view class="goods-info-container" style="position: relative; left: 0rpx; top: 0rpx">
+    <view class="info-item">
+      <text class="info-label">剩余库存:</text>
+      <text class="info-value">{{stock}}件</text>
+    </view>
+    <view class="info-item">
+      <text class="info-label">服务:</text>
+      <text class="info-value">{{serviceInfo}}</text>
+    </view>
+  </view>
+
+  <!-- 商品展示图片区域（纵向显示） -->
+  <view class="display-pictures-container" style="position: relative; left: 0rpx; top: 0rpx; margin-bottom: 20rpx;">
+    <view class="section-title">商品展示</view>
+    <block wx:if="{{displayPicturesList && displayPicturesList.length > 0}}">
+      <view wx:for="{{displayPicturesList}}" wx:key="index" class="display-picture-item">
+        <image src="{{item}}" mode="aspectFill" class="display-picture"></image>
+      </view>
+    </block>
+  </view>
+
+  <!-- 购买按钮区域 -->
+  <view class="buy-container">
+    <!-- 左侧图标按钮：客服、购物车 -->
+    <view class="left-buttons">
+      <view class="icon-btn" bindtap="contactService">
+        <image class="btn-icon" src="/images/to-kefu.png"></image>
+        <text class="btn-text">客服</text>
+      </view>
+      <view class="icon-btn" bindtap="goToCart">
+        <image class="btn-icon" src="/images/to-cart.png"></image>
+        <text class="btn-text">购物车</text>
+      </view>
+    </view>
+    
+    <!-- 右侧大按钮：感兴趣和下单 -->
+    <view class="right-buttons">
+      <button class="cart-btn" bindtap="openSelectModal" data-type="cart">感兴趣</button>
+      <button class="buy-btn" bindtap="openSelectModal" data-type="buy">下单</button>
+    </view>
+  </view>
+
+  <!-- 尺码颜色选择弹出层 -->
+  <view class="select-modal" wx:if="{{showSelectModal}}">
+    <view class="modal-overlay" bindtap="closeSelectModal"></view>
+    <view class="modal-content">
+      <view class="modal-header">
+        <text class="modal-title">选择商品规格</text>
+        <view class="close-btn" bindtap="closeSelectModal">×</view>
+      </view>
+      
+      <view class="modal-body">
+        <!-- 商品图片和价格显示区域 -->
+        <view class="modal-image-price-container">
+          <view class="modal-image-wrapper">
+            <image src="{{selectedColorImage || goodsImages[0] || '/images/products.png'}}" mode="aspectFill" class="modal-image"></image>
+          </view>
+          <view class="modal-info-wrapper">
+            <view class="modal-price-row">
+              <text class="modal-current-price">¥{{currentPrice}}</text>
+            </view>
+            <view class="modal-quantity-stock-row">
+              <view class="quantity-selector">
+                <text class="qty-btn" bindtap="decreaseQuantity">-</text>
+                <text class="qty-value">{{quantity}}</text>
+                <text class="qty-btn" bindtap="increaseQuantity">+</text>
+              </view>
+              <view class="modal-stock-info" wx:if="{{selectedSize && currentItemStock > 0}}">
+                <text class="stock-text">库存：{{currentItemStock}}件</text>
+              </view>
+            </view>
+          </view>
+        </view>
+        
+        <!-- 颜色选择 -->
+        <view class="select-section">
+          <text class="section-title">颜色</text>
+          <view class="color-options">
+            <block wx:if="{{items && items.length > 0}}">
+              <view wx:for="{{items}}" wx:key="index" class="color-item {{selectedColor === item.color ? 'selected' : ''}}" data-color="{{item.color}}" bindtap="selectColor">
+                <text>{{item.color}}</text>
+              </view>
+            </block>
+            <view wx:else>
+              <text class="select-tip">暂无颜色选项</text>
+            </view>
+          </view>
+        </view>
+        
+        <!-- 尺码选择 -->
+        <view class="select-section">
+          <text class="section-title">尺码</text>
+          <view class="size-options">
+            <view wx:if="{{!selectedColor}}">
+              <text class="select-tip">请先选择颜色</text>
+            </view>
+            <view wx:elif="{{selectedColor && items.length > 0}}">
+              <!-- 查找选中颜色的尺码，使用flex-wrap实现横向排列自动换行 -->
+              <block wx:for="{{items}}" wx:key="index" wx:for-item="colorItem">
+                <block wx:if="{{colorItem.color === selectedColor}}">
+                  <block wx:if="{{colorItem.sizes && colorItem.sizes.length > 0}}">
+                    <view class="size-grid">
+                      <view wx:for="{{colorItem.sizes}}" wx:key="id" wx:for-item="sizeItem" class="size-item {{selectedSize === sizeItem.size ? 'selected' : ''}}" data-size="{{sizeItem.size}}" bindtap="selectSize">
+                        <text>{{sizeItem.size}}</text>
+                      </view>
+                    </view>
+                  </block>
+                  <view wx:else>
+                    <text class="select-tip">该颜色暂无尺码选项</text>
+                  </view>
+                </block>
+              </block>
+            </view>
+          </view>
+        </view>
+      </view>
+      
+      <view class="modal-footer">
+        <button class="cancel-btn" bindtap="closeSelectModal">取消</button>
+        <button class="confirm-btn" bindtap="confirmSelect">
+          {{actionType === 'cart' ? '加入感兴趣的商品' : '下单'}}
+        </button>
+      </view>
+    </view>
+  </view>
+</view>

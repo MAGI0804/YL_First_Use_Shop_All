@@ -1,0 +1,31 @@
+<!--pages/accUser/index.wxml-->
+<view class="container">
+  <view class="content">
+    <view class="logo-section">
+      <image class="logo" src="/images/home.png" mode="aspectFit"></image>
+    </view>
+    
+    <view class="title-section">
+      <text class="title">幼岚星球</text>
+      <text class="subtitle">儿童成长奇妙世界</text>
+    </view>
+    
+    <view class="login-section">
+      <view class="login-btn" bindtap="getUserProfile">
+        <text class="btn-text">微信一键登录</text>
+      </view>
+    </view>
+    
+    <view class="agreement-section">
+      <view class="checkbox" bindtap="toggleAgreement">
+        <view class="checkbox-inner {{agreementChecked ? 'checked' : ''}}"></view>
+      </view>
+      <view class="agreement-text">
+        <text class="text">登录即代表您已同意</text>
+        <text class="link" bindtap="navigateToAgreement">用户协议</text>
+        <text class="text">和</text>
+        <text class="link" bindtap="navigateToPrivacy">隐私政策</text>
+      </view>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,109 @@
+/* pages/accUser/index.wxss */
+page {
+  min-height: 100vh;
+  background: #ffffff;
+}
+
+.login-page {
+  min-height: 100vh;
+  background: #ffffff;
+  padding: 150rpx 56rpx 48rpx;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.title-image {
+  width: 420rpx;
+  display: block;
+  margin-bottom: 120rpx;
+}
+
+.login-box {
+  width: 100%;
+}
+
+.login-btn {
+  width: 100%;
+  height: 92rpx;
+  line-height: 92rpx;
+  border-radius: 8rpx;
+  background: #4aa3f0;
+  color: #ffffff;
+  font-size: 31rpx;
+  font-weight: 600;
+  text-align: center;
+  padding: 0;
+  margin: 0;
+  border: none;
+}
+
+.login-btn::after {
+  border: none;
+}
+
+.login-btn:active {
+  background: #2f92df;
+}
+
+.agreement-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 26rpx;
+  width: 100%;
+}
+
+.checkbox-hit {
+  width: 44rpx;
+  height: 44rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.checkbox {
+  width: 28rpx;
+  height: 28rpx;
+  border-radius: 50%;
+  border: 2rpx solid #9ccdec;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.checkbox.checked {
+  background: #4aa3f0;
+  border-color: #4aa3f0;
+}
+
+.check-mark {
+  font-size: 20rpx;
+  line-height: 24rpx;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.agreement-copy {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  font-size: 24rpx;
+  line-height: 34rpx;
+  color: #8b99a6;
+}
+
+.agreement-text,
+.agreement-link {
+  font-size: 24rpx;
+  line-height: 34rpx;
+}
+
+.agreement-link {
+  color: #2287d5;
+}

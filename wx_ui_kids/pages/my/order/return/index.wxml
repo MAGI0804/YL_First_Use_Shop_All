@@ -1,0 +1,173 @@
+<!--pages/my/order/return/index.wxml-->
+<view class="return-container">
+  <!-- 页面头部 -->
+  <!-- <view class="page-header">
+    <text class="page-title">申请售后</text>
+  </view> -->
+
+  <!-- 订单信息 -->
+  <view class="order-info" wx:if="{{orderInfo}}">
+    <view class="order-header">
+      <text class="order-number">订单号：{{orderInfo.id}}</text>
+      <text class="order-status">{{orderInfo.statusText}}</text>
+    </view>
+    
+    <!-- 商品信息 -->
+    <view class="product-info">
+      <image class="product-image" src="{{orderInfo.products[0].image}}" mode="aspectFit"></image>
+      <view class="product-details">
+        <text class="product-name">{{orderInfo.products[0].name}}</text>
+        <view class="product-price-quantity">
+          <text class="product-price">¥{{orderInfo.products[0].price}}</text>
+          <text class="product-quantity">x{{orderInfo.products[0].quantity}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 售后类型选择 -->
+  <view class="form-section">
+    <text class="section-title">售后类型</text>
+    <view class="type-options">
+      <view 
+        wx:for="{{afterSalesTypes}}" 
+        wx:key="value" 
+        class="type-option {{selectedType === item.value ? 'active' : ''}}"
+        bindtap="selectType" 
+        data-value="{{item.value}}"
+      >
+        <text class="type-text">{{item.label}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 售后原因选择 -->
+  <view class="form-section">
+    <text class="section-title">售后原因</text>
+    <view class="reason-options">
+      <view 
+        wx:for="{{afterSalesReasons}}" 
+        wx:key="value" 
+        class="reason-option {{selectedReason === item.value ? 'active' : ''}}"
+        bindtap="selectReason" 
+        data-value="{{item.value}}"
+      >
+        <text class="reason-text">{{item.label}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 选择商品 -->
+  <view class="form-section" wx:if="{{orderInfo && orderInfo.products && orderInfo.products.length > 0}}">
+    <text class="section-title">选择商品</text>
+    <!-- 调试信息 -->
+    <!-- <view class="debug-info" style="padding: 10rpx; background: #f0f0f0; margin-bottom: 16rpx; font-size: 22rpx; color: #666;">
+      选中的商品ID: {{selectedProducts}}
+    </view> -->
+    <view class="product-list">
+      <view 
+        wx:for="{{orderInfo.products}}" 
+        wx:key="id" 
+        class="product-item"
+        catchtap="toggleProduct" 
+        data-id="{{item.id}}"
+      >
+        <image class="product-image" src="{{item.image}}" mode="aspectFit"></image>
+        <view class="product-details">
+          <text class="product-name">{{item.name}}</text>
+          <text class="product-price">¥{{item.price}}</text>
+        </view>
+        <!-- 复选框 -->
+        <view class="checkbox-container">
+          <view class="checkbox">
+            <block wx:if="{{productSelected[item.id]}}">
+              <view class="checkbox-inner checked">
+                <text class="checkbox-check">✓</text>
+              </view>
+            </block>
+            <block wx:else>
+              <view class="checkbox-inner"></view>
+            </block>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+  <!-- 商品列表为空时显示提示 -->
+  <view class="form-section" wx:else>
+    <text class="section-title">选择商品</text>
+    <view class="empty-product">
+      <text>暂无商品信息</text>
+    </view>
+  </view>
+
+  <!-- 问题描述 -->
+  <view class="form-section">
+    <text class="section-title">问题描述</text>
+    <textarea 
+      class="description-input" 
+      placeholder="请详细描述您遇到的问题" 
+      value="{{description}}" 
+      bindinput="inputDescription"
+      maxlength="200"
+    ></textarea>
+    <text class="description-count">{{description.length}}/200</text>
+  </view>
+
+  <!-- 图片上传 -->
+  <!-- <view class="form-section">
+    <text class="section-title">上传凭证（选填）</text>
+    <view class="image-uploader">
+      <view 
+        wx:for="{{uploadedImages}}" 
+        wx:key="index" 
+        class="uploaded-image"
+      >
+        <image src="{{item}}" mode="aspectFit"></image>
+        <view class="image-remove" bindtap="removeImage" data-index="{{index}}">
+          <text>×</text>
+        </view>
+      </view>
+      <view 
+        wx:if="{{uploadedImages.length < 5}}" 
+        class="upload-button" 
+        bindtap="chooseImage"
+      >
+        <text>+</text>
+        <text>添加图片</text>
+      </view>
+    </view>
+  </view> -->
+
+  <!-- 退货地址 -->
+  <view class="address-section" wx:if="{{orderStatus !== 'shipped'}}">
+    <view class="section-title">退货地址</view>
+    <view class="address-card" bindtap="selectAddress">
+      <view class="address-content" wx:if="{{selectedAddress.name}}">
+        <view class="address-header">
+          <text class="address-name">{{selectedAddress.name}}</text>
+          <text class="address-phone">{{selectedAddress.phone}}</text>
+        </view>
+        <text class="address-detail">{{selectedAddress.province}}{{selectedAddress.city}}{{selectedAddress.county}}{{selectedAddress.address}}</text>
+      </view>
+      <view class="address-placeholder" wx:else>
+        <text class="address-empty-tip">暂未获取到退货地址</text>
+        <text class="address-action-tip">请点击添加退货地址</text>
+      </view>
+      <view class="arrow-right">
+        <image src="/images/order_status.svg" mode="aspectFit"></image>
+      </view>
+    </view>
+  </view>
+
+  <!-- 提交按钮 -->
+  <view class="submit-section">
+    <button 
+      class="submit-button" 
+      bindtap="submitAfterSales"
+      disabled="{{!canSubmit}}"
+    >
+      提交申请
+    </button>
+  </view>
+</view>

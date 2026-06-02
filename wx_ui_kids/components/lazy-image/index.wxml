@@ -1,0 +1,9 @@
+<view class="lazy-image-container">
+  <image 
+    class="lazy-image {{loaded ? 'loaded' : ''}}" 
+    src="{{currentSrc}}" 
+    mode="{{mode}}"
+    bindload="onImageLoad"
+    binderror="onImageError"
+  />
+</view>

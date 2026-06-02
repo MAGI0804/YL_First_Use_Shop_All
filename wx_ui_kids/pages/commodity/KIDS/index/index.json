@@ -1,0 +1,6 @@
+{
+  "usingComponents": {},
+  "navigationBarTitleText": "商品展示",
+  "enablePullDownRefresh": false,
+  "backgroundTextStyle": "dark"
+}

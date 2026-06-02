@@ -1,0 +1,22 @@
+Sparse checkout examples for this monorepo.
+
+Frontend only:
+git clone --filter=blob:none --sparse https://github.com/MAGI0804/YL_First_Use_Shop_All.git
+cd YL_First_Use_Shop_All
+git sparse-checkout set Management_web_shop
+
+Backend only:
+git clone --filter=blob:none --sparse https://github.com/MAGI0804/YL_First_Use_Shop_All.git
+cd YL_First_Use_Shop_All
+git sparse-checkout set Member_Shop
+
+Mini program only:
+git clone --filter=blob:none --sparse https://github.com/MAGI0804/YL_First_Use_Shop_All.git
+cd YL_First_Use_Shop_All
+git sparse-checkout set wx_ui_kids
+
+Multiple parts:
+git sparse-checkout set Management_web_shop Member_Shop wx_ui_kids
+
+Return to full checkout:
+git sparse-checkout disable

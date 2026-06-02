@@ -1,0 +1,209 @@
+<!--pages/my/order/detail/index.wxml-->
+<view class="order-detail-container">
+  <!-- 顶部导航栏 -->
+  <!-- <view class="nav-bar">
+    <view class="nav-back" bindtap="navigateBack">
+      <text>返回</text>
+    </view>
+    <view class="nav-title">订单详情</view>
+    <view class="nav-right"></view>
+  </view> -->
+
+  <!-- 订单状态 -->
+  <view class="order-status-section" wx:if="{{!loading && orderDetail}}">
+    <view class="order-status-info">
+      <text class="order-status-text">{{orderDetail.statusText}}</text>
+      <text class="order-status-desc">
+        <text wx:if="{{orderDetail.status === 'pending'}}">等待商家处理</text>
+        <text wx:elif="{{orderDetail.status === 'shipped'}}">商品已发出，请耐心等待</text>
+        <text wx:elif="{{orderDetail.status === 'delivered'}}">商品已送达，感谢您的购买</text>
+        <text wx:elif="{{orderDetail.status === 'canceled'}}">订单已取消</text>
+        <text wx:elif="{{orderDetail.status === 'processing'}}">售后处理中</text>
+      </text>
+    </view>
+  </view>
+
+  <!-- 收货地址 -->
+  <view class="address-section" wx:if="{{!loading && orderDetail && orderDetail.address}}">
+    <view class="address-info">
+      <view class="address-header">
+        <text class="address-name">{{orderDetail.address.name}}</text>
+        <text class="address-phone">{{orderDetail.address.phone}}</text>
+      </view>
+      <text class="address-detail">{{orderDetail.address.address}}</text>
+    </view>
+  </view>
+
+  <!-- 商品列表 -->
+  <view class="product-section" wx:if="{{!loading && orderDetail && orderDetail.products.length > 0}}">
+    <view class="section-title">商品信息</view>
+    <view class="product-list">
+      <view class="product-item" wx:for="{{orderDetail.products}}" wx:key="id" bindtap="navigateToProductDetail" data-product-id="{{item.styleCode}}">
+        <image class="product-image" src="{{item.image}}" mode="aspectFit"></image>
+        <view class="product-info">
+          <text class="product-name">{{item.name}}</text>
+          <!-- 显示商品款式码和分类信息（如果有） -->
+          <text class="product-style" wx:if="{{item.styleCode}}">款式码：{{item.styleCode}}</text>
+          <text class="product-category" wx:if="{{item.category}}">分类：{{item.category}}</text>
+          <view class="product-price-quantity">
+            <text class="product-price">¥{{item.price}}</text>
+            <text class="product-quantity">x{{item.quantity}}</text>
+            <!-- 显示商品小计 -->
+            <text class="product-subtotal">小计：¥{{item.subtotal}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 物流信息入口 -->
+  <view class="logistics-section" 
+        wx:if="{{!loading && orderDetail && orderDetail.logistics && (orderDetail.status === 'shipped' || orderDetail.status === 'delivered' || orderDetail.status === 'processing')}}"
+        bindtap="navigateToLogisticsPage">
+    <view class="section-title">物流信息</view>
+    <view class="logistics-info">
+      <view class="logistics-company">
+        <text>快递公司：{{orderDetail.logistics.company}}</text>
+        <text>运单号：{{orderDetail.logistics.trackingNumber}}</text>
+      </view>
+      <view class="logistics-status">
+        <text>点击查看详细物流信息</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 订单信息 -->
+  <view class="order-info-section" wx:if="{{!loading && orderDetail}}">
+    <view class="section-title">订单信息</view>
+    <view class="info-list">
+      <view class="info-item">
+        <text class="info-label">订单编号</text>
+        <text class="info-value">{{orderDetail.orderNumber}}</text>
+      </view>
+      
+      <!-- 待处理状态：只显示下单时间 -->
+      <block wx:if="{{orderDetail.status === 'pending'}}">
+        <view class="info-item">
+          <text class="info-label">下单时间</text>
+          <text class="info-value">{{orderDetail.orderTime}}</text>
+        </view>
+      </block>
+      
+      <!-- 已发货状态：显示下单时间和发货时间 -->
+      <block wx:elif="{{orderDetail.status === 'shipped'}}">
+        <view class="info-item">
+          <text class="info-label">下单时间</text>
+          <text class="info-value">{{orderDetail.orderTime}}</text>
+        </view>
+        <view class="info-item" wx:if="{{orderDetail.shippedTime}}">
+          <text class="info-label">发货时间</text>
+          <text class="info-value">{{orderDetail.shippedTime}}</text>
+        </view>
+      </block>
+      
+      <!-- 已送达状态：显示下单时间、发货时间、完成时间 -->
+      <block wx:elif="{{orderDetail.status === 'delivered'}}">
+        <view class="info-item">
+          <text class="info-label">下单时间</text>
+          <text class="info-value">{{orderDetail.orderTime}}</text>
+        </view>
+        <view class="info-item" wx:if="{{orderDetail.shippedTime}}">
+          <text class="info-label">发货时间</text>
+          <text class="info-value">{{orderDetail.shippedTime}}</text>
+        </view>
+        <view class="info-item" wx:if="{{orderDetail.deliveredTime}}">
+          <text class="info-label">完成时间</text>
+          <text class="info-value">{{orderDetail.deliveredTime}}</text>
+        </view>
+      </block>
+      
+      <!-- 已取消状态：显示下单时间和取消时间 -->
+      <block wx:elif="{{orderDetail.status === 'canceled'}}">
+        <view class="info-item">
+          <text class="info-label">下单时间</text>
+          <text class="info-value">{{orderDetail.orderTime}}</text>
+        </view>
+        <view class="info-item" wx:if="{{orderDetail.canceledTime}}">
+          <text class="info-label">取消时间</text>
+          <text class="info-value">{{orderDetail.canceledTime}}</text>
+        </view>
+      </block>
+      
+      <!-- 售后中状态：显示下单时间、发货时间、售后发起时间 -->
+      <block wx:elif="{{orderDetail.status === 'processing'}}">
+        <view class="info-item">
+          <text class="info-label">下单时间</text>
+          <text class="info-value">{{orderDetail.orderTime}}</text>
+        </view>
+        <view class="info-item" wx:if="{{orderDetail.shippedTime}}">
+          <text class="info-label">发货时间</text>
+          <text class="info-value">{{orderDetail.shippedTime}}</text>
+        </view>
+        <view class="info-item" wx:if="{{orderDetail.processingTime}}">
+          <text class="info-label">售后发起时间</text>
+          <text class="info-value">{{orderDetail.processingTime}}</text>
+        </view>
+      </block>
+      
+      <!-- <view class="info-item">
+        <text class="info-label">支付方式</text>
+        <text class="info-value">{{orderDetail.paymentMethod}}</text>
+      </view> -->
+    </view>
+  </view>
+
+  <!-- 价格信息 -->
+  <view class="price-section" wx:if="{{!loading && orderDetail}}">
+    <view class="section-title">金额信息</view>
+    <view class="price-list">
+      <view class="price-item">
+        <text class="price-label">商品总价</text>
+        <text class="price-value">¥{{orderDetail.totalPrice}}</text>
+      </view>
+      <view class="price-item">
+        <text class="price-label">运费</text>
+        <text class="price-value">¥0.00</text>
+      </view>
+      <view class="price-item total">
+        <text class="price-label">实付金额</text>
+        <text class="price-value total-price">¥{{orderDetail.totalPrice}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 操作按钮 -->
+  <view class="action-buttons" wx:if="{{!loading && orderDetail}}">
+    <view class="action-group">
+      <button class="action-button secondary" bindtap="contactService">联系客服</button>
+      
+      <!-- 根据订单状态显示不同的操作按钮 -->
+      <block wx:if="{{orderDetail.status === 'pending'}}">
+        <button class="action-button secondary" bindtap="cancelOrder">取消订单</button>
+      </block>
+      
+      <block wx:elif="{{orderDetail.status === 'shipped'}}">
+        <button class="action-button primary" bindtap="confirmReceipt">确认收货</button>
+      </block>
+      
+      <block wx:elif="{{orderDetail.status === 'delivered' || orderDetail.status === 'processing'}}">
+        <button class="action-button secondary" bindtap="buyAgain">再次购买</button>
+        <button class="action-button primary" bindtap="applyAfterSale">申请售后</button>
+      </block>
+      
+      <block wx:elif="{{orderDetail.status === 'canceled'}}">
+        <button class="action-button primary" bindtap="buyAgain">再次购买</button>
+      </block>
+    </view>
+  </view>
+
+  <!-- 加载状态 -->
+  <view class="loading-state" wx:if="{{loading}}">
+    <text>加载中...</text>
+  </view>
+
+  <!-- 错误状态 -->
+  <view class="error-state" wx:if="{{!loading && !orderDetail}}">
+    <text>订单信息加载失败</text>
+    <button class="retry-button" bindtap="loadOrderDetail">重试</button>
+  </view>
+</view>

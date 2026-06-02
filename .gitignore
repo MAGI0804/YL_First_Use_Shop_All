@@ -6,6 +6,10 @@
 **/.env.*
 !**/.env.example
 
+# Documentation drafts
+*.md
+**/*.md
+
 # Dependencies
 node_modules/
 **/node_modules/
@@ -59,3 +63,6 @@ wx_ui_kids/pages/**/images/
 Management_web_shop/agent-skills/
 Management_web_shop/ui-ux-pro-max-skill/
 Management_web_shop/wx_file/
+
+# Backups of old nested repositories after monorepo flattening
+**/.git.repo-backup/

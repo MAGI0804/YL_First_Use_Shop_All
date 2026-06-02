@@ -1,0 +1,225 @@
+/* pages/my/index/index.wxss */
+
+/* 全局样式 */
+.my-container {
+  height: 100vh;
+  background-color: #f5f5f5;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 顶部用户信息区域 */
+.user-info-container {
+  background-color: #fff;
+  padding: 30rpx 20rpx;
+  display: flex;
+  align-items: center;
+  border-bottom: 1rpx solid #eee;
+}
+
+.avatar-container {
+  width: 140rpx;
+  height: 140rpx;
+  border-radius: 50%;
+  overflow: hidden;
+  margin-right: 30rpx;
+}
+
+.avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.user-info {
+  flex: 1;
+}
+
+.nickname {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #333;
+}
+
+.edit-btn {
+  color: #1989fa;
+  font-size: 30rpx;
+  padding: 0 20rpx;
+}
+
+/* 未登录状态 */
+.login-container {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #f5f5f5;
+}
+
+.login-btn {
+  width: 300rpx;
+  height: 80rpx;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 32rpx;
+  color: #fff;
+  background-color: #e64340;
+  border-radius: 40rpx;
+  border: none;
+  padding: 0;
+}
+
+.login-btn::after {
+  border: none;
+}
+
+/* 订单区域 */
+.order-section {
+  background-color: #fff;
+  margin-top: 20rpx;
+  border-radius: 20rpx;
+  overflow: hidden;
+}
+
+/* 订单标题区域 */
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 30rpx 20rpx;
+  border-bottom: 1rpx solid #eee;
+}
+
+.order-title {
+  font-size: 34rpx;
+  font-weight: bold;
+  color: #333;
+}
+
+.order-more {
+  display: flex;
+  align-items: center;
+  color: #999;
+}
+
+.order-more text {
+  font-size: 28rpx;
+  margin-right: 10rpx;
+}
+
+/* 订单状态分类列表 */
+.order-status-list {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 20rpx 0;
+}
+
+/* 订单状态项 */
+.order-status-item {
+  width: 20%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20rpx 0;
+}
+
+/* 状态图标基础样式 */
+.status-icon {
+  width: 80rpx;
+  height: 80rpx;
+  margin-bottom: 10rpx;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 16rpx;
+  font-weight: bold;
+}
+
+/* 文本图标样式 */
+.icon-text {
+  font-size: 28rpx;
+  color: #fff;
+  text-align: center;
+}
+
+/* 待发货状态样式 */
+.status-icon-pending {
+  background-color: #e64340;
+}
+
+/* 已发货状态样式 */
+.status-icon-shipped {
+  background-color: #faad14;
+}
+
+/* 已送达状态样式 */
+.status-icon-delivered {
+  background-color: #52c41a;
+}
+
+/* 已取消状态样式 */
+.status-icon-cancelled {
+  background-color: #999;
+}
+
+/* 售后中状态样式 */
+.status-icon-aftersale {
+  background-color: #1989fa;
+}
+
+.status-text {
+  font-size: 26rpx;
+  color: #333;
+}
+
+/* 功能列表 */
+.function-list {
+  flex: 1;
+  background-color: #fff;
+  margin-top: 20rpx;
+  border-radius: 20rpx;
+  overflow: hidden;
+}
+
+.function-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 30rpx 20rpx;
+  border-bottom: 1rpx solid #eee;
+}
+
+.function-item:last-child {
+  border-bottom: none;
+}
+
+.item-text {
+  font-size: 32rpx;
+  color: #333;
+}
+
+.arrow-icon {
+  color: #999;
+}
+
+/* 退出登录按钮 */
+.logout-btn {
+  width: calc(100% - 40rpx);
+  margin: 30rpx 20rpx;
+  height: 88rpx;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 32rpx;
+  color: #fff;
+  background-color: #4CA3FB;
+  border-radius: 0;
+  border: none;
+  padding: 0;
+  letter-spacing: 6rpx;
+}
+
+.logout-btn::after {
+  border: none;
+}

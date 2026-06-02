@@ -1,0 +1,92 @@
+<!--pages/accUser/privacy/index.wxml-->
+<view class="privacy-container">
+  <!-- 顶部导航栏 -->
+  <view class="nav-bar">
+    <view class="nav-back" bindtap="navigateBack">
+      <iconfont class="back-icon" name="back" size="36"/>
+    </view>
+    <view class="nav-title">{{type === 'privacy' ? '隐私政策' : '用户协议'}}</view>
+    <view class="nav-right"></view>
+  </view>
+
+  <!-- 内容区域 -->
+  <scroll-view class="content" scroll-y>
+    <view class="content-wrapper">
+      <!-- 隐私政策内容 -->
+      <view class="policy-content" wx:if="{{type === 'privacy'}}">
+        <!-- <view class="policy-header">
+          <text class="policy-title">隐私政策</text>
+          <text class="policy-update-time">更新时间：2024年6月1日</text>
+        </view> -->
+        
+        <view class="policy-section">
+          <text class="section-title">一、我们收集的信息</text>
+          <text class="section-content">我们收集的信息包括但不限于您提供的个人信息，如姓名、联系方式、地址等，以及您在使用我们服务过程中产生的信息，如浏览记录、购买记录等。</text>
+        </view>
+        
+        <view class="policy-section">
+          <text class="section-title">二、信息的使用</text>
+          <text class="section-content">我们会将收集的信息用于提供、维护和改进我们的服务，开发新功能和服务，以及保护我们的用户和服务的安全。</text>
+        </view>
+        
+        <view class="policy-section">
+          <text class="section-title">三、信息的共享</text>
+          <text class="section-content">我们不会向第三方出售您的个人信息，但可能会在以下情况下共享您的信息：获得您的明确同意；遵守法律法规要求；保护我们的权利、财产或安全。</text>
+        </view>
+        
+        <view class="policy-section">
+          <text class="section-title">四、信息的保护</text>
+          <text class="section-content">我们采取各种安全措施保护您的个人信息，包括技术措施、管理措施等，但互联网传输并非绝对安全，我们不能保证您信息的绝对安全。</text>
+        </view>
+        
+        <view class="policy-section">
+          <text class="section-title">五、您的权利</text>
+          <text class="section-content">您有权访问、更正或删除您的个人信息，也有权限制或反对我们处理您的个人信息，以及数据可携带权。</text>
+        </view>
+        
+        <view class="policy-section">
+          <text class="section-title">六、政策的更新</text>
+          <text class="section-content">我们可能会不时更新本隐私政策，更新后的政策将在我们的应用程序中发布，并在必要时通知您。</text>
+        </view>
+      </view>
+
+      <!-- 用户协议内容 -->
+      <view class="policy-content" wx:else>
+        <view class="policy-header">
+          <text class="policy-title">用户协议</text>
+          <text class="policy-update-time">更新时间：2024年6月1日</text>
+        </view>
+        
+        <view class="policy-section">
+          <text class="section-title">一、协议的接受</text>
+          <text class="section-content">通过注册、登录或使用我们的服务，您表示您已阅读并同意本用户协议的全部条款和条件。如果您不同意本协议，您应立即停止使用我们的服务。</text>
+        </view>
+        
+        <view class="policy-section">
+          <text class="section-title">二、账号注册与管理</text>
+          <text class="section-content">您需要提供真实、准确、完整的个人资料，并在资料变更时及时更新。您应妥善保管账号和密码，因账号安全问题导致的损失由您自行承担。</text>
+        </view>
+        
+        <view class="policy-section">
+          <text class="section-title">三、服务内容</text>
+          <text class="section-content">我们提供的服务包括但不限于儿童产品销售、会员服务、活动参与等。我们有权根据业务发展调整服务内容，并不时发布新功能和服务。</text>
+        </view>
+        
+        <view class="policy-section">
+          <text class="section-title">四、用户行为规范</text>
+          <text class="section-content">您在使用我们的服务时，不得违反法律法规、损害他人合法权益，不得干扰我们的服务正常运行，不得进行任何违法违规的活动。</text>
+        </view>
+        
+        <view class="policy-section">
+          <text class="section-title">五、知识产权</text>
+          <text class="section-content">我们拥有服务中使用的所有内容、技术和软件的知识产权，未经授权，您不得以任何方式使用、复制或传播。</text>
+        </view>
+        
+        <view class="policy-section">
+          <text class="section-title">六、协议的修改</text>
+          <text class="section-content">我们有权在必要时修改本协议，修改后的协议将在我们的应用程序中公布，您继续使用我们的服务表示您接受修改后的协议。</text>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+</view>

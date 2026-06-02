@@ -1,0 +1,123 @@
+/* pages/search/index.wxss */
+
+/* 整体容器 */
+.search-container {
+  padding: 20rpx;
+  background-color: #f5f5f5;
+  min-height: 100vh;
+}
+
+/* 搜索栏 */
+.search-bar {
+  display: flex;
+  align-items: center;
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 16rpx 20rpx;
+  margin-bottom: 30rpx;
+  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.05);
+}
+
+.search-input-group {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.search-icon {
+  width: 40rpx;
+  height: 40rpx;
+  margin-right: 20rpx;
+  opacity: 0.5;
+}
+
+.search-input {
+  flex: 1;
+  height: 60rpx;
+  font-size: 28rpx;
+  color: #333;
+}
+
+.clear-btn {
+  width: 60rpx;
+  height: 60rpx;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 32rpx;
+  color: #999;
+  position: absolute;
+  right: 20rpx;
+  border-radius: 50%;
+  transition: all 0.3s;
+}
+
+.clear-btn:active {
+  background-color: #f0f0f0;
+  transform: scale(0.95);
+}
+
+.cancel-btn {
+  font-size: 32rpx;
+  color: #333;
+  margin-left: 20rpx;
+}
+
+/* 搜索内容区域 */
+.search-content {
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 20rpx;
+  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.05);
+}
+
+.search-section {
+  margin-bottom: 30rpx;
+}
+
+.section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 28rpx;
+  color: #666;
+  margin-bottom: 20rpx;
+  padding-bottom: 10rpx;
+  border-bottom: 1rpx solid #eee;
+}
+
+.clear-history {
+  font-size: 26rpx;
+  color: #999;
+}
+
+.hot-tags, .history-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20rpx;
+}
+
+.tag {
+  display: inline-block;
+  padding: 16rpx 28rpx;
+  background-color: #f5f5f5;
+  border-radius: 60rpx;
+  font-size: 28rpx;
+  color: #333;
+}
+
+/* 搜索结果区域 */
+.search-result {
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 30rpx;
+  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.05);
+}
+
+.result-tip {
+  font-size: 28rpx;
+  color: #999;
+  text-align: center;
+  padding: 60rpx 0;
+}

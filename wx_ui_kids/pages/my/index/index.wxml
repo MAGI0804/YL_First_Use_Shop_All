@@ -1,0 +1,83 @@
+<!--pages/my/index/index.wxml-->
+<view class="my-container">
+  <!-- 顶部用户信息区域 -->
+  <view class="user-info-container" wx:if="{{isLogin}}">
+    <view class="avatar-container">
+      <image class="avatar" src="{{userInfo.user_img}}"></image>
+    </view>
+    <view class="user-info">
+      <text class="nickname">{{userInfo.nickname}}</text>
+    </view>
+    <view class="edit-btn" bindtap="navigateToEditProfile">
+      <text>编辑资料</text>
+    </view>
+  </view>
+
+  <!-- 未登录状态 -->
+  <view class="login-container" wx:else>
+    <button class="login-btn" bindtap="navigateToLogin">立即登录</button>
+  </view>
+
+  <!-- 订单区域 -->
+  <view class="order-section" wx:if="{{isLogin}}">
+    <!-- 全部订单 -->
+    <view class="order-header" bindtap="navigateToAllOrders">
+      <text class="order-title">我的订单</text>
+      <view class="order-more">
+        <text>查看全部订单</text>
+        <icon class="arrow-icon" type="arrowright" size="14"></icon>
+      </view>
+    </view>
+    
+    <!-- 订单状态分类 -->
+    <view class="order-status-list">
+      <view class="order-status-item" bindtap="navigateToOrderByStatus" data-status="待发货">
+        <view class="status-icon status-icon-pending">
+          <text class="icon-text">待发</text>
+        </view>
+        <text class="status-text">待发货</text>
+      </view>
+      <view class="order-status-item" bindtap="navigateToOrderByStatus" data-status="已发货">
+        <view class="status-icon status-icon-shipped">
+          <text class="icon-text">已发</text>
+        </view>
+        <text class="status-text">已发货</text>
+      </view>
+      <view class="order-status-item" bindtap="navigateToOrderByStatus" data-status="已送达">
+        <view class="status-icon status-icon-delivered">
+          <text class="icon-text">已达</text>
+        </view>
+        <text class="status-text">已送达</text>
+      </view>
+      <view class="order-status-item" bindtap="navigateToOrderByStatus" data-status="已取消">
+        <view class="status-icon status-icon-cancelled">
+          <text class="icon-text">已取</text>
+        </view>
+        <text class="status-text">已取消</text>
+      </view>
+      <view class="order-status-item" bindtap="navigateToOrderByStatus" data-status="售后中">
+        <view class="status-icon status-icon-aftersale">
+          <text class="icon-text">售后</text>
+        </view>
+        <text class="status-text">售后中</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 功能列表 -->
+  <view class="function-list" wx:if="{{isLogin}}">
+    <view class="function-item" bindtap="navigateToAddress">
+      <text class="item-text">地址管理</text>
+      <icon class="arrow-icon" type="arrowright" size="14"></icon>
+    </view>
+    <view class="function-item" bindtap="navigateToMessage">
+      <text class="item-text">我的消息</text>
+      <icon class="arrow-icon" type="arrowright" size="14"></icon>
+    </view>
+    <view class="function-item" bindtap="navigateToCustomerService">
+      <text class="item-text">联系客服</text>
+      <icon class="arrow-icon" type="arrowright" size="14"></icon>
+    </view>
+    <button class="logout-btn" bindtap="handleLogout">退出登录</button>
+  </view>
+</view>

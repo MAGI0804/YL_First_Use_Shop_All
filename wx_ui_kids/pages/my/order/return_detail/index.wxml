@@ -1,0 +1,180 @@
+<!--pages/my/order/return_detail/index.wxml-->
+<view class="order-detail-container">
+  
+  <!-- 售后订单状态 -->
+  <view class="order-status-section" wx:if="{{!loading && returnOrderInfo}}">
+    <view class="order-status-info">
+      <text class="order-status-text">{{returnOrderInfo.status_text}}</text>
+      <text class="order-status-desc">
+        <text wx:if="{{returnOrderInfo.status === 'pending'}}">等待商家处理</text>
+        <text wx:elif="{{returnOrderInfo.status === 'processing'}}">售后处理中</text>
+        <text wx:elif="{{returnOrderInfo.status === 'completed'}}">售后已完成</text>
+        <text wx:elif="{{returnOrderInfo.status === 'canceled'}}">售后已取消</text>
+      </text>
+    </view>
+  </view>
+
+  <!-- 售后收货地址 -->
+  <view class="address-section" wx:if="{{!loading && returnOrderInfo}}">
+    <view class="section-title">售后收货地址</view>
+    <view class="address-info">
+      <view class="address-header">
+        <text class="address-name">{{returnOrderInfo.buyer_name || '收货人'}}</text>
+        <text class="address-phone">{{returnOrderInfo.buyer_phone}}</text>
+      </view>
+      <text class="address-detail">{{returnOrderInfo.buyer_province}}{{returnOrderInfo.buyer_city}}{{returnOrderInfo.buyer_county}}{{returnOrderInfo.buyer_address}}</text>
+    </view>
+  </view>
+
+  <!-- 售后商品列表 -->
+  <view class="product-section" wx:if="{{!loading && returnOrderInfo && returnOrderInfo.products.length > 0}}">
+    <view class="section-title">售后商品信息</view>
+    <view class="product-list">
+      <view class="product-item" wx:for="{{returnOrderInfo.products}}" wx:key="id" bindtap="navigateToProductDetail" data-product-id="{{item.id}}">
+        <image class="product-image" src="{{item.image}}" mode="aspectFit"></image>
+        <view class="product-info">
+          <text class="product-name">{{item.name}}</text>
+          <view class="product-price-quantity">
+            <text class="product-price">¥{{item.price}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 售后物流信息 -->
+  <view class="logistics-section" wx:if="{{!loading && returnOrderInfo && (returnOrderInfo.express_company || returnOrderInfo.express_number)}}" bindtap="navigateToLogistics">
+    <view class="section-title">售后物流信息</view>
+    <view class="logistics-info">
+      <view class="logistics-company">
+        <text>快递公司：{{returnOrderInfo.express_company}}</text>
+        <text>运单号：{{returnOrderInfo.express_number}}</text>
+      </view>
+      <view class="logistics-status">
+        <text wx:if="{{returnOrderInfo.shipped_time}}">已发货时间：{{returnOrderInfo.shipped_time}}</text>
+        <text wx:else>待发货</text>
+        <text>点击查看详细物流信息</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 原订单物流信息 -->
+  <view class="logistics-section" wx:if="{{!loading && originalOrderInfo && (originalOrderInfo.express_company || originalOrderInfo.express_number)}}" bindtap="navigateToOriginalLogistics">
+    <view class="section-title">原订单物流信息</view>
+    <view class="logistics-info">
+      <view class="logistics-company">
+        <text>快递公司：{{originalOrderInfo.express_company}}</text>
+        <text>运单号：{{originalOrderInfo.express_number}}</text>
+      </view>
+      <view class="logistics-status">
+        <text>点击查看详细物流信息</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 售后信息 -->
+  <view class="order-info-section" wx:if="{{!loading && returnOrderInfo}}">
+    <view class="section-title">售后信息</view>
+    <view class="info-list">
+      <view class="info-item">
+        <text class="info-label">售后订单编号</text>
+        <text class="info-value">{{returnOrderInfo.return_id}}</text>
+      </view>
+      <view class="info-item">
+        <text class="info-label">售后类型</text>
+        <text class="info-value">{{returnOrderInfo.type_text}}</text>
+      </view>
+      <view class="info-item">
+        <text class="info-label">售后原因</text>
+        <text class="info-value">{{returnOrderInfo.reason}}</text>
+      </view>
+      <view class="info-item">
+        <text class="info-label">具体原因</text>
+        <text class="info-value">{{returnOrderInfo.specific_reasons || '无'}}</text>
+      </view>
+      <view class="info-item">
+        <text class="info-label">申请时间</text>
+        <text class="info-value">{{returnOrderInfo.request_time}}</text>
+      </view>
+      <view class="info-item" wx:if="{{returnOrderInfo.processing_time}}">
+        <text class="info-label">处理时间</text>
+        <text class="info-value">{{returnOrderInfo.processing_time}}</text>
+      </view>
+      <view class="info-item" wx:if="{{returnOrderInfo.shipped_time}}">
+        <text class="info-label">发货时间</text>
+        <text class="info-value">{{returnOrderInfo.shipped_time}}</text>
+      </view>
+      <view class="info-item" wx:if="{{returnOrderInfo.completed_time}}">
+        <text class="info-label">完成时间</text>
+        <text class="info-value">{{returnOrderInfo.completed_time}}</text>
+      </view>
+      <view class="info-item" wx:if="{{returnOrderInfo.canceled_time}}">
+        <text class="info-label">取消时间</text>
+        <text class="info-value">{{returnOrderInfo.canceled_time}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 原订单信息 -->
+  <view class="order-info-section" wx:if="{{!loading && originalOrderInfo}}">
+    <view class="section-title">原订单信息</view>
+    <view class="info-list">
+      <view class="info-item">
+        <text class="info-label">原订单编号</text>
+        <text class="info-value">{{originalOrderInfo.order_id}}</text>
+      </view>
+      <view class="info-item">
+        <text class="info-label">原订单状态</text>
+        <text class="info-value">{{originalOrderInfo.status_text}}</text>
+      </view>
+      <view class="info-item">
+        <text class="info-label">下单时间</text>
+        <text class="info-value">{{originalOrderInfo.order_time}}</text>
+      </view>
+      <view class="info-item" wx:if="{{originalOrderInfo.shipped_time}}">
+        <text class="info-label">发货时间</text>
+        <text class="info-value">{{originalOrderInfo.shipped_time}}</text>
+      </view>
+      <view class="info-item" wx:if="{{originalOrderInfo.delivered_time}}">
+        <text class="info-label">完成时间</text>
+        <text class="info-value">{{originalOrderInfo.delivered_time}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 原订单商品信息 -->
+  <view class="product-section" wx:if="{{!loading && originalOrderInfo && originalOrderInfo.products.length > 0}}">
+    <view class="section-title">原订单商品信息</view>
+    <view class="product-list">
+      <view class="product-item" wx:for="{{originalOrderInfo.products}}" wx:key="id" bindtap="navigateToProductDetail" data-product-id="{{item.id}}">
+        <image class="product-image" src="{{item.image}}" mode="aspectFit"></image>
+        <view class="product-info">
+          <text class="product-name">{{item.name}}</text>
+          <view class="product-price-quantity">
+            <text class="product-price">¥{{item.price}}</text>
+            <text class="product-quantity">x{{item.quantity || 1}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 操作按钮 -->
+  <view class="action-buttons" wx:if="{{!loading && returnOrderInfo}}">
+    <view class="action-group">
+      <button class="action-button secondary" bindtap="contactService">联系客服</button>
+      <!-- 可以根据售后订单状态添加其他操作按钮 -->
+    </view>
+  </view>
+
+  <!-- 加载状态 -->
+  <view class="loading-state" wx:if="{{loading}}">
+    <text>加载中...</text>
+  </view>
+
+  <!-- 错误状态 -->
+  <view class="error-state" wx:if="{{!loading && errorMessage}}">
+    <text>{{errorMessage}}</text>
+    <button class="retry-button" bindtap="retryRequest">重试</button>
+  </view>
+</view>

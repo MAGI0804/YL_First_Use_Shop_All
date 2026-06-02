@@ -1,0 +1,22 @@
+<!--pages/accUser/index.wxml-->
+<view class="login-page">
+  <image class="title-image" src="/images/title.jpg" mode="widthFix"></image>
+
+  <view class="login-box">
+    <button class="login-btn" bindtap="getUserProfile">微信登录</button>
+  </view>
+
+  <view class="agreement-row">
+    <view class="checkbox-hit" bindtap="toggleAgreement">
+      <view class="checkbox {{agreementChecked ? 'checked' : ''}}">
+        <text wx:if="{{agreementChecked}}" class="check-mark">✓</text>
+      </view>
+    </view>
+    <view class="agreement-copy">
+      <text class="agreement-text">同意</text>
+      <text class="agreement-link" catchtap="navigateToAgreement">《用户协议》</text>
+      <text class="agreement-text">和</text>
+      <text class="agreement-link" catchtap="navigateToPrivacy">《隐私政策》</text>
+    </view>
+  </view>
+</view>

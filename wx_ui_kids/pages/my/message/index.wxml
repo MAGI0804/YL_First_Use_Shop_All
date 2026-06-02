@@ -1,0 +1,50 @@
+<!--pages/my/message/index.wxml-->
+<view class="message-container">
+  <!-- 页面头部 -->
+  <!-- <view class="page-header">
+    <text class="page-title">我的消息</text>
+  </view> -->
+
+  <!-- 消息列表 -->
+  <view class="message-list">
+    <!-- 消息项 -->
+    <view 
+      wx:for="{{messageList}}" 
+      wx:key="id" 
+      class="message-item {{item.unread ? 'unread' : ''}}"
+      bindtap="viewMessageDetail"
+      data-id="{{item.id}}"
+    >
+      <!-- 消息图标 -->
+      <view class="message-icon {{item.type}}">
+        <text>{{item.icon}}</text>
+      </view>
+      
+      <!-- 消息内容 -->
+      <view class="message-content">
+        <view class="message-header">
+          <text class="message-title">{{item.title}}</text>
+          <text class="message-time">{{item.time}}</text>
+        </view>
+        <text class="message-desc">{{item.description}}</text>
+      </view>
+      
+      <!-- 未读标记 -->
+      <view class="unread-dot" wx:if="{{item.unread}}"></view>
+    </view>
+    
+    <!-- 空状态 -->
+    <view class="empty-state" wx:if="{{messageList.length === 0}}">
+      <image src="/images/home.png" class="empty-image" mode="aspectFit"></image>
+      <text class="empty-text">暂无消息</text>
+    </view>
+  </view>
+
+  <!-- 联系客服按钮 -->
+  <view class="customer-service-section">
+    <button class="customer-service-btn" bindtap="contactService">
+      <text class="btn-icon">💬</text>
+      <text class="btn-text">联系客服</text>
+    </button>
+  </view>
+</view>

@@ -1,0 +1,36 @@
+<!--index.wxml-->
+
+<view class="search-container" bindtap="onSearch">
+  <view class="search-box">
+    <icon type="search" size="14" class="search-icon"></icon>
+    <text class="search-placeholder">搜索商品、款号</text>
+    <view class="search-btn">搜索</view>
+  </view>
+</view>
+
+<scroll-view class="scrollarea" scroll-y type="list">
+  <view class="container">
+    <view class="state-container" wx:if="{{loading}}">
+      <view class="spinner"></view>
+      <text class="state-title">正在加载</text>
+      <text class="state-desc">为你整理最新活动</text>
+    </view>
+
+    <view class="state-container" wx:elif="{{error}}">
+      <text class="state-title">页面没有加载出来</text>
+      <text class="state-desc">网络有点慢，点一下重试</text>
+      <button class="retry-btn" bindtap="onRetry">重新加载</button>
+    </view>
+
+    <view class="state-container" wx:elif="{{imageList.length === 0}}">
+      <text class="state-title">暂无活动</text>
+      <text class="state-desc">可以先去童装分类逛逛</text>
+    </view>
+
+    <view class="image-list" wx:else>
+      <view class="image-item" wx:for="{{imageList}}" wx:key="id" bindtap="onImageTap" data-item="{{item}}">
+        <image src="{{item.image}}" mode="widthFix" lazy-load class="item-image"></image>
+      </view>
+    </view>
+  </view>
+</scroll-view>

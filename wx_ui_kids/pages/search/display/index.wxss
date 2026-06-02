@@ -1,0 +1,125 @@
+/* pages/search/display/index.wxss */
+
+/* 重置样式 */
+page {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  background-color: #f5f5f5;
+  height: 100%;
+}
+
+/* 空状态样式 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: calc(100vh - 120rpx);
+  padding: 40rpx;
+  text-align: center;
+}
+
+.empty-icon {
+  width: 200rpx;
+  height: 200rpx;
+  margin-bottom: 40rpx;
+  opacity: 0.5;
+}
+
+.empty-text {
+  font-size: 28rpx;
+  color: #999;
+}
+
+/* 搜索结果容器 */
+.search-results-container {
+  padding: 20rpx;
+  box-sizing: border-box;
+}
+
+/* 搜索头部 */
+.search-header {
+  padding: 20rpx 0;
+  margin-bottom: 20rpx;
+  border-bottom: 1rpx solid #eee;
+}
+
+.keyword {
+  font-size: 28rpx;
+  font-weight: bold;
+  color: #333;
+}
+
+.result-count {
+  font-size: 24rpx;
+  color: #999;
+  margin-left: 10rpx;
+}
+
+/* 商品列表 */
+.goods-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+/* 商品项 - 确保6个占一屏幕 */
+.goods-item {
+  background-color: #fff;
+  border-radius: 12rpx;
+  overflow: hidden;
+  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.05);
+  /* 计算高度：屏幕高度减去头部和间距，除以6 */
+  height: calc((100vh - 120rpx) / 6);
+  display: flex;
+  flex-direction: row;
+}
+
+/* 商品图片容器 */
+.goods-image-container {
+  width: 200rpx;
+  height: 100%;
+  flex-shrink: 0;
+}
+
+/* 商品图片 */
+.goods-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* 商品信息 */
+.goods-info {
+  flex: 1;
+  padding: 20rpx;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* 商品名称 */
+.goods-name {
+  font-size: 28rpx;
+  color: #333;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 商品价格 */
+.goods-price {
+  font-size: 32rpx;
+  color: #e64340;
+  font-weight: bold;
+}
+
+/* 加载提示 */
+.loading-tip {
+  padding: 40rpx 0;
+  text-align: center;
+  font-size: 28rpx;
+  color: #999;
+}

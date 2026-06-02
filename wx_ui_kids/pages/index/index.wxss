@@ -1,0 +1,135 @@
+/**index.wxss**/
+page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #f7fafc;
+}
+
+/* 搜索框样式 */
+.search-container {
+  padding: 18rpx 24rpx;
+  background-color: rgba(255, 255, 255, 0.96);
+  border-bottom: 1rpx solid #edf0f2;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  box-sizing: border-box;
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  background-color: #f4f8fb;
+  border-radius: 8rpx;
+  height: 72rpx;
+  padding: 0 22rpx;
+  border: 1rpx solid #d8e8f5;
+  box-sizing: border-box;
+}
+
+.search-icon {
+  color: #999;
+  margin-right: 10rpx;
+}
+
+.search-placeholder {
+  flex: 1;
+  min-width: 0;
+  font-size: 28rpx;
+  color: #7f8b96;
+}
+
+.search-btn {
+  font-size: 28rpx;
+  color: #1769aa;
+  margin-left: auto;
+  flex-shrink: 0;
+  text-align: right;
+  min-width: 72rpx;
+}
+
+/* 调整滚动区域样式，避免被搜索框遮挡 */
+.scrollarea {
+  margin-top: 108rpx;
+}
+.scrollarea {
+  flex: 1;
+  overflow-y: auto;
+}
+.container {
+  min-height: calc(100vh - 108rpx);
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.state-container {
+  min-height: calc(100vh - 108rpx);
+  padding: 80rpx 48rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.spinner {
+  width: 48rpx;
+  height: 48rpx;
+  border: 6rpx solid #d8e8f5;
+  border-left-color: #1769aa;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+  margin-bottom: 28rpx;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.state-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1f2933;
+  line-height: 1.5;
+}
+
+.state-desc {
+  margin-top: 10rpx;
+  font-size: 26rpx;
+  color: #7f8b96;
+  line-height: 1.5;
+}
+
+.retry-btn {
+  margin-top: 32rpx;
+  min-width: 220rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  border-radius: 8rpx;
+  background: #1769aa;
+  color: #fff;
+  font-size: 28rpx;
+}
+
+.retry-btn::after {
+  border: none;
+}
+.image-list {
+  width: 100%;
+  font-size: 0;
+  line-height: 0;
+}
+.image-item {
+  width: 100%;
+  overflow: hidden;
+  background-color: #eef5f8;
+}
+.item-image {
+  width: 100%;
+  display: block;
+  vertical-align: top;
+}

@@ -1,0 +1,13 @@
+GLOBAL.md
+OPEN_FLOW.md
+Wait_Complete.md
+.vs/
+.idea/
+Flow_file.md
+.media/
+media/
+staticfiles/
+.env
+.env.*
+!.env.example
+logs/

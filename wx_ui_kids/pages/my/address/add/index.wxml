@@ -1,0 +1,56 @@
+<!--pages/my/address/add/index.wxml-->
+<view class="address-form-container">
+  <!-- 导航栏 -->
+  <!-- <view class="nav-bar">
+    <view class="nav-left" bindtap="navigateBack">
+      <text class="nav-back-icon">←</text>
+    </view>
+    <view class="nav-title">{{isEdit ? '编辑地址' : '添加地址'}}</view>
+    <view class="nav-right"></view>
+  </view> -->
+
+  <!-- 表单 -->
+  <view class="form-content">
+    <!-- 收货人 -->
+    <view class="form-item">
+      <text class="form-label">收货人</text>
+      <input class="form-input" placeholder="请输入收货人姓名" value="{{addressData.consignee}}" bindinput="onConsigneeInput"/>
+    </view>
+
+    <!-- 手机号 -->
+    <view class="form-item">
+      <text class="form-label">手机号</text>
+      <input class="form-input {{phoneError ? 'input-error' : ''}}" type="number" placeholder="请输入手机号码" value="{{addressData.phone}}" bindinput="onPhoneInput" maxlength="11"/>
+      <text class="error-message" wx:if="{{phoneError}}">{{phoneErrorMessage}}</text>
+    </view>
+
+    <!-- 所在地区 - 使用原生地区选择器组件 -->
+    <view class="form-item">
+      <text class="form-label">所在地区</text>
+      <picker mode="region" bindchange="onRegionChange" value="{{regionArray}}" custom-item="" field="{{['province', 'city', 'county']}}">
+        <view class="region-value">
+          <text wx:if="{{addressData.province && addressData.city && addressData.district}}">
+            {{addressData.province}}{{addressData.city}}{{addressData.district}}
+          </text>
+          <text wx:else class="placeholder">请选择所在地区</text>
+        </view>
+        <text class="arrow-icon">→</text>
+      </picker>
+    </view>
+
+    <!-- 详细地址 -->
+    <view class="form-item">
+      <text class="form-label">详细地址</text>
+      <textarea class="form-textarea" placeholder="请输入详细地址信息" value="{{addressData.address}}" bindinput="onAddressInput" auto-height="true"/>
+    </view>
+
+    <!-- 设置默认地址 -->
+    <view class="form-item switch-item">
+      <text class="form-label">设为默认地址</text>
+      <switch checked="{{addressData.is_default}}" bindchange="onDefaultChange"/>
+    </view>
+
+    <!-- 保存按钮 -->
+    <view class="save-btn" bindtap="saveAddress">保存</view>
+  </view>
+</view>

@@ -1,0 +1,35 @@
+<!--pages/my/modify/index.wxml-->
+<view class="modify-container">
+  <!-- 导航栏 -->
+  <!-- <view class="nav-bar">
+    <text class="nav-title">{{nav.title}}</text>
+  </view> -->
+  
+  <!-- 头像上传区域 -->
+  <view class="avatar-container">
+    <view class="avatar-wrapper">
+      <image class="avatar" src="{{userInfo.avatarUrl || '/images/profile.png'}}" mode="aspectFill"></image>
+      <view class="avatar-upload" bindtap="uploadAvatar">
+        <text class="upload-text">更换头像</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 表单区域 -->
+  <view class="form-container">
+    <!-- 昵称 -->
+    <view class="form-item">
+      <view class="form-label">昵称</view>
+      <input class="form-input" model:value="{{userInfo.nickName}}" placeholder="请输入昵称" bindinput="onNickNameInput" />
+    </view>
+
+    <!-- 手机号 -->
+    <!-- <view class="form-item">
+      <view class="form-label">手机号</view>
+      <input class="form-input" model:value="{{userInfo.mobile}}" placeholder="请输入手机号" type="number" maxlength="11" bindinput="onMobileInput" />
+    </view> -->
+  </view>
+
+  <!-- 保存按钮 -->
+  <view class="save-btn" bindtap="saveUserInfo">保存修改</view>
+</view>

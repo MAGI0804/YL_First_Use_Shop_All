@@ -1,0 +1,122 @@
+/* pages/accUser/privacy/index.wxss */
+:root {
+  --primary: #4A90E2;
+  --primary-light: #6AA8F7;
+  --text-main: #333333;
+  --text-secondary: #666666;
+  --text-tertiary: #999999;
+  --white: #FFFFFF;
+  --background: #F7FAFC;
+  --border-color: #EEEEEE;
+}
+
+page {
+  background-color: var(--background);
+  min-height: 100vh;
+}
+
+/* 顶部导航栏 */
+.nav-bar {
+  width: 100%;
+  height: 90rpx;
+  background-color: var(--white);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 30rpx;
+  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.05);
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 999;
+  box-sizing: border-box;
+}
+
+.nav-back {
+  width: 60rpx;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.back-icon {
+  color: var(--text-main);
+}
+
+.nav-title {
+  font-size: 32rpx;
+  color: var(--text-main);
+  font-weight: 500;
+}
+
+.nav-right {
+  width: 60rpx;
+}
+
+/* 内容区域 */
+.content {
+  width: 100%;
+  min-height: 100vh;
+  padding-top: 90rpx;
+  box-sizing: border-box;
+}
+
+.content-wrapper {
+  width: 100%;
+  padding: 30rpx;
+  box-sizing: border-box;
+}
+
+/* 政策内容 */
+.policy-content {
+  background-color: var(--white);
+  border-radius: 20rpx;
+  padding: 40rpx;
+  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.05);
+}
+
+.policy-header {
+  margin-bottom: 40rpx;
+  padding-bottom: 30rpx;
+  border-bottom: 1rpx solid var(--border-color);
+}
+
+.policy-title {
+  display: block;
+  font-size: 40rpx;
+  font-weight: bold;
+  color: var(--text-main);
+  text-align: center;
+  margin-bottom: 20rpx;
+}
+
+.policy-update-time {
+  display: block;
+  font-size: 24rpx;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+/* 章节样式 */
+.policy-section {
+  margin-bottom: 30rpx;
+}
+
+.section-title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: bold;
+  color: var(--text-main);
+  margin-bottom: 16rpx;
+  line-height: 1.5;
+}
+
+.section-content {
+  display: block;
+  font-size: 28rpx;
+  color: var(--text-secondary);
+  line-height: 1.8;
+  margin-bottom: 20rpx;
+  text-indent: 56rpx;
+}

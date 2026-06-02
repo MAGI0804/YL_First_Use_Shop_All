@@ -1,0 +1,159 @@
+<!--pages/commodity/index/index.wxml-->
+
+<view class="search-container" bindtap="navigateToSearch">
+  <view class="search-box">
+    <icon type="search" size="14" class="search-icon"></icon>
+    <text class="search-placeholder">搜索童装、配饰、款号</text>
+    <view class="search-btn">搜索</view>
+  </view>
+</view>
+
+<view class="page-container">
+  <!-- 左侧类目导航 -->
+  <view class="category-container">
+    <!-- 已移除类目标题 -->
+    <view class="category-list">
+      <view
+        wx:for="{{categories}}"
+        wx:key="id"
+        class="category-item {{selectedCategory === item.name ? 'active' : ''}}"
+        data-category="{{item.name}}"
+        bindtap="onCategoryClick"
+      >
+        {{item.name}}
+      </view>
+    </view>
+  </view>
+
+  <!-- 右侧商品展示 -->
+  <view class="right-container">
+    <!-- 右侧顶部的二级菜单 -->
+    <view class="right-label-two-container">
+      <view class="label-two-header">
+        <view class="label-two-list">
+          <block wx:for="{{menuItems}}" wx:key="index">
+            <view wx:if="{{item.isSelected}}" class="label-two-item active" data-label="{{item.label}}" bindtap="onLabelTwoClick">
+              {{item.label}}
+            </view>
+            <view wx:else class="label-two-item" data-label="{{item.label}}" bindtap="onLabelTwoClick">
+              {{item.label}}
+            </view>
+          </block>
+        </view>
+        <view class="filter-button" bindtap="openFilterModal">
+          <text class="filter-text">筛选</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 筛选模态框 -->
+    <view class="filter-modal" wx:if="{{showFilterModal}}">
+      <view class="filter-mask" bindtap="closeFilterModal"></view>
+      <view class="filter-content">
+        <view class="filter-header">
+          <text class="filter-title">筛选条件</text>
+          <view class="close-button" bindtap="closeFilterModal">×</view>
+        </view>
+        
+        <!-- 可滚动的筛选内容 -->
+        <scroll-view class="filter-scroll-content" scroll-y="true">
+          <!-- 年份筛选 -->
+          <view class="filter-section">
+            <text class="filter-section-title">年份</text>
+            <view class="filter-options">
+              <block wx:for="{{filterItems.labelOne}}" wx:key="index">
+                <view wx:if="{{item.isSelected}}" class="filter-option active" bindtap="toggleLabelOne" data-item="{{item.label}}">
+                  {{item.label}}
+                </view>
+                <view wx:else class="filter-option" bindtap="toggleLabelOne" data-item="{{item.label}}">
+                  {{item.label}}
+                </view>
+              </block>
+            </view>
+          </view>
+          
+          <!-- 服装类型筛选 -->
+          <view class="filter-section">
+            <text class="filter-section-title">服装类型</text>
+            <view class="filter-options">
+              <block wx:for="{{filterItems.labelFour}}" wx:key="index">
+                <view wx:if="{{item.isSelected}}" class="filter-option active" bindtap="toggleLabelFour" data-item="{{item.label}}">
+                  {{item.label}}
+                </view>
+                <view wx:else class="filter-option" bindtap="toggleLabelFour" data-item="{{item.label}}">
+                  {{item.label}}
+                </view>
+              </block>
+            </view>
+          </view>
+          
+          <!-- 具体类别筛选 -->
+          <view class="filter-section">
+            <text class="filter-section-title">具体类别</text>
+            <view class="filter-options">
+              <block wx:for="{{filterItems.labelSeven}}" wx:key="index">
+                <view wx:if="{{item.isSelected}}" class="filter-option active" bindtap="toggleLabelSeven" data-item="{{item.label}}">
+                  {{item.label}}
+                </view>
+                <view wx:else class="filter-option" bindtap="toggleLabelSeven" data-item="{{item.label}}">
+                  {{item.label}}
+                </view>
+              </block>
+            </view>
+          </view>
+        </scroll-view>
+        
+        <!-- 底部按钮 -->
+        <view class="filter-footer">
+          <view class="reset-button" bindtap="resetFilters">重置</view>
+          <view class="confirm-button" bindtap="confirmFilters">确定</view>
+        </view>
+      </view>
+    </view>
+    
+    <scroll-view 
+      class="product-container" 
+      scroll-y="true"
+      enable-back-to-top="true"
+      bindrefresherrefresh="onPullDownRefresh"
+      refresher-enabled="true"
+      refresher-triggered="{{refresherTriggered}}"
+      refresher-background="#fff"
+      bindscrolltolower="onScrollToLower"
+    >
+    <!-- 加载状态 -->
+    <view class="loading-container" wx:if="{{loading}}">
+      <view class="spinner"></view>
+      <text class="loading-text">加载中...</text>
+    </view>
+
+    <!-- 错误状态 -->
+    <view class="error-container" wx:if="{{error && !loading}}">
+      <text class="error-text">加载失败</text>
+      <button class="retry-btn" bindtap="reloadCategories">重试</button>
+    </view>
+
+    <!-- 空状态 -->
+    <view class="empty-container" wx:if="{{!loading && !error && products.length === 0}}">
+      <text class="empty-text">暂无商品数据</text>
+    </view>
+
+    <!-- 商品列表 -->
+    <view class="product-list" wx:if="{{!loading && !error && products.length > 0}}">
+      <view class="product-item" wx:for="{{products}}" wx:key="style_code" bindtap="navigateToGoodsDetail" data-id="{{item.style_code}}">
+        <image class="product-image" src="{{item.imageUrl}}" mode="aspectFit" lazy-load></image>
+        <view class="product-info">
+          <view class="product-name">{{item.name}}</view>
+          <view class="product-price">¥{{item.price}}</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 加载更多 -->
+    <view class="load-more" wx:if="{{hasMore}}">
+      <view class="load-more-spinner" wx:if="{{loadingMore}}"></view>
+      <text class="load-more-text" wx:else>上拉加载更多</text>
+    </view>
+  </scroll-view>
+  </view>
+</view>

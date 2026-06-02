@@ -1,0 +1,40 @@
+<!--pages/search/index.wxml-->
+<view class="search-container">
+  <!-- 搜索栏 -->
+  <view class="search-bar">
+    <view class="search-input-group">
+      <image class="search-icon" src="/images/home.png" mode="aspectFit"></image>
+      <input class="search-input" placeholder="搜索商品" bindinput="onInputChange" value="{{searchValue}}" confirm-type="search" bindconfirm="onSearch"></input>
+      <view class="clear-btn" wx:if="{{searchValue}}" bindtap="clearSearch">×</view>
+    </view>
+    <text class="cancel-btn" bindtap="onCancel">取消</text>
+  </view>
+
+  <!-- 搜索内容区域 -->
+  <view class="search-content" wx:if="{{!searchValue}}">
+    <!-- 热门搜索 -->
+    <view class="search-section">
+      <view class="section-title">热门搜索</view>
+      <view class="hot-tags">
+        <text class="tag" wx:for="{{hotSearches}}" wx:key="index" bindtap="searchTag" data-keyword="{{item}}">{{item}}</text>
+      </view>
+    </view>
+
+    <!-- 搜索记录 -->
+    <view class="search-section" wx:if="{{searchHistory.length > 0}}">
+      <view class="section-title">
+        <text>搜索记录</text>
+        <text class="clear-history" bindtap="clearHistory">清除</text>
+      </view>
+      <view class="history-tags">
+        <text class="tag" wx:for="{{searchHistory}}" wx:key="index" bindtap="searchTag" data-keyword="{{item}}">{{item}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 搜索结果区域（这里只是占位，实际应用中会根据搜索内容显示结果） -->
+  <view class="search-result" wx:else>
+    <view class="result-tip">搜索结果: {{searchValue}}</view>
+    <!-- 这里会显示搜索结果列表 -->
+  </view>
+</view>

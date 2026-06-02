@@ -1,0 +1,47 @@
+<!--pages/activity/index/index.wxml-->
+<view class="activity-container">
+  <view class="loading-state" wx:if="{{loading}}">
+    <view class="loading-icon"></view>
+    <text>加载中...</text>
+  </view>
+
+  <view wx:else>
+    <view class="activity-banner">
+      <image 
+        wx:for="{{activityImages}}" 
+        wx:key="index" 
+        src="{{item}}" 
+        mode="widthFix" 
+        class="banner-image"
+      ></image>
+    </view>
+
+    <view class="product-section" wx:if="{{productList.length > 0}}">
+      <view class="section-title">精选商品</view>
+      <view class="product-grid">
+        <view 
+          class="product-item" 
+          wx:for="{{productList}}" 
+          wx:key="id"
+          bindtap="goProductDetail"
+          data-id="{{item.id}}"
+          data-style_code="{{item.style_code}}"
+        >
+          <image 
+            src="{{item.image}}" 
+            mode="aspectFill" 
+            class="product-image"
+          ></image>
+          <view class="product-info">
+            <view class="product-name">{{item.name}}</view>
+            <view class="product-price">¥{{item.price}}</view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="empty-state" wx:if="{{productList.length === 0}}">
+      <text>暂无商品</text>
+    </view>
+  </view>
+</view>

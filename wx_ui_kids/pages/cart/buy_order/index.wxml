@@ -1,0 +1,127 @@
+<!--pages/cart/buy_order/index.wxml-->
+<view class="order-container">
+  <!-- 页面标题 -->
+  <!-- <view class="nav-bar">
+    <view class="nav-title">确认订单</view>
+    <view class="nav-right">
+      <text class="clear-btn" bindtap="clearOrderContent">清空</text>
+    </view>
+  </view> -->
+
+  <!-- 地址选择区域 -->
+  <view class="address-section">
+    <view class="section-title">收货地址</view>
+    <view class="address-card" bindtap="selectAddress">
+      <view class="address-content" wx:if="{{address.name}}">
+        <view class="address-header">
+          <text class="address-name">{{address.name}}</text>
+          <text class="address-phone">{{address.phone}}</text>
+          <text wx:if="{{address.is_default}}" class="default-tag">默认</text>
+        </view>
+        <text class="address-detail">{{address.province}}{{address.city}}{{address.district}}{{address.detail}}</text>
+      </view>
+      <view class="address-placeholder" wx:else>
+        <text class="address-empty-tip">暂未获取到收货地址</text>
+        <text class="address-action-tip">请点击添加收货地址</text>
+      </view>
+      <view class="arrow-right">
+        <image src="/images/order_status.svg" mode="aspectFit"></image>
+      </view>
+    </view>
+  </view>
+
+  <!-- 商品信息区域 -->
+  <view class="goods-section">
+    <view class="section-title">商品信息</view>
+    <view class="goods-list">
+      <block wx:for="{{selectedItems}}" wx:key="id">
+        <view class="goods-item">
+          <!-- 商品图片 -->
+          <view class="goods-image">
+            <image src="{{item.image || '/images/products.png'}}" mode="aspectFill"></image>
+          </view>
+          
+          <!-- 商品详情 -->
+          <view class="goods-details">
+            <text class="goods-title">{{item.name}}</text>
+            <text class="goods-spec" wx:if="{{item.specification}}">{{item.specification}}</text>
+            <view class="goods-info-row">
+              <text class="goods-price">¥{{item.priceFormatted || '0.00'}}</text>
+              <text class="goods-quantity">x{{item.quantity}}</text>
+            </view>
+          </view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <!-- 价格信息区域 -->
+  <view class="price-section">
+    <view class="section-title">价格详情</view>
+    <view class="price-list">
+      <view class="price-item">
+        <text class="price-label">商品总价</text>
+        <text class="price-value">¥{{totalPriceFormatted || '0.00'}}</text>
+      </view>
+      <view class="price-item">
+        <text class="price-label">运费</text>
+        <text class="price-value">¥0.00</text>
+      </view>
+      <view class="price-item" wx:if="{{discount > 0}}">
+        <text class="price-label">优惠</text>
+        <text class="price-value discount">-¥{{discount.toFixed(2)}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 优惠券区域 -->
+  <view class="coupon-section">
+    <view class="coupon-row" bindtap="selectCoupon">
+      <text class="coupon-label">优惠券</text>
+      <view class="coupon-value">
+        <text class="coupon-text">{{coupon || '暂无可用'}}</text>
+        <image src="/images/order_status.svg" mode="aspectFit" class="arrow-right"></image>
+      </view>
+    </view>
+  </view>
+
+  <!-- 订单备注区域 -->
+  <view class="remark-section">
+    <view class="section-title">订单备注</view>
+    <input class="remark-input"
+           placeholder="选填，填写订单特殊需求"
+           placeholder-style="color:#999;"
+           maxlength="200"
+           bindinput="onRemarkInput"
+           value="{{remark}}"/>
+  </view>
+
+  <!-- 服务承诺区域 -->
+  <view class="service-section">
+    <view class="service-tags">
+      <view class="service-tag">
+        <image src="/images/cart-active.png" mode="aspectFit" class="service-icon"></image>
+        <text class="service-text">品质保证</text>
+      </view>
+      <view class="service-tag">
+        <image src="/images/cart-active.png" mode="aspectFit" class="service-icon"></image>
+        <text class="service-text">7天无理由</text>
+      </view>
+      <view class="service-tag">
+        <image src="/images/cart-active.png" mode="aspectFit" class="service-icon"></image>
+        <text class="service-text">售后无忧</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 底部结算栏 -->
+  <view class="bottom-bar">
+    <view class="total-price">
+      <text class="total-label">实付款：</text>
+      <text class="total-amount">¥{{finalPriceFormatted || '0.00'}}</text>
+    </view>
+    <button class="submit-btn" bindtap="submitOrder">
+      提交订单
+    </button>
+  </view>
+</view>

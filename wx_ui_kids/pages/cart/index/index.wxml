@@ -1,0 +1,75 @@
+<!--pages/cart/index/index.wxml-->
+<view class="cart-container">
+  <!-- 头部导航 -->
+  <view class="cart-header">
+    <view class="header-action" bindtap="editCart">
+      <text class="edit-text">{{isEditing ? '完成' : '编辑'}}</text>
+    </view>
+  </view>
+
+  <!-- 商品列表 -->
+  <view class="cart-items">
+    <block wx:if="{{cartItems.length > 0}}">
+      <!-- 全选 -->
+      <view class="select-all">
+        <view class="checkbox-wrapper" bindtap="toggleSelectAll">
+          <view class="checkbox {{isAllSelected ? 'checked' : ''}}">
+            <iconfont wx:if="{{isAllSelected}}" class="check-icon" name="checked" size="24"/>
+          </view>
+          <text class="select-all-text">全选</text>
+        </view>
+        <view class="delete-selected" wx:if="{{isEditing}}" bindtap="batchDelete">
+          <text class="delete-text">删除所选</text>
+        </view>
+      </view>
+
+      <!-- 商品项 -->
+      <view class="item-group" wx:for="{{cartItems}}" wx:key="id">
+        <view class="checkbox-wrapper" bindtap="toggleSelectItem" data-id="{{item.id}}">
+          <view class="checkbox {{item.selected ? 'checked' : ''}}">
+            <iconfont wx:if="{{item.selected}}" class="check-icon" name="checked" size="24"/>
+          </view>
+        </view>
+        <view class="item-content" bindtap="goToProductDetail" data-id="{{item.id}}" data-style_code="{{item.style_code}}">
+          <image class="item-image" src="{{item.image}}" mode="aspectFit"/>
+          <view class="item-info">
+            <text class="item-title">{{item.title}}</text>
+            <text class="item-spec">{{item.spec}}</text>
+            <view class="item-price-count">
+              <text class="item-price">¥{{item.priceFormatted}}</text>
+              <view class="item-count">
+                <view class="count-btn minus" catchtap="decreaseCount" data-id="{{item.id}}">-</view>
+                <text class="count-num">{{item.count}}</text>
+                <view class="count-btn plus" catchtap="increaseCount" data-id="{{item.id}}">+</view>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </block>
+
+    <!-- 空购物车提示 -->
+    <view class="empty-cart" wx:else>
+      <image class="empty-icon" src="../../../images/cart.png"/>
+      <text class="empty-text">购物车还是空的</text>
+      <text class="empty-subtext">快去挑选心仪的商品吧</text>
+      <navigator class="go-shopping" url="/pages/index/index">去逛逛</navigator>
+    </view>
+  </view>
+
+  <!-- 底部结算栏 -->
+  <view class="cart-footer" wx:if="{{cartItems.length > 0}}">
+    <view class="footer-left">
+      <view class="select-info">
+        <text class="total-text">合计：</text>
+        <text class="total-price">¥{{totalPriceFormatted}}</text>
+        <text class="selected-count">(已选{{selectedCount}}件)</text>
+      </view>
+    </view>
+    <view class="footer-right">
+      <button class="checkout-btn" bindtap="batchCheckout" disabled="{{selectedCount === 0}}">
+        下单
+      </button>
+    </view>
+  </view>
+</view>

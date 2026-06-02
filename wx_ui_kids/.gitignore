@@ -1,0 +1,36 @@
+# Windows
+[Dd]esktop.ini
+Thumbs.db
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+
+# Node.js
+node_modules/
+miniprogram_npm/
+
+# Environment and local config
+.env
+.env.*
+!.env.example
+
+# Build/compiler output
+dist/
+build/
+coverage/
+*.tsbuildinfo
+*.log
+
+# Local cloud/compiler metadata
+.cloudbase/
+.vscode/
+project.private.config.json
+
+# Static resources generated or maintained outside source
+images/
+pages/**/images/

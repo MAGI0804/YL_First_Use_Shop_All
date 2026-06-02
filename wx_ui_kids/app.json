@@ -1,0 +1,78 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/commodity/KIDS/index/index",
+    "pages/cart/index/index",
+    "pages/my/index/index",
+    "pages/search/index/index",
+    "pages/search/display/index",
+    "pages/accUser/index",
+    "pages/my/order/index",
+    "pages/my/message/index",
+    "pages/my/message_details/index",
+    "pages/my/address/index",
+    "pages/my/modify/index",
+    "pages/my/address/add/index",
+    "pages/my/address/edit/index",
+    "pages/my/order/detail/index",
+    "pages/my/order/return/index",
+    "pages/my/order/logistics/index",
+    "pages/my/order/return_detail/index",
+    "pages/accUser/privacy/index",
+    "pages/cart/buy_order/index",
+    "pages/commodity/Adult/index/index",
+    "pages/commodity/goods/index",
+    "pages/activity/index/index"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#fff",
+    "navigationBarTitleText": "幼岚星球",
+    "navigationBarTextStyle": "black"
+  },
+  "tabBar": {
+    "color": "#121212",
+    "selectedColor": "#121212",
+    "backgroundColor": "#fff",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页",
+        "iconPath": "images/home-f.png",
+        "selectedIconPath": "images/home.png"
+      },
+      {
+        "pagePath": "pages/commodity/KIDS/index/index",
+        "text": "童装",
+        "iconPath": "images/products.png",
+        "selectedIconPath": "images/mall.png"
+      },
+      {
+        "pagePath": "pages/commodity/Adult/index/index",
+        "text": "成人装",
+        "iconPath": "images/products.png",
+        "selectedIconPath": "images/mall.png"
+      },
+      {
+        "pagePath": "pages/cart/index/index",
+        "text": "感兴趣",
+        "iconPath": "images/products.png",
+        "selectedIconPath": "images/mall.png"
+      },
+      {
+        "pagePath": "pages/my/index/index",
+        "text": "我的",
+        "iconPath": "images/f-my.png",
+        "selectedIconPath": "images/my.png"
+      }
+    ]
+  },
+  "usingComponents": {
+    "lazy-image": "/components/lazy-image/index"
+  },
+  "requiredPrivateInfos": [
+    "chooseAddress"
+  ],
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

@@ -1,0 +1,102 @@
+/* pages/my/modify/index.wxss */
+/* 页面容器 */
+.modify-container {
+  padding-bottom: 80rpx;
+  background-color: #f8f8f8;
+  min-height: 100vh;
+}
+
+/* 导航栏 */
+.nav-bar {
+  height: 88rpx;
+  background-color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 2rpx solid #f0f0f0;
+  position: relative;
+}
+
+.nav-title {
+  font-size: 36rpx;
+  color: #333;
+  font-weight: 500;
+}
+
+/* 头像区域 */
+.avatar-container {
+  display: flex;
+  justify-content: center;
+  padding: 60rpx 0;
+  background-color: #fff;
+  margin-bottom: 20rpx;
+}
+
+.avatar-wrapper {
+  position: relative;
+}
+
+.avatar {
+  width: 180rpx;
+  height: 180rpx;
+  border-radius: 50%;
+  border: 4rpx solid #eee;
+}
+
+.avatar-upload {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 60rpx;
+  height: 60rpx;
+  background-color: #3CA5FA;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.1);
+}
+
+.upload-text {
+  color: #fff;
+  font-size: 20rpx;
+  line-height: 24rpx;
+}
+
+/* 表单区域 */
+.form-container {
+  background-color: #fff;
+  padding: 0 40rpx;
+}
+
+.form-item {
+  display: flex;
+  align-items: center;
+  padding: 30rpx 0;
+  border-bottom: 2rpx solid #f0f0f0;
+}
+
+.form-label {
+  width: 140rpx;
+  font-size: 28rpx;
+  color: #333;
+}
+
+.form-input {
+  flex: 1;
+  font-size: 28rpx;
+  color: #333;
+}
+
+/* 保存按钮 */
+.save-btn {
+  margin: 60rpx 40rpx 0;
+  height: 90rpx;
+  background-color: #3CA5FA;
+  color: #fff;
+  font-size: 32rpx;
+  text-align: center;
+  line-height: 90rpx;
+  border-radius: 45rpx;
+  box-shadow: 0 4rpx 20rpx rgba(60, 165, 250, 0.3);
+}

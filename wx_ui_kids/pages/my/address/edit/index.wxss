@@ -1,0 +1,129 @@
+/* pages/my/address/edit/index.wxss */
+.address-form-container {
+  background-color: #f8f8f8;
+  min-height: 100vh;
+  padding-bottom: 20rpx;
+}
+
+/* 导航栏 */
+.nav-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 90rpx;
+  background-color: #fff;
+  padding: 0 30rpx;
+  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.1);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+}
+
+.nav-left {
+  width: 60rpx;
+  height: 60rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-back-icon {
+  font-size: 40rpx;
+  color: #333;
+}
+
+.nav-title {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #333;
+}
+
+.nav-right {
+  width: 60rpx;
+}
+
+/* 表单内容 */
+.form-content {
+  margin-top: 100rpx;
+  background-color: #fff;
+  padding: 0 30rpx;
+}
+
+.form-item {
+  display: flex;
+  align-items: center;
+  padding: 30rpx 0;
+  border-bottom: 1rpx solid #eee;
+}
+
+.form-label {
+  width: 160rpx;
+  font-size: 30rpx;
+  color: #333;
+}
+
+.form-input {
+  flex: 1;
+  font-size: 30rpx;
+  color: #333;
+}
+
+.region-value {
+  flex: 1;
+  font-size: 30rpx;
+  color: #333;
+  display: flex;
+  align-items: center;
+}
+
+.placeholder {
+  color: #999;
+}
+
+.arrow-icon {
+  font-size: 30rpx;
+  color: #999;
+}
+
+.form-textarea {
+  flex: 1;
+  font-size: 30rpx;
+  color: #333;
+  min-height: 180rpx;
+}
+
+.switch-item {
+  justify-content: space-between;
+}
+
+.save-btn {
+  margin: 50rpx 30rpx;
+  height: 90rpx;
+  background-color: #FF6B6B;
+  border-radius: 45rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  color: #fff;
+  font-weight: bold;
+}
+
+.save-btn:active {
+  opacity: 0.8;
+}
+
+/* 错误提示样式 */
+.error-message {
+  color: #FF6B6B;
+  font-size: 26rpx;
+  margin-top: 10rpx;
+  margin-left: 160rpx;
+}
+
+/* 输入框错误状态样式 */
+.input-error {
+  border-color: #FF6B6B;
+}
