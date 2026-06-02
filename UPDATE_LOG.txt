@@ -10,3 +10,4 @@ Youlan Kids Shop update log
 - Documentation: progress is now also tracked in the development document under "更新进度记录".
 - Correction: order payment timing now matches the business flow. Orders enter pending/unpaid after creation, can ship before payment, and can only be marked paid after delivery.
 - Web operations: shipped orders can now be marked delivered from the order list before final payment confirmation.
+- Web operations: order detail now shows payment status, final payment amount, discount details, and allows final payment confirmation after delivery.

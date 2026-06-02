@@ -29,12 +29,19 @@
             <span class="label-text">下单时间</span>
             <span class="time-text">{{ orderData.order_time }}</span>
           </div>
+          <div v-if="canConfirmPayment" class="order-actions">
+            <el-button type="success" size="small" @click="confirmPayment">确认支付</el-button>
+          </div>
         </div>
 
         <div class="divider-line"></div>
 
         <!-- 订单状态和收货人信息 -->
         <div class="info-section">
+          <div class="info-item">
+            <span class="label-text">支付状态</span>
+            <el-tag :type="getPayStatusType(orderData.pay_status)" size="small">{{ getPayStatusText(orderData.pay_status) }}</el-tag>
+          </div>
           <div class="info-item">
             <span class="label-text">订单状态</span>
             <el-tag :type="getStatusType(orderData.status)" size="small">{{ getStatusText(orderData.status) }}</el-tag>
@@ -100,11 +107,19 @@
 
         <div class="divider-line"></div>
 
-        <!-- 金额信息 -->
+        <!-- 金额和支付信息 -->
         <div class="amount-section">
           <div class="amount-item">
-            <span>商品金额</span>
-            <span>¥{{ orderData.order_amount?.toFixed(2) || '0.00' }}</span>
+            <span>订单金额</span>
+            <span>¥{{ formatMoney(orderData.order_amount) }}</span>
+          </div>
+          <div class="amount-item">
+            <span>优惠金额</span>
+            <span>¥{{ formatMoney(orderData.discount_amount) }}</span>
+          </div>
+          <div v-if="orderData.discount_reason" class="amount-item">
+            <span>优惠原因</span>
+            <span>{{ orderData.discount_reason }}</span>
           </div>
           <div class="amount-item">
             <span>运费</span>
@@ -112,7 +127,15 @@
           </div>
           <div class="amount-item total">
             <span>实付金额</span>
-            <span>¥{{ orderData.order_amount?.toFixed(2) || '0.00' }}</span>
+            <span>¥{{ formatMoney(orderData.final_pay_amount || orderData.order_amount) }}</span>
+          </div>
+          <div v-if="orderData.payment_time" class="amount-item">
+            <span>支付时间</span>
+            <span>{{ orderData.payment_time }}</span>
+          </div>
+          <div v-if="orderData.payment_remark" class="amount-item">
+            <span>支付备注</span>
+            <span>{{ orderData.payment_remark }}</span>
           </div>
         </div>
       </el-card>
@@ -121,11 +144,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, DocumentCopy } from '@element-plus/icons-vue'
-import { queryOrderDetail, getToken, batchGetProducts } from '@/api'
+import { queryOrderDetail, getToken, batchGetProducts, confirmOrderPayment } from '@/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -133,6 +156,7 @@ const loading = ref(true)
 const orderData = ref<any>({})
 const productList = ref<string[]>([])
 const productMap = ref<Record<string, any>>({})
+const canConfirmPayment = computed(() => orderData.value.status === 'delivered' && orderData.value.pay_status !== 'paid')
 
 const copyOrderId = () => {
   if (orderData.value.order_id) {
@@ -150,7 +174,7 @@ const fetchOrderDetail = async () => {
     
     const requestParams = {
       order_id: orderId,
-      inquired_list: ['order_id', 'order_amount', 'product_list', 'province', 'city', 'county', 'detailed_address', 'status', 'remarks', 'order_time', 'receiver_phone', 'express_company', 'express_number'],
+      inquired_list: ['order_id', 'order_amount', 'final_pay_amount', 'discount_amount', 'discount_reason', 'pay_status', 'payment_time', 'payment_remark', 'product_list', 'province', 'city', 'county', 'detailed_address', 'status', 'remarks', 'order_time', 'receiver_phone', 'express_company', 'express_number'],
       shopname: 'youlan_kids'
     }
     console.log('请求参数:', requestParams)
@@ -204,13 +228,56 @@ const getStatusType = (status: string) => {
 
 const getStatusText = (status: string) => {
   const map: Record<string, string> = {
-    pending: '未发货',
+    pending: '待发货',
     shipped: '已发货',
-    delivered: '已送达',
+    delivered: '已签收',
     canceled: '已取消',
     processing: '售后中'
   }
   return map[status] || status
+}
+
+const getPayStatusType = (status: string) => {
+  const map: Record<string, string> = {
+    unpaid: 'warning',
+    paid: 'success',
+    partial_paid: 'primary'
+  }
+  return map[status] || 'info'
+}
+
+const getPayStatusText = (status: string) => {
+  const map: Record<string, string> = {
+    unpaid: '未支付',
+    paid: '已支付',
+    partial_paid: '部分支付'
+  }
+  return map[status] || status || '未支付'
+}
+
+const formatMoney = (value: number | string | undefined | null) => {
+  return Number(value || 0).toFixed(2)
+}
+
+const confirmPayment = async () => {
+  try {
+    await ElMessageBox.confirm(`订单 ${orderData.value.order_id} 已签收，确认已完成线下收款？`, '确认支付', {
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    await confirmOrderPayment({
+      order_id: orderData.value.order_id,
+      operator_id: 1,
+      payment_remark: '运营后台订单详情确认支付'
+    })
+    ElMessage.success('支付状态已确认')
+    fetchOrderDetail()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.msg || '确认支付失败')
+    }
+  }
 }
 
 onMounted(() => {
