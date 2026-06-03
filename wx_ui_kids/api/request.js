@@ -1,5 +1,5 @@
 const API_HOSTS = {
-  develop: 'http://localhost:3088',
+  develop: 'https://shop-test.youlankids.com',
   trial: 'https://shop-test.youlankids.com',
   release: 'https://snow-api.youlankids.com'
 }

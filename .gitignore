@@ -72,3 +72,7 @@ Management_web_shop/wx_file/
 Member_Shop/Dockerfile
 Member_Shop/docker-compose.yml
 Member_Shop/nginx.conf
+
+
+#证书文件
+Member_Shop/ssl
