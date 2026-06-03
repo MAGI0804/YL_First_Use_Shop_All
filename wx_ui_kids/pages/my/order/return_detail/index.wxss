@@ -262,6 +262,37 @@
   border: 1rpx solid #ddd;
 }
 
+.return-logistics-form {
+  width: 100%;
+  background-color: #fff;
+  padding: 30rpx;
+  margin-bottom: 20rpx;
+  box-sizing: border-box;
+}
+
+.logistics-input {
+  width: 100%;
+  height: 78rpx;
+  padding: 0 24rpx;
+  margin-top: 18rpx;
+  background-color: #f7f7f7;
+  border-radius: 8rpx;
+  font-size: 26rpx;
+  color: #333;
+  box-sizing: border-box;
+}
+
+.submit-logistics-button {
+  width: 100%;
+  height: 78rpx;
+  line-height: 78rpx;
+  margin-top: 22rpx;
+  background-color: #e64340;
+  color: #fff;
+  border-radius: 39rpx;
+  font-size: 28rpx;
+}
+
 /* 加载状态 */
 .loading-state {
   width: 100%;

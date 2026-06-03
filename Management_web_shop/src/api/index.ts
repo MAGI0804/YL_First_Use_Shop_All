@@ -565,6 +565,108 @@ export const setActivityDetail = (params: SetActivityDetailParams) => {
   return http.post<SetActivityDetailResponse>('/activity/set_has_activity_detail', params)
 }
 
+export interface ReturnOrderItem {
+  id: number
+  user_id: number
+  return_id: string
+  order_id: string
+  sub_order_id: string
+  product_list: string | any[]
+  type: string
+  status: string
+  express_company: string
+  express_number: string
+  reason: string
+  specific_reasons: string
+  buyer_province: string
+  buyer_city: string
+  buyer_county: string
+  buyer_address: string
+  buyer_phone: string
+  remarks: string
+  request_time: string
+  shipped_time: string
+  completed_time: string
+  canceled_time: string
+}
+
+export interface ReturnOrderQueryParams {
+  return_order_id?: string
+  order_id?: string
+  user_id?: number
+  status?: string
+  page: number
+  page_size: number
+}
+
+export interface ReturnOrderQueryResponse {
+  code: number
+  data: {
+    return_orders: ReturnOrderItem[]
+    total: number
+    page: number
+    page_size: number
+  }
+  msg: string
+}
+
+export interface ReturnOrderApproveParams {
+  return_order_id: string
+  approve_status: 'approved' | 'rejected'
+  user_id: number
+  remark?: string
+}
+
+export interface ReturnOrderReceiveParams {
+  return_order_id: string
+  user_id: number
+}
+
+export interface ReturnReasonRankItem {
+  reason: string
+  count: number
+}
+
+export interface ReturnOrderStatisticsParams {
+  begin_time?: string
+  end_time?: string
+}
+
+export interface ReturnOrderStatisticsData {
+  total_count: number
+  pending_count: number
+  completed_count: number
+  after_sale_rate: number
+  after_sale_amount: number
+  reason_rank: ReturnReasonRankItem[]
+  completed_orders: number
+  after_sale_orders: number
+}
+
+export interface ReturnOrderStatisticsResponse {
+  code: number
+  data: {
+    statistics: ReturnOrderStatisticsData
+  }
+  msg: string
+}
+
+export const queryReturnOrders = (params: ReturnOrderQueryParams) => {
+  return http.post<ReturnOrderQueryResponse>('/return_order/query', params)
+}
+
+export const approveReturnOrder = (params: ReturnOrderApproveParams) => {
+  return http.post('/return_order/approve', params)
+}
+
+export const receiveReturnOrder = (params: ReturnOrderReceiveParams) => {
+  return http.post('/return_order/receive', params)
+}
+
+export const queryReturnOrderStatistics = (params: ReturnOrderStatisticsParams) => {
+  return http.post<ReturnOrderStatisticsResponse>('/return_order/statistics', params)
+}
+
 export interface InventoryQueryParams {
   commodity_id?: string
   style_code?: string

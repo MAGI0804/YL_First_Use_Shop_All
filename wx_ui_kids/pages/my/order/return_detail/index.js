@@ -17,7 +17,9 @@ Page({
     // 原订单信息
     originalOrderInfo: null,
     // 错误信息
-    errorMessage: ''
+    errorMessage: '',
+    returnExpressCompany: '',
+    returnExpressNumber: ''
   },
 
   /**
@@ -92,6 +94,9 @@ Page({
           
           const statusMap = {
             'pending': '待处理',
+            'approved': '已通过',
+            'rejected': '已拒绝',
+            'buyer_shipped': '买家已寄回',
             'processing': '处理中',
             'completed': '已完成',
             'canceled': '已取消',
@@ -381,6 +386,79 @@ Page({
         icon: 'none'
       });
     }
+  },
+
+  inputReturnExpressCompany(e) {
+    this.setData({
+      returnExpressCompany: e.detail.value
+    });
+  },
+
+  inputReturnExpressNumber(e) {
+    this.setData({
+      returnExpressNumber: e.detail.value
+    });
+  },
+
+  submitReturnLogistics() {
+    const { returnOrderInfo, returnExpressCompany, returnExpressNumber } = this.data;
+    if (!returnOrderInfo || !returnOrderInfo.return_id) {
+      wx.showToast({
+        title: '售后单不存在',
+        icon: 'none'
+      });
+      return;
+    }
+    if (!returnExpressCompany || !returnExpressNumber) {
+      wx.showToast({
+        title: '请填写物流信息',
+        icon: 'none'
+      });
+      return;
+    }
+
+    const globalUserInfo = app.globalData.userInfo || {};
+    const userId = parseInt(globalUserInfo.user_id || app.globalData.user_id || wx.getStorageSync('user_id') || 0);
+    if (!userId) {
+      wx.showToast({
+        title: '请先登录',
+        icon: 'none'
+      });
+      return;
+    }
+
+    wx.showLoading({ title: '提交中...' });
+    app.req.post('/return_order/deliver', {
+      return_order_id: returnOrderInfo.return_id,
+      user_id: userId,
+      express_company: returnExpressCompany,
+      express_number: returnExpressNumber
+    }, (res) => {
+      wx.hideLoading();
+      if (res && res.code === 200) {
+        wx.showToast({
+          title: '已提交物流',
+          icon: 'success'
+        });
+        this.setData({
+          returnExpressCompany: '',
+          returnExpressNumber: ''
+        });
+        this.loadReturnOrderDetail();
+      } else {
+        wx.showToast({
+          title: res && res.msg ? res.msg : '提交失败',
+          icon: 'none'
+        });
+      }
+    }, (err) => {
+      wx.hideLoading();
+      console.error('提交售后物流失败:', err);
+      wx.showToast({
+        title: '网络请求失败',
+        icon: 'none'
+      });
+    });
   },
 
   /**

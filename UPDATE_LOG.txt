@@ -23,3 +23,6 @@ Youlan Kids Shop update log
 - Verification: go test ./... passed; npm run build passed.
 - Week 6 backend after-sales: added /return_order/statistics, after-sale rate/amount/reason ranking, and relaxed create-time buyer address validation for refund-only requests.
 - Week 6 tests: added after-sales statistics rate and time-range coverage.
+- Week 6 web after-sales: replaced mock after-sales data with real query, approve, receive, and statistics API integrations.
+- Week 6 mini program after-sales: moved after-sales creation to /return_order/create and added buyer return-logistics submission through /return_order/deliver.
+- Week 6 verification: go test ./... passed; npm run build passed; node --check passed for mini program after-sales pages.

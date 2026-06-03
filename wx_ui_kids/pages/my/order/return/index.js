@@ -504,7 +504,8 @@ Page({
       specific_reasons: this.data.description,
       type: selectedType,
       user_id: userId,
-      order_status: this.data.orderStatus
+      order_status: this.data.orderStatus,
+      product_ids: this.data.selectedProducts
     };
     
     // 对于退货和换货类型，添加地址信息
@@ -520,24 +521,31 @@ Page({
     console.log('提交售后申请，请求数据:', requestData);
     
     // 调用API提交售后申请
-    app.req.post('/order/request_return', requestData, (res) => {
+    app.req.post('/return_order/create', requestData, (res) => {
       wx.hideLoading();
       console.log('提交售后申请响应:', res);
       if (res && res.code === 200) {
+        const returnOrderId = res.data && res.data.return_order_id ? res.data.return_order_id : '';
         wx.showToast({
-          title: res.data && res.data.message ? res.data.message : '提交成功',
+          title: '提交成功',
           icon: 'success'
         });
         
-        // 跳转到订单详情页
+        // 跳转到售后详情页，展示审核和寄回进度
         setTimeout(() => {
-          wx.navigateTo({
-            url: `/pages/my/order/detail/index?id=${orderId}`
-          });
+          if (returnOrderId) {
+            wx.redirectTo({
+              url: `/pages/my/order/return_detail/index?returnOrderId=${returnOrderId}&orderId=${orderId}`
+            });
+          } else {
+            wx.navigateTo({
+              url: `/pages/my/order/detail/index?id=${orderId}`
+            });
+          }
         }, 1500);
       } else {
         wx.showToast({
-          title: res && res.data && res.data.message ? res.data.data.message : '提交失败',
+          title: res && res.msg ? res.msg : '提交失败',
           icon: 'none'
         });
       }

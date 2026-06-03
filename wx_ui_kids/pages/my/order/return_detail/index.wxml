@@ -58,6 +58,14 @@
     </view>
   </view>
 
+  <!-- 买家寄回物流填写 -->
+  <view class="return-logistics-form" wx:if="{{!loading && returnOrderInfo && returnOrderInfo.status === 'approved' && returnOrderInfo.type !== 'refund'}}">
+    <view class="section-title">填写寄回物流</view>
+    <input class="logistics-input" placeholder="物流公司" value="{{returnExpressCompany}}" bindinput="inputReturnExpressCompany" />
+    <input class="logistics-input" placeholder="物流单号" value="{{returnExpressNumber}}" bindinput="inputReturnExpressNumber" />
+    <button class="submit-logistics-button" bindtap="submitReturnLogistics">提交寄回物流</button>
+  </view>
+
   <!-- 原订单物流信息 -->
   <view class="logistics-section" wx:if="{{!loading && originalOrderInfo && (originalOrderInfo.express_company || originalOrderInfo.express_number)}}" bindtap="navigateToOriginalLogistics">
     <view class="section-title">原订单物流信息</view>
