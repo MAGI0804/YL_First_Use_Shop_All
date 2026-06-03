@@ -66,3 +66,9 @@ Management_web_shop/wx_file/
 
 # Backups of old nested repositories after monorepo flattening
 **/.git.repo-backup/
+
+
+#Docker
+Member_Shop/Dockerfile
+Member_Shop/docker-compose.yml
+Member_Shop/nginx.conf
