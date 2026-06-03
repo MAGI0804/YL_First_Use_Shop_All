@@ -1,0 +1,48 @@
+<view class="review-page">
+  <view class="product-card">
+    <view class="product-name">{{productName || '订单商品'}}</view>
+    <view class="product-meta">订单号：{{orderId}}</view>
+  </view>
+
+  <view class="form-section">
+    <view class="section-title">商品评分</view>
+    <view class="rating-row">
+      <text
+        wx:for="{{[1, 2, 3, 4, 5]}}"
+        wx:key="*this"
+        class="star {{rating >= item ? 'active' : ''}}"
+        data-rating="{{item}}"
+        bindtap="selectRating"
+      >★</text>
+    </view>
+  </view>
+
+  <view class="form-section">
+    <view class="section-title">评价标签</view>
+    <view class="tag-row">
+      <view
+        wx:for="{{tagOptions}}"
+        wx:key="*this"
+        class="tag-item {{selectedTags.indexOf(item) >= 0 ? 'selected' : ''}}"
+        data-tag="{{item}}"
+        bindtap="toggleTag"
+      >{{item}}</view>
+    </view>
+  </view>
+
+  <view class="form-section">
+    <view class="section-title">评价内容</view>
+    <textarea
+      class="content-input"
+      maxlength="500"
+      placeholder="写下商品体验、尺码、面料或服务感受"
+      value="{{content}}"
+      bindinput="inputContent"
+    />
+    <view class="content-count">{{content.length}}/500</view>
+  </view>
+
+  <view class="submit-bar">
+    <button class="submit-button" loading="{{submitting}}" bindtap="submitReview">提交评价</button>
+  </view>
+</view>

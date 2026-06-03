@@ -192,6 +192,8 @@ Page({
           // 调用商品详情API获取真实商品信息
           if (allProductIds.length > 0) {
             this.getProductDetails(allProductIds);
+          } else {
+            this.loadSubOrders();
           }
           
           // 不再自动处理物流信息，改为点击跳转查看
@@ -286,6 +288,7 @@ Page({
                 productCount: Object.values(productCountMap).reduce((sum, count) => sum + count, 0) // 重新计算商品总数
               }
             });
+            this.loadSubOrders();
           }
         } else {
           // 请求商品详情失败，在失败情况下也尝试合并相同商品
@@ -317,6 +320,7 @@ Page({
                 productCount: Object.values(productCountMap).reduce((sum, count) => sum + count, 0)
               }
             });
+            this.loadSubOrders();
           }
           
           // 显示提示
@@ -359,6 +363,7 @@ Page({
               productCount: Object.values(productCountMap).reduce((sum, count) => sum + count, 0)
             }
           });
+          this.loadSubOrders();
         }
         
         // 显示错误提示
@@ -368,6 +373,53 @@ Page({
         });
       }
     );
+  },
+
+  loadSubOrders() {
+    const { orderId, orderDetail } = this.data;
+    if (!orderId || !orderDetail || !Array.isArray(orderDetail.products)) {
+      return;
+    }
+
+    app.req.post('/order/query_sub_order_data', {
+      order_id: orderId
+    }, (res) => {
+      const subOrders = res && res.code === 200 && res.data && Array.isArray(res.data.sub_orders)
+        ? res.data.sub_orders
+        : [];
+      if (subOrders.length === 0) {
+        return;
+      }
+
+      const subOrderMap = {};
+      subOrders.forEach((subOrder) => {
+        const commodityId = (subOrder.commodity_id || '').toString();
+        if (commodityId && !subOrderMap[commodityId]) {
+          subOrderMap[commodityId] = subOrder;
+        }
+      });
+
+      const products = orderDetail.products.map((product) => {
+        const subOrder = subOrderMap[(product.id || '').toString()];
+        if (!subOrder) {
+          return product;
+        }
+        return {
+          ...product,
+          subOrderId: subOrder.sub_order_id,
+          reviewable: orderDetail.status === 'delivered' && subOrder.status === 'delivered'
+        };
+      });
+
+      this.setData({
+        orderDetail: {
+          ...orderDetail,
+          products
+        }
+      });
+    }, (err) => {
+      console.error('查询子订单失败:', err);
+    });
   },
   
   /**
@@ -418,6 +470,21 @@ Page({
         url: `/pages/commodity/goods/index?id=${productId}`
       });
     }
+  },
+
+  navigateToReview(e) {
+    const { productId, subOrderId, styleCode, productName } = e.currentTarget.dataset;
+    const { orderDetail } = this.data;
+    if (!productId || !subOrderId) {
+      wx.showToast({
+        title: '评价信息缺失',
+        icon: 'none'
+      });
+      return;
+    }
+    wx.navigateTo({
+      url: `/pages/my/order/review/index?orderId=${orderDetail.id}&subOrderId=${subOrderId}&commodityId=${productId}&styleCode=${styleCode || ''}&productName=${encodeURIComponent(productName || '')}`
+    });
   },
 
   /**

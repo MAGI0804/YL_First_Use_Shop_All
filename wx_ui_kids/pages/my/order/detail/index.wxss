@@ -187,6 +187,18 @@
   font-weight: bold;
 }
 
+.review-button {
+  width: 120rpx;
+  height: 56rpx;
+  line-height: 56rpx;
+  margin: 16rpx 0 0 auto;
+  padding: 0;
+  border-radius: 28rpx;
+  background-color: #e64340;
+  color: #fff;
+  font-size: 24rpx;
+}
+
 /* 物流信息区域 */
 .logistics-section {
   width: 100%;

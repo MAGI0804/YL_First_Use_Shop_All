@@ -52,6 +52,15 @@
             <!-- 显示商品小计 -->
             <text class="product-subtotal">小计：¥{{item.subtotal}}</text>
           </view>
+          <button
+            wx:if="{{item.reviewable}}"
+            class="review-button"
+            catchtap="navigateToReview"
+            data-product-id="{{item.id}}"
+            data-sub-order-id="{{item.subOrderId}}"
+            data-style-code="{{item.styleCode}}"
+            data-product-name="{{item.name}}"
+          >评价</button>
         </view>
       </view>
     </view>

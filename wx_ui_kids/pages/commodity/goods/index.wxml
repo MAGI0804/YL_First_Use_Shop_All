@@ -60,6 +60,37 @@
     </view>
   </view>
 
+  <!-- 商品评价 -->
+  <view class="reviews-container">
+    <view class="reviews-header">
+      <view>
+        <view class="section-title">商品评价</view>
+        <view class="reviews-summary" wx:if="{{reviewStats.total > 0}}">
+          <text>{{reviewStats.averageRating}} 分</text>
+          <text>好评率 {{reviewStats.goodRate}}%</text>
+          <text>{{reviewStats.total}} 条评价</text>
+        </view>
+      </view>
+    </view>
+    <view wx:if="{{reviewLoading}}" class="reviews-empty">评价加载中...</view>
+    <view wx:elif="{{productReviews.length === 0}}" class="reviews-empty">暂无已审核评价</view>
+    <view wx:else class="review-list">
+      <view wx:for="{{productReviews}}" wx:key="id" class="review-item">
+        <view class="review-top">
+          <text class="review-user">用户 {{item.user_id}}</text>
+          <text class="review-stars">{{item.displayRating}}</text>
+        </view>
+        <view class="review-content">{{item.content || '用户未填写评价内容'}}</view>
+        <view class="review-tags" wx:if="{{item.displayTags.length > 0}}">
+          <text wx:for="{{item.displayTags}}" wx:key="*this" wx:for-item="tag" class="review-tag">{{tag}}</text>
+        </view>
+        <view class="review-reply" wx:for="{{item.displayReplies}}" wx:key="id" wx:for-item="reply">
+          <text>商家回复：{{reply.content}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
   <!-- 商品展示图片区域（纵向显示） -->
   <view class="display-pictures-container" style="position: relative; left: 0rpx; top: 0rpx; margin-bottom: 20rpx;">
     <view class="section-title">商品展示</view>

@@ -50,7 +50,15 @@ Page({
     selectedCommodityId: '', // 选中的商品ID
     showSelectModal: false,  // 是否显示选择弹出层
     actionType: '',        // 操作类型：cart 或 buy
-    quantity: 1           // 选择的数量，默认为1
+    quantity: 1,           // 选择的数量，默认为1
+    currentStyleCode: '',
+    reviewStats: {
+      total: 0,
+      averageRating: '0.00',
+      goodRate: '0.00'
+    },
+    productReviews: [],
+    reviewLoading: false
   },
 
   /**
@@ -73,7 +81,11 @@ Page({
     if (options.id || options.style_code) {
       const goodsId = options.style_code || options.id;
       console.log('款式编码:', goodsId);
+      this.setData({
+        currentStyleCode: goodsId
+      });
       this.fetchGoodsDetail(goodsId);
+      this.loadProductReviews(goodsId);
     } else {
       this.setData({
         error: true,
@@ -533,6 +545,67 @@ Page({
     wx.switchTab({
       url: '/pages/cart/index/index'
     })
+  },
+
+  loadProductReviews(styleCode) {
+    if (!styleCode) {
+      return;
+    }
+    this.setData({ reviewLoading: true });
+
+    app.req.post('/review/statistics', {
+      style_code: styleCode
+    }, (res) => {
+      if (res && res.code === 200 && res.data && res.data.statistics) {
+        const stats = res.data.statistics;
+        this.setData({
+          reviewStats: {
+            total: stats.total || 0,
+            averageRating: Number(stats.average_rating || 0).toFixed(2),
+            goodRate: (Number(stats.good_rate || 0) * 100).toFixed(2)
+          }
+        });
+      }
+    }, (err) => {
+      console.error('查询评价统计失败:', err);
+    });
+
+    app.req.post('/review/query_by_product', {
+      style_code: styleCode,
+      page: 1,
+      page_size: 5
+    }, (res) => {
+      this.setData({ reviewLoading: false });
+      const reviews = res && res.code === 200 && res.data && Array.isArray(res.data.data)
+        ? res.data.data
+        : [];
+      this.setData({
+        productReviews: reviews.map((review) => ({
+          ...review,
+          displayRating: '★★★★★'.slice(0, Number(review.rating || 0)),
+          displayTags: this.parseReviewList(review.tags),
+          displayReplies: Array.isArray(review.replies) ? review.replies : []
+        }))
+      });
+    }, (err) => {
+      console.error('查询商品评价失败:', err);
+      this.setData({ reviewLoading: false });
+    });
+  },
+
+  parseReviewList(value) {
+    if (!value) {
+      return [];
+    }
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed.filter(Boolean).map(item => item.toString());
+      }
+    } catch (e) {
+      return value.split(',').map(item => item.trim()).filter(Boolean);
+    }
+    return [];
   },
 
   /**

@@ -15,6 +15,7 @@
     "pages/my/address/add/index",
     "pages/my/address/edit/index",
     "pages/my/order/detail/index",
+    "pages/my/order/review/index",
     "pages/my/order/return/index",
     "pages/my/order/logistics/index",
     "pages/my/order/return_detail/index",
