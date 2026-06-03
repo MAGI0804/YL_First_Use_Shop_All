@@ -12,41 +12,9 @@
           text-color="#ffffff"
           active-text-color="#87ceeb"
         >
-          <el-menu-item index="/dashboard">
-            <el-icon><DataAnalysis /></el-icon>
-            <span>数据总览</span>
-          </el-menu-item>
-          <el-menu-item index="/home-manage">
-            <el-icon><Document /></el-icon>
-            <span>主页管理</span>
-          </el-menu-item>
-          <el-menu-item index="/product">
-            <el-icon><Goods /></el-icon>
-            <span>商品管理</span>
-          </el-menu-item>
-          <el-menu-item index="/inventory">
-            <el-icon><Box /></el-icon>
-            <span>库存管理</span>
-          </el-menu-item>
-          <el-menu-item index="/order">
-            <el-icon><Document /></el-icon>
-            <span>订单管理</span>
-          </el-menu-item>
-          <el-menu-item index="/after-sales">
-            <el-icon><Service /></el-icon>
-            <span>售后中心</span>
-          </el-menu-item>
-          <el-menu-item index="/reviews">
-            <el-icon><ChatDotRound /></el-icon>
-            <span>评价管理</span>
-          </el-menu-item>
-          <el-menu-item index="/member">
-            <el-icon><UserFilled /></el-icon>
-            <span>会员管理</span>
-          </el-menu-item>
-          <el-menu-item index="/report">
-            <el-icon><PieChart /></el-icon>
-            <span>报表管理</span>
+          <el-menu-item v-for="item in visibleMenus" :key="item.path" :index="item.path">
+            <el-icon><component :is="item.icon" /></el-icon>
+            <span>{{ item.label }}</span>
           </el-menu-item>
         </el-menu>
       </el-aside>
@@ -60,7 +28,7 @@
             <el-dropdown @command="handleCommand">
               <span class="user-info">
                 <el-icon><User /></el-icon>
-                <span>管理员</span>
+                <span>{{ backendUser?.nickname || '管理员' }}</span>
               </span>
               <template #dropdown>
                 <el-dropdown-menu>
@@ -81,22 +49,39 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Box, ChatDotRound, DataAnalysis, Document, Goods, PieChart, User, UserFilled, Service } from '@element-plus/icons-vue'
+import { Box, ChatDotRound, DataAnalysis, Document, Goods, PieChart, Service, User, UserFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { clearBackendSession, getStoredBackendUser } from '@/api'
 
 const route = useRoute()
 const router = useRouter()
+const backendUser = ref(getStoredBackendUser())
+
+const menus = [
+  { path: '/dashboard', label: '数据总览', permission: 'dashboard', icon: DataAnalysis },
+  { path: '/home-manage', label: '主页管理', permission: 'home-manage', icon: Document },
+  { path: '/product', label: '商品管理', permission: 'product', icon: Goods },
+  { path: '/inventory', label: '库存管理', permission: 'inventory', icon: Box },
+  { path: '/order', label: '订单管理', permission: 'order', icon: Document },
+  { path: '/after-sales', label: '售后中心', permission: 'after-sales', icon: Service },
+  { path: '/reviews', label: '评价管理', permission: 'reviews', icon: ChatDotRound },
+  { path: '/member', label: '会员管理', permission: 'member', icon: UserFilled },
+  { path: '/report', label: '报表管理', permission: 'report', icon: PieChart },
+  { path: '/users', label: '账号管理', permission: 'users', icon: UserFilled }
+]
 
 const activeMenu = computed(() => route.path)
-
-const pageTitle = computed(() => {
-  return (route.meta.title as string) || '数据总览'
+const pageTitle = computed(() => (route.meta.title as string) || '数据总览')
+const visibleMenus = computed(() => {
+  const permissions = backendUser.value?.permissions || []
+  return menus.filter((item) => permissions.includes(item.permission))
 })
 
 const handleCommand = (command: string) => {
   if (command === 'logout') {
+    clearBackendSession()
     ElMessage.success('已退出登录')
     router.push('/login')
   } else if (command === 'profile') {

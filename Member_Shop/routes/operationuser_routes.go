@@ -2,6 +2,7 @@ package routes
 
 import (
 	"Member_shop/controllers"
+	"Member_shop/middleware"
 
 	"github.com/gin-gonic/gin"
 )
@@ -28,5 +29,15 @@ func InitOperationUserRoutes(router *gin.Engine) {
 		operationUserGroup.POST("/change_password", operationUserController.ChangePassword)
 		operationUserGroup.POST("/send_register_captcha", operationUserController.SendBackendRegisterCaptcha)
 		operationUserGroup.POST("/backend_register_by_phone", operationUserController.BackendRegisterByPhone)
+		operationUserGroup.POST("/backend_login", operationUserController.BackendLogin)
+
+		protectedBackendGroup := operationUserGroup.Group("/")
+		protectedBackendGroup.Use(middleware.BackendAuthMiddleware())
+		{
+			protectedBackendGroup.POST("/backend_me", operationUserController.BackendMe)
+			protectedBackendGroup.POST("/backend_invite_user", operationUserController.AddBackendUserInvite)
+			protectedBackendGroup.POST("/backend_users", operationUserController.QueryBackendUsers)
+			protectedBackendGroup.POST("/backend_update_status", operationUserController.UpdateBackendUserStatus)
+		}
 	}
 }

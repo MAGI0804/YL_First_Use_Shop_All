@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
+import { clearBackendSession, getStoredBackendUser, queryBackendMe, saveBackendSession } from '@/api'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -96,6 +97,12 @@ const routes: RouteRecordRaw[] = [
         name: 'Reviews',
         component: () => import('@/views/Reviews.vue'),
         meta: { title: '评价管理' }
+      },
+      {
+        path: 'users',
+        name: 'Users',
+        component: () => import('@/views/Users.vue'),
+        meta: { title: '账号管理', permission: 'users' }
       }
     ]
   },
@@ -110,9 +117,31 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
   if (to.meta.title) {
     document.title = to.meta.title as string
+  }
+  if (to.path === '/login' || to.path === '/forgot-password') {
+    next()
+    return
+  }
+  if (!localStorage.getItem('backend_token')) {
+    next('/login')
+    return
+  }
+  try {
+    const res = await queryBackendMe()
+    saveBackendSession(res.data.user)
+    const requiredPermission = to.meta.permission as string | undefined
+    if (requiredPermission && !res.data.user.permissions.includes(requiredPermission)) {
+      const fallback = getStoredBackendUser()?.permissions?.[0] || 'dashboard'
+      next(`/${fallback}`)
+      return
+    }
+  } catch {
+    clearBackendSession()
+    next('/login')
+    return
   }
   next()
 })

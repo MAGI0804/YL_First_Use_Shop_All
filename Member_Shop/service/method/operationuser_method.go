@@ -1,6 +1,7 @@
 package method
 
 import (
+	"Member_shop/config"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"Member_shop/db"
 	"Member_shop/models"
 	"Member_shop/requestbody"
+	"Member_shop/utils"
 
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -235,17 +237,32 @@ func RegisterBackendUserByPhone(req requestbody.BackendRegisterByPhoneRequest) (
 	if !IsValidMobile(req.Mobile) {
 		return nil, fmt.Errorf("手机号格式无效")
 	}
+	if len(req.Password) < 6 {
+		return nil, fmt.Errorf("password must be at least 6 characters")
+	}
 	if err := db.VerifyCaptcha(req.Mobile, req.Captcha); err != nil {
 		return nil, err
 	}
 
-	var existing models.BackendUser
-	err := db.DB.Where("mobile = ?", req.Mobile).First(&existing).Error
-	if err == nil {
-		return nil, fmt.Errorf("手机号已存在")
+	var backendUser models.BackendUser
+	err := db.DB.Where("mobile = ?", req.Mobile).First(&backendUser).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		isBootstrap, countErr := hasNoBackendUsers()
+		if countErr != nil {
+			return nil, countErr
+		}
+		if !isBootstrap {
+			return nil, fmt.Errorf("mobile has not been invited by an administrator")
+		}
 	}
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
+	}
+	if backendUser.ID != 0 && backendUser.Status == "disabled" {
+		return nil, fmt.Errorf("account is disabled")
+	}
+	if backendUser.ID != 0 && backendUser.Status == "active" && backendUser.Password != "" {
+		return nil, fmt.Errorf("account has already been activated")
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -253,15 +270,21 @@ func RegisterBackendUserByPhone(req requestbody.BackendRegisterByPhoneRequest) (
 		return nil, err
 	}
 
-	backendUser := models.BackendUser{
-		Nickname: req.Nickname,
-		Mobile:   req.Mobile,
-		Password: string(hashedPassword),
-		Role:     req.Role,
-		Level:    req.Level,
-		Remarks:  req.Remarks,
+	if backendUser.ID == 0 {
+		backendUser = models.BackendUser{
+			Nickname: "超级管理员",
+			Mobile:   req.Mobile,
+			Role:     "admin",
+			Level:    9,
+			Status:   "active",
+		}
 	}
-	if err := db.DB.Create(&backendUser).Error; err != nil {
+	if strings.TrimSpace(req.Nickname) != "" {
+		backendUser.Nickname = strings.TrimSpace(req.Nickname)
+	}
+	backendUser.Password = string(hashedPassword)
+	backendUser.Status = "active"
+	if err := db.DB.Save(&backendUser).Error; err != nil {
 		return nil, err
 	}
 	return &backendUser, nil
@@ -269,6 +292,209 @@ func RegisterBackendUserByPhone(req requestbody.BackendRegisterByPhoneRequest) (
 
 // VerificationResult 验证结果结构体
 // 包含用户ID、昵称、密码（加密后）
+// BackendUserSession is returned to the web app after login or token validation.
+type BackendUserSession struct {
+	ID           uint     `json:"id"`
+	OperatorNo   string   `json:"operator_no"`
+	Mobile       string   `json:"mobile"`
+	Nickname     string   `json:"nickname"`
+	Role         string   `json:"role"`
+	Level        int      `json:"level"`
+	Status       string   `json:"status"`
+	Permissions  []string `json:"permissions"`
+	Token        string   `json:"token,omitempty"`
+	RefreshToken string   `json:"refresh_token,omitempty"`
+}
+
+// BuildBackendUserSession converts a model into the stable web auth response.
+func BuildBackendUserSession(user *models.BackendUser, token, refreshToken string) BackendUserSession {
+	return BackendUserSession{
+		ID:           user.ID,
+		OperatorNo:   user.OperatorNo,
+		Mobile:       user.Mobile,
+		Nickname:     user.Nickname,
+		Role:         user.Role,
+		Level:        user.Level,
+		Status:       user.Status,
+		Permissions:  BackendUserPermissions(user),
+		Token:        token,
+		RefreshToken: refreshToken,
+	}
+}
+
+func BackendUserPermissions(user *models.BackendUser) []string {
+	base := []string{"dashboard", "home-manage", "product", "inventory", "order", "after-sales", "reviews", "member", "report"}
+	if IsBackendAdmin(user) {
+		return append(base, "users")
+	}
+	return base
+}
+
+func IsBackendAdmin(user *models.BackendUser) bool {
+	if user == nil {
+		return false
+	}
+	return user.Role == "admin" || user.Level >= 9
+}
+
+func AddBackendUserInvite(req requestbody.AddBackendUserInviteRequest) (*models.BackendUser, error) {
+	if !IsValidMobile(req.Mobile) {
+		return nil, fmt.Errorf("invalid mobile")
+	}
+	if strings.TrimSpace(req.Nickname) == "" {
+		return nil, fmt.Errorf("nickname is required")
+	}
+	var existing models.BackendUser
+	err := db.DB.Where("mobile = ?", req.Mobile).First(&existing).Error
+	if err == nil {
+		return nil, fmt.Errorf("mobile already exists")
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	role := strings.TrimSpace(req.Role)
+	if role == "" {
+		role = "operation"
+	}
+	level := req.Level
+	if level <= 0 {
+		level = 1
+	}
+	user := models.BackendUser{
+		Nickname: strings.TrimSpace(req.Nickname),
+		Mobile:   req.Mobile,
+		Password: "",
+		Role:     role,
+		Level:    level,
+		Status:   "pending",
+		Remarks:  req.Remarks,
+	}
+	if err := db.DB.Create(&user).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func CanSendBackendRegisterCaptcha(mobile string) error {
+	if !IsValidMobile(mobile) {
+		return fmt.Errorf("invalid mobile")
+	}
+	var user models.BackendUser
+	if err := db.DB.Where("mobile = ?", mobile).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			isBootstrap, countErr := hasNoBackendUsers()
+			if countErr != nil {
+				return countErr
+			}
+			if isBootstrap {
+				return nil
+			}
+			return fmt.Errorf("mobile has not been invited by an administrator")
+		}
+		return err
+	}
+	if user.Status == "disabled" {
+		return fmt.Errorf("account is disabled")
+	}
+	if user.Status == "active" && user.Password != "" {
+		return fmt.Errorf("account has already been activated")
+	}
+	return nil
+}
+
+func hasNoBackendUsers() (bool, error) {
+	var count int64
+	if err := db.DB.Model(&models.BackendUser{}).Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count == 0, nil
+}
+
+func BackendLogin(req requestbody.BackendLoginRequest) (*models.BackendUser, string, string, error) {
+	if !IsValidMobile(req.Mobile) {
+		return nil, "", "", fmt.Errorf("invalid mobile")
+	}
+	var user models.BackendUser
+	if err := db.DB.Where("mobile = ?", req.Mobile).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, "", "", fmt.Errorf("account not found")
+		}
+		return nil, "", "", err
+	}
+	if user.Status != "active" {
+		return nil, "", "", fmt.Errorf("account is not active")
+	}
+	if user.Password == "" {
+		return nil, "", "", fmt.Errorf("account has not been activated")
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+		return nil, "", "", fmt.Errorf("invalid password")
+	}
+	accessToken, refreshToken, err := utils.GenerateTokens(int(user.ID), config.LoadConfig())
+	if err != nil {
+		return nil, "", "", err
+	}
+	return &user, accessToken, refreshToken, nil
+}
+
+func QueryBackendUsers(req requestbody.QueryBackendUsersRequest) ([]models.BackendUser, int64, error) {
+	page := req.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	query := db.DB.Model(&models.BackendUser{})
+	if req.Mobile != "" {
+		query = query.Where("mobile LIKE ?", "%"+req.Mobile+"%")
+	}
+	if req.Status != "" {
+		query = query.Where("status = ?", req.Status)
+	}
+	if req.Role != "" {
+		query = query.Where("role = ?", req.Role)
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var users []models.BackendUser
+	if err := query.Order("created_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&users).Error; err != nil {
+		return nil, 0, err
+	}
+	return users, total, nil
+}
+
+func UpdateBackendUserStatus(req requestbody.UpdateBackendUserStatusRequest) (*models.BackendUser, error) {
+	if req.Status != "pending" && req.Status != "active" && req.Status != "disabled" {
+		return nil, fmt.Errorf("invalid status")
+	}
+	var user models.BackendUser
+	if err := db.DB.Where("id = ?", req.ID).First(&user).Error; err != nil {
+		return nil, err
+	}
+	if req.Status == "disabled" && IsBackendAdmin(&user) {
+		var activeAdminCount int64
+		if err := db.DB.Model(&models.BackendUser{}).
+			Where("status = ? AND (role = ? OR level >= ?)", "active", "admin", 9).
+			Count(&activeAdminCount).Error; err != nil {
+			return nil, err
+		}
+		if activeAdminCount <= 1 {
+			return nil, fmt.Errorf("cannot disable the last active administrator")
+		}
+	}
+	user.Status = req.Status
+	if err := db.DB.Save(&user).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 type VerificationResult struct {
 	UserID   string
 	Nickname string

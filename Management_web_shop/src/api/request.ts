@@ -13,6 +13,7 @@ interface AccessTokenResponse {
 class HttpRequest {
   private instance: AxiosInstance
   private token: string = ''
+  private backendToken: string = ''
 
   constructor() {
     this.instance = axios.create({
@@ -23,6 +24,7 @@ class HttpRequest {
       }
     })
     this.token = localStorage.getItem('access_token') || ''
+    this.backendToken = localStorage.getItem('backend_token') || ''
 
     this.instance.interceptors.request.use(
       (config) => {
@@ -31,6 +33,10 @@ class HttpRequest {
             ...config.params,
             access_token: this.token
           }
+        }
+        this.backendToken = localStorage.getItem('backend_token') || ''
+        if (this.backendToken && config.headers) {
+          ;(config.headers as any).Authorization = `Bearer ${this.backendToken}`
         }
         return config
       },
@@ -61,6 +67,11 @@ class HttpRequest {
             return Promise.reject(tokenError)
           }
         }
+        if (error.response?.status === 401 && !originalRequest?.url?.includes('/backend_login')) {
+          localStorage.removeItem('backend_token')
+          localStorage.removeItem('backend_refresh_token')
+          localStorage.removeItem('backend_user')
+        }
         
         return Promise.reject(error)
       }
@@ -81,6 +92,18 @@ class HttpRequest {
       console.error('获取token失败:', error)
       throw error
     }
+  }
+
+  setBackendToken(token: string) {
+    this.backendToken = token
+    localStorage.setItem('backend_token', token)
+  }
+
+  clearBackendToken() {
+    this.backendToken = ''
+    localStorage.removeItem('backend_token')
+    localStorage.removeItem('backend_refresh_token')
+    localStorage.removeItem('backend_user')
   }
 
   async get<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {

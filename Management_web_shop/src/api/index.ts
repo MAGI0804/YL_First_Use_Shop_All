@@ -8,6 +8,103 @@ export const login = (username: string, password: string) => {
   return http.post('/login', { username, password })
 }
 
+export interface BackendUserSession {
+  id: number
+  operator_no: string
+  mobile: string
+  nickname: string
+  role: string
+  level: number
+  status: 'pending' | 'active' | 'disabled'
+  permissions: string[]
+  token?: string
+  refresh_token?: string
+}
+
+export interface BackendAuthResponse {
+  code: number
+  data: {
+    user: BackendUserSession
+  }
+  msg: string
+}
+
+export const backendLogin = (params: { mobile: string; password: string }) => {
+  return http.post<BackendAuthResponse>('/OperationUser/backend_login', params)
+}
+
+export const sendBackendRegisterCaptcha = (params: { mobile: string }) => {
+  return http.post('/OperationUser/send_register_captcha', params)
+}
+
+export const backendRegisterByPhone = (params: { mobile: string; password: string; captcha: string }) => {
+  return http.post<BackendAuthResponse>('/OperationUser/backend_register_by_phone', params)
+}
+
+export const queryBackendMe = async () => {
+  await http.getToken()
+  return http.post<BackendAuthResponse>('/OperationUser/backend_me')
+}
+
+export interface BackendUserQueryParams {
+  mobile?: string
+  status?: string
+  role?: string
+  page: number
+  page_size: number
+}
+
+export interface BackendUserQueryResponse {
+  code: number
+  data: {
+    items: BackendUserSession[]
+    total: number
+    page: number
+    page_size: number
+  }
+  msg: string
+}
+
+export const queryBackendUsers = (params: BackendUserQueryParams) => {
+  return http.post<BackendUserQueryResponse>('/OperationUser/backend_users', params)
+}
+
+export const inviteBackendUser = (params: { mobile: string; nickname: string; role?: string; level?: number; remarks?: string }) => {
+  return http.post<BackendAuthResponse>('/OperationUser/backend_invite_user', params)
+}
+
+export const updateBackendUserStatus = (params: { id: number; status: 'pending' | 'active' | 'disabled' }) => {
+  return http.post<BackendAuthResponse>('/OperationUser/backend_update_status', params)
+}
+
+export const saveBackendSession = (session: BackendUserSession) => {
+  if (session.token) {
+    http.setBackendToken(session.token)
+  }
+  if (session.refresh_token) {
+    localStorage.setItem('backend_refresh_token', session.refresh_token)
+  }
+  localStorage.setItem('backend_user', JSON.stringify({
+    ...session,
+    token: undefined,
+    refresh_token: undefined
+  }))
+}
+
+export const getStoredBackendUser = (): BackendUserSession | null => {
+  const value = localStorage.getItem('backend_user')
+  if (!value) return null
+  try {
+    return JSON.parse(value) as BackendUserSession
+  } catch {
+    return null
+  }
+}
+
+export const clearBackendSession = () => {
+  http.clearBackendToken()
+}
+
 export interface OrderQueryParams {
   page: number
   page_size: number

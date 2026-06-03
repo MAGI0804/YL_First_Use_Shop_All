@@ -39,9 +39,39 @@ type SendBackendRegisterCaptchaRequest struct {
 type BackendRegisterByPhoneRequest struct {
 	Mobile   string `json:"mobile" binding:"required"`
 	Captcha  string `json:"captcha" binding:"required"`
-	Nickname string `json:"nickname" binding:"required"`
 	Password string `json:"password" binding:"required"`
+	Nickname string `json:"nickname"`
 	Role     string `json:"role"`
 	Level    int    `json:"level"`
 	Remarks  string `json:"remarks"`
+}
+
+// BackendLoginRequest logs a backend staff account in with mobile and password.
+type BackendLoginRequest struct {
+	Mobile   string `json:"mobile" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+// AddBackendUserInviteRequest creates a pending backend account that can be activated by SMS.
+type AddBackendUserInviteRequest struct {
+	Mobile   string `json:"mobile" binding:"required"`
+	Nickname string `json:"nickname" binding:"required"`
+	Role     string `json:"role"`
+	Level    int    `json:"level"`
+	Remarks  string `json:"remarks"`
+}
+
+// QueryBackendUsersRequest filters backend staff accounts.
+type QueryBackendUsersRequest struct {
+	Mobile   string `json:"mobile"`
+	Status   string `json:"status"`
+	Role     string `json:"role"`
+	Page     int    `json:"page"`
+	PageSize int    `json:"page_size"`
+}
+
+// UpdateBackendUserStatusRequest changes a backend account status.
+type UpdateBackendUserStatusRequest struct {
+	ID     uint   `json:"id" binding:"required"`
+	Status string `json:"status" binding:"required"`
 }

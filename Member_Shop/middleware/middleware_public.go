@@ -3,11 +3,13 @@ package middleware
 import (
 	"Member_shop/config"
 	"Member_shop/db"
+	"Member_shop/models"
 	"Member_shop/service/msg"
 	"Member_shop/utils"
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -72,6 +74,60 @@ func JWTAuthMiddleware() gin.HandlerFunc {
 	}
 }
 
+// BackendAuthMiddleware validates the backend staff JWT used by the web admin app.
+func BackendAuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) != 2 || parts[0] != "Bearer" || strings.TrimSpace(parts[1]) == "" {
+			c.JSON(http.StatusUnauthorized, msg.ErrResponseStr("backend token missing"))
+			c.Abort()
+			return
+		}
+
+		token, err := utils.ParseToken(parts[1], config.LoadConfig())
+		if err != nil || !token.Valid {
+			c.JSON(http.StatusUnauthorized, msg.ErrResponseStr("backend token invalid"))
+			c.Abort()
+			return
+		}
+
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, msg.ErrResponseStr("backend token claims invalid"))
+			c.Abort()
+			return
+		}
+		sub, ok := claims["sub"].(string)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, msg.ErrResponseStr("backend token subject missing"))
+			c.Abort()
+			return
+		}
+		userID, err := strconv.Atoi(sub)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, msg.ErrResponseStr("backend token subject invalid"))
+			c.Abort()
+			return
+		}
+
+		var user models.BackendUser
+		if err := db.DB.Where("id = ?", userID).First(&user).Error; err != nil {
+			c.JSON(http.StatusUnauthorized, msg.ErrResponseStr("backend user not found"))
+			c.Abort()
+			return
+		}
+		if user.Status != "active" {
+			c.JSON(http.StatusForbidden, msg.ErrResponseStr("backend user disabled"))
+			c.Abort()
+			return
+		}
+
+		c.Set("backendUser", &user)
+		c.Next()
+	}
+}
+
 // AccessTokenValidationMiddleware access_token验证中间件
 // 除了特定豁免路径外，其他所有路径都需要验证access_token
 func AccessTokenValidationMiddleware() gin.HandlerFunc {
@@ -87,6 +143,7 @@ func AccessTokenValidationMiddleware() gin.HandlerFunc {
 		"/ordinary_user/wechat_login",
 		"/OperationUser/send_register_captcha",
 		"/OperationUser/backend_register_by_phone",
+		"/OperationUser/backend_login",
 	}
 
 	return func(c *gin.Context) {

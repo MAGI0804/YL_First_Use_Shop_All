@@ -3,29 +3,52 @@ package method
 import (
 	"Member_shop/db"
 	"Member_shop/models"
+	"encoding/json"
+	"fmt"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
 
+const activityImageCacheTTL = 10 * time.Minute
+
+type activityImageListCache struct {
+	Items []models.ActivityImage `json:"items"`
+	Total int64                  `json:"total"`
+}
+
 // CreateActivityImage 创建活动图片记录
 func CreateActivityImage(img *models.ActivityImage) error {
-	return db.DB.Select("status", "image", "category", "notes", "commodities").Create(img).Error
+	if err := db.DB.Select("status", "image", "category", "notes", "commodities").Create(img).Error; err != nil {
+		return err
+	}
+	InvalidateActivityImageCache()
+	return nil
 }
 
 // GetActivityImageByID 根据ID获取活动图片
 func GetActivityImageByID(id int) (*models.ActivityImage, error) {
+	if cached, ok := getCachedActivityImageByID(id); ok {
+		return cached, nil
+	}
+
 	var activityImg models.ActivityImage
 	err := db.DB.Where("id = ?", id).First(&activityImg).Error
 	if err != nil {
 		return nil, err
 	}
+	setCachedActivityImageByID(&activityImg)
 	return &activityImg, nil
 }
 
 // UpdateActivityImage 更新活动图片信息
 func UpdateActivityImage(img *models.ActivityImage) error {
-	return db.DB.Save(img).Error
+	if err := db.DB.Save(img).Error; err != nil {
+		return err
+	}
+	InvalidateActivityImageCache()
+	return nil
 }
 
 // GetOnlineActivityImageCount 获取已上线活动图片数量
@@ -140,6 +163,7 @@ func UpdateActivityImageOffline(id int) error {
 		return err
 	}
 
+	InvalidateActivityImageCache()
 	return nil
 }
 
@@ -182,11 +206,16 @@ func BatchUpdateActivityImageOrders(orders []struct {
 		return err
 	}
 
+	InvalidateActivityImageCache()
 	return nil
 }
 
 // QueryActivityImages 分页查询活动图片，支持状态过滤、时间范围过滤和是否有活动详情过滤
 func QueryActivityImages(page, pageSize int, status string, startTime, endTime string, hasActivityDetail *bool) ([]models.ActivityImage, int64, error) {
+	if cached, ok := getCachedActivityImageList(page, pageSize, status, startTime, endTime, hasActivityDetail); ok {
+		return cached.Items, cached.Total, nil
+	}
+
 	var activityImages []models.ActivityImage
 	var total int64
 
@@ -224,5 +253,77 @@ func QueryActivityImages(page, pageSize int, status string, startTime, endTime s
 		return nil, 0, err
 	}
 
+	setCachedActivityImageList(page, pageSize, status, startTime, endTime, hasActivityDetail, activityImages, total)
 	return activityImages, total, nil
+}
+
+// InvalidateActivityImageCache clears activity image cache after any write.
+func InvalidateActivityImageCache() {
+	if db.Rds == nil {
+		return
+	}
+	iter := db.Rds.Scan(db.RedisCtx, 0, "cache:activity:*", 100).Iterator()
+	for iter.Next(db.RedisCtx) {
+		_ = db.Rds.Del(db.RedisCtx, iter.Val()).Err()
+	}
+}
+
+func getCachedActivityImageByID(id int) (*models.ActivityImage, bool) {
+	if db.Rds == nil {
+		return nil, false
+	}
+	value, err := db.Rds.Get(db.RedisCtx, fmt.Sprintf("cache:activity:detail:%d", id)).Result()
+	if err == redis.Nil || err != nil {
+		return nil, false
+	}
+	var activityImg models.ActivityImage
+	if err := json.Unmarshal([]byte(value), &activityImg); err != nil {
+		return nil, false
+	}
+	return &activityImg, true
+}
+
+func setCachedActivityImageByID(img *models.ActivityImage) {
+	if db.Rds == nil || img == nil {
+		return
+	}
+	payload, err := json.Marshal(img)
+	if err != nil {
+		return
+	}
+	_ = db.Rds.Set(db.RedisCtx, fmt.Sprintf("cache:activity:detail:%d", img.ID), payload, activityImageCacheTTL).Err()
+}
+
+func getCachedActivityImageList(page, pageSize int, status, startTime, endTime string, hasActivityDetail *bool) (*activityImageListCache, bool) {
+	if db.Rds == nil {
+		return nil, false
+	}
+	value, err := db.Rds.Get(db.RedisCtx, activityImageListCacheKey(page, pageSize, status, startTime, endTime, hasActivityDetail)).Result()
+	if err == redis.Nil || err != nil {
+		return nil, false
+	}
+	var cached activityImageListCache
+	if err := json.Unmarshal([]byte(value), &cached); err != nil {
+		return nil, false
+	}
+	return &cached, true
+}
+
+func setCachedActivityImageList(page, pageSize int, status, startTime, endTime string, hasActivityDetail *bool, items []models.ActivityImage, total int64) {
+	if db.Rds == nil {
+		return
+	}
+	payload, err := json.Marshal(activityImageListCache{Items: items, Total: total})
+	if err != nil {
+		return
+	}
+	_ = db.Rds.Set(db.RedisCtx, activityImageListCacheKey(page, pageSize, status, startTime, endTime, hasActivityDetail), payload, activityImageCacheTTL).Err()
+}
+
+func activityImageListCacheKey(page, pageSize int, status, startTime, endTime string, hasActivityDetail *bool) string {
+	detail := "all"
+	if hasActivityDetail != nil {
+		detail = fmt.Sprintf("%t", *hasActivityDetail)
+	}
+	return fmt.Sprintf("cache:activity:list:p%d:s%d:status:%s:start:%s:end:%s:detail:%s", page, pageSize, status, startTime, endTime, detail)
 }

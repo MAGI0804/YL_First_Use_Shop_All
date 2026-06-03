@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"Member_shop/config"
 	crand "crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -11,10 +12,12 @@ import (
 	"time"
 
 	"Member_shop/db"
+	"Member_shop/models"
 	"Member_shop/requestbody"
 	"Member_shop/service/method"
 	"Member_shop/service/msg"
 	sms "Member_shop/service/sms"
+	"Member_shop/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -229,6 +232,10 @@ func (ouc *OperationUserController) SendBackendRegisterCaptcha(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, msg.ErrResponseStr("Invalid mobile"))
 		return
 	}
+	if err := method.CanSendBackendRegisterCaptcha(req.Mobile); err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr(err.Error()))
+		return
+	}
 
 	captcha := db.GenerateCaptcha()
 	if err := db.SaveCaptcha(req.Mobile, captcha); err != nil {
@@ -258,16 +265,125 @@ func (ouc *OperationUserController) BackendRegisterByPhone(c *gin.Context) {
 		return
 	}
 
-	data := map[string]any{
-		"id":          backendUser.ID,
-		"operator_no": backendUser.OperatorNo,
-		"mobile":      backendUser.Mobile,
-		"nickname":    backendUser.Nickname,
-		"role":        backendUser.Role,
-		"level":       backendUser.Level,
-		"status":      backendUser.Status,
+	accessToken, refreshToken, err := utils.GenerateTokens(int(backendUser.ID), config.LoadConfig())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, msg.ErrResponseStr(err.Error()))
+		return
 	}
+	data := backendSessionData(method.BuildBackendUserSession(backendUser, accessToken, refreshToken))
 	c.JSON(http.StatusOK, msg.SuccessResponse("Backend user registered successfully", &data))
+}
+
+// BackendLogin logs an active backend account in with mobile and password.
+func (ouc *OperationUserController) BackendLogin(c *gin.Context) {
+	var req requestbody.BackendLoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr("Invalid request"))
+		return
+	}
+	backendUser, accessToken, refreshToken, err := method.BackendLogin(req)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, msg.ErrResponseStr(err.Error()))
+		return
+	}
+	data := backendSessionData(method.BuildBackendUserSession(backendUser, accessToken, refreshToken))
+	c.JSON(http.StatusOK, msg.SuccessResponse("Backend login successful", &data))
+}
+
+// BackendMe returns the current backend user and permissions from a valid token.
+func (ouc *OperationUserController) BackendMe(c *gin.Context) {
+	backendUser := currentBackendUser(c)
+	if backendUser == nil {
+		c.JSON(http.StatusUnauthorized, msg.ErrResponseStr("backend user missing"))
+		return
+	}
+	data := backendSessionData(method.BuildBackendUserSession(backendUser, "", ""))
+	c.JSON(http.StatusOK, msg.SuccessResponse("Backend token valid", &data))
+}
+
+// AddBackendUserInvite creates a pending backend account by mobile and nickname.
+func (ouc *OperationUserController) AddBackendUserInvite(c *gin.Context) {
+	if !method.IsBackendAdmin(currentBackendUser(c)) {
+		c.JSON(http.StatusForbidden, msg.ErrResponseStr("admin permission required"))
+		return
+	}
+	var req requestbody.AddBackendUserInviteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr("Invalid request"))
+		return
+	}
+	user, err := method.AddBackendUserInvite(req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr(err.Error()))
+		return
+	}
+	data := backendSessionData(method.BuildBackendUserSession(user, "", ""))
+	c.JSON(http.StatusOK, msg.SuccessResponse("Backend user invited", &data))
+}
+
+// QueryBackendUsers lists backend accounts for administrators.
+func (ouc *OperationUserController) QueryBackendUsers(c *gin.Context) {
+	if !method.IsBackendAdmin(currentBackendUser(c)) {
+		c.JSON(http.StatusForbidden, msg.ErrResponseStr("admin permission required"))
+		return
+	}
+	var req requestbody.QueryBackendUsersRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr("Invalid request"))
+		return
+	}
+	users, total, err := method.QueryBackendUsers(req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, msg.ErrResponseStr(err.Error()))
+		return
+	}
+	items := make([]method.BackendUserSession, 0, len(users))
+	for i := range users {
+		items = append(items, method.BuildBackendUserSession(&users[i], "", ""))
+	}
+	data := map[string]any{
+		"items":     items,
+		"total":     total,
+		"page":      req.Page,
+		"page_size": req.PageSize,
+	}
+	c.JSON(http.StatusOK, msg.SuccessResponse("Backend users queried", &data))
+}
+
+// UpdateBackendUserStatus changes a backend account status.
+func (ouc *OperationUserController) UpdateBackendUserStatus(c *gin.Context) {
+	if !method.IsBackendAdmin(currentBackendUser(c)) {
+		c.JSON(http.StatusForbidden, msg.ErrResponseStr("admin permission required"))
+		return
+	}
+	var req requestbody.UpdateBackendUserStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr("Invalid request"))
+		return
+	}
+	user, err := method.UpdateBackendUserStatus(req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr(err.Error()))
+		return
+	}
+	data := backendSessionData(method.BuildBackendUserSession(user, "", ""))
+	c.JSON(http.StatusOK, msg.SuccessResponse("Backend user status updated", &data))
+}
+
+func backendSessionData(session method.BackendUserSession) map[string]any {
+	return map[string]any{"user": session}
+}
+
+func currentBackendUser(c *gin.Context) *models.BackendUser {
+	userValue, ok := c.Get("backendUser")
+	if !ok {
+		return nil
+	}
+	user, ok := userValue.(*models.BackendUser)
+	if !ok {
+		return nil
+	}
+	return user
 }
 
 // generateRequestID 生成唯一请求ID

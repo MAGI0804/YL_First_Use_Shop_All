@@ -1,181 +1,247 @@
 <template>
-  <div class="login-container">
-    <div class="login-box">
-      <div class="login-header">
-        <h1 class="title">先用后付商城管理</h1>
-        <p class="subtitle">管理后台</p>
+  <div class="login-page">
+    <section class="auth-panel">
+      <div class="brand">
+        <img src="/title.jpg" alt="logo" class="brand-logo" />
+        <div>
+          <h1>优蓝童装管理后台</h1>
+          <p>手机号密码登录，首次登录需短信验证码激活</p>
+        </div>
       </div>
 
-      <el-form
-        ref="loginFormRef"
-        :model="loginForm"
-        :rules="loginRules"
-        class="login-form"
-        @submit.prevent="handleLogin"
-      >
-        <el-form-item prop="username">
-          <el-input
-            v-model="loginForm.username"
-            placeholder="请输入账号"
-            prefix-icon="User"
-            size="large"
-          />
-        </el-form-item>
+      <el-tabs v-model="activeTab" class="auth-tabs">
+        <el-tab-pane label="密码登录" name="login">
+          <el-form ref="loginFormRef" :model="loginForm" :rules="loginRules" @submit.prevent="handleLogin">
+            <el-form-item prop="mobile">
+              <el-input v-model="loginForm.mobile" placeholder="手机号" prefix-icon="Iphone" size="large" />
+            </el-form-item>
+            <el-form-item prop="password">
+              <el-input
+                v-model="loginForm.password"
+                type="password"
+                placeholder="密码"
+                prefix-icon="Lock"
+                size="large"
+                show-password
+                @keyup.enter="handleLogin"
+              />
+            </el-form-item>
+            <el-button class="submit-button" type="primary" size="large" :loading="loading" @click="handleLogin">
+              登录
+            </el-button>
+          </el-form>
+        </el-tab-pane>
 
-        <el-form-item prop="password">
-          <el-input
-            v-model="loginForm.password"
-            type="password"
-            placeholder="请输入密码"
-            prefix-icon="Lock"
-            size="large"
-            show-password
-            @keyup.enter="handleLogin"
-          />
-        </el-form-item>
-
-        <div class="login-options">
-          <el-checkbox v-model="loginForm.remember">记住我</el-checkbox>
-          <el-link type="primary" :underline="false" @click="goToForgotPassword">
-            忘记密码？
-          </el-link>
-        </div>
-
-        <el-button
-          type="primary"
-          size="large"
-          class="login-button"
-          :loading="loading"
-          @click="handleLogin"
-        >
-          登 录
-        </el-button>
-      </el-form>
-    </div>
+        <el-tab-pane label="首次注册" name="register">
+          <el-form ref="registerFormRef" :model="registerForm" :rules="registerRules" @submit.prevent="handleRegister">
+            <el-form-item prop="mobile">
+              <el-input v-model="registerForm.mobile" placeholder="管理员已添加的手机号" prefix-icon="Iphone" size="large" />
+            </el-form-item>
+            <el-form-item prop="password">
+              <el-input
+                v-model="registerForm.password"
+                type="password"
+                placeholder="设置登录密码"
+                prefix-icon="Lock"
+                size="large"
+                show-password
+              />
+            </el-form-item>
+            <el-form-item prop="captcha">
+              <div class="captcha-row">
+                <el-input v-model="registerForm.captcha" placeholder="短信验证码" prefix-icon="Key" size="large" />
+                <el-button :disabled="countdown > 0" :loading="captchaLoading" size="large" @click="sendCaptcha">
+                  {{ countdown > 0 ? `${countdown}s` : '获取验证码' }}
+                </el-button>
+              </div>
+            </el-form-item>
+            <el-button class="submit-button" type="primary" size="large" :loading="loading" @click="handleRegister">
+              注册并登录
+            </el-button>
+          </el-form>
+        </el-tab-pane>
+      </el-tabs>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, FormInstance } from 'element-plus'
 import type { FormRules } from 'element-plus'
+import { backendLogin, backendRegisterByPhone, saveBackendSession, sendBackendRegisterCaptcha } from '@/api'
 
 const router = useRouter()
+const activeTab = ref('login')
 const loginFormRef = ref<FormInstance>()
+const registerFormRef = ref<FormInstance>()
 const loading = ref(false)
+const captchaLoading = ref(false)
+const countdown = ref(0)
+
+const mobileRule = /^1[3-9]\d{9}$/
 
 const loginForm = reactive({
-  username: '',
-  password: '',
-  remember: false
+  mobile: '',
+  password: ''
 })
 
+const registerForm = reactive({
+  mobile: '',
+  password: '',
+  captcha: ''
+})
+
+const mobileRules = [
+  { required: true, message: '请输入手机号', trigger: 'blur' },
+  { pattern: mobileRule, message: '手机号格式不正确', trigger: 'blur' }
+]
+
+const passwordRules = [
+  { required: true, message: '请输入密码', trigger: 'blur' },
+  { min: 6, message: '密码至少6位', trigger: 'blur' }
+]
+
 const loginRules: FormRules = {
-  username: [
-    { required: true, message: '请输入账号', trigger: 'blur' }
-  ],
-  password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, message: '密码长度至少6位', trigger: 'blur' }
+  mobile: mobileRules,
+  password: passwordRules
+}
+
+const registerRules: FormRules = {
+  mobile: mobileRules,
+  password: passwordRules,
+  captcha: [
+    { required: true, message: '请输入验证码', trigger: 'blur' },
+    { len: 6, message: '验证码为6位数字', trigger: 'blur' }
   ]
 }
 
 const handleLogin = async () => {
   if (!loginFormRef.value) return
+  const valid = await loginFormRef.value.validate().catch(() => false)
+  if (!valid) return
 
-  await loginFormRef.value.validate((valid) => {
-    if (valid) {
-      loading.value = true
-      setTimeout(() => {
-        loading.value = false
-        ElMessage.success('登录成功')
-        router.push('/dashboard')
-      }, 1000)
-    }
-  })
+  loading.value = true
+  try {
+    const res = await backendLogin(loginForm)
+    saveBackendSession(res.data.user)
+    ElMessage.success('登录成功')
+    router.push('/dashboard')
+  } catch (error: any) {
+    ElMessage.error(error?.response?.data?.msg || '登录失败')
+  } finally {
+    loading.value = false
+  }
 }
 
-const goToForgotPassword = () => {
-  router.push('/forgot-password')
+const sendCaptcha = async () => {
+  if (!mobileRule.test(registerForm.mobile)) {
+    ElMessage.warning('请先输入正确的手机号')
+    return
+  }
+  captchaLoading.value = true
+  try {
+    await sendBackendRegisterCaptcha({ mobile: registerForm.mobile })
+    ElMessage.success('验证码已发送')
+    countdown.value = 60
+    const timer = window.setInterval(() => {
+      countdown.value -= 1
+      if (countdown.value <= 0) window.clearInterval(timer)
+    }, 1000)
+  } catch (error: any) {
+    ElMessage.error(error?.response?.data?.msg || '验证码发送失败')
+  } finally {
+    captchaLoading.value = false
+  }
+}
+
+const handleRegister = async () => {
+  if (!registerFormRef.value) return
+  const valid = await registerFormRef.value.validate().catch(() => false)
+  if (!valid) return
+
+  loading.value = true
+  try {
+    const res = await backendRegisterByPhone(registerForm)
+    saveBackendSession(res.data.user)
+    ElMessage.success('注册成功')
+    router.push('/dashboard')
+  } catch (error: any) {
+    ElMessage.error(error?.response?.data?.msg || '注册失败')
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
 <style scoped>
-.login-container {
+.login-page {
   min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #f5f7fa 0%, #e4e7ed 100%);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #eef2f7;
 }
 
-.login-box {
-  width: 400px;
-  padding: 40px;
+.auth-panel {
+  width: min(440px, 100%);
+  padding: 32px;
   background: #ffffff;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  border: 1px solid #dfe5ee;
+  border-radius: 8px;
+  box-shadow: 0 12px 36px rgba(20, 34, 58, 0.12);
 }
 
-.login-header {
-  text-align: center;
-  margin-bottom: 32px;
-}
-
-.title {
-  font-size: 28px;
-  font-weight: 600;
-  color: #1a1a1a;
-  margin: 0 0 8px 0;
-}
-
-.subtitle {
-  font-size: 14px;
-  color: #999999;
-  margin: 0;
-}
-
-.login-form {
-  margin-top: 24px;
-}
-
-.login-form :deep(.el-input__wrapper) {
-  padding: 4px 12px;
-}
-
-.login-form :deep(.el-input__inner) {
-  height: 40px;
-}
-
-.login-options {
+.brand {
   display: flex;
-  justify-content: space-between;
+  gap: 14px;
   align-items: center;
   margin-bottom: 24px;
 }
 
-.login-options :deep(.el-checkbox__label) {
-  color: #666666;
+.brand-logo {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
 }
 
-.login-button {
+.brand h1 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.25;
+  color: #172033;
+}
+
+.brand p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.auth-tabs :deep(.el-tabs__header) {
+  margin-bottom: 22px;
+}
+
+.captcha-row {
   width: 100%;
-  background: #87ceeb;
-  border-color: #87ceeb;
-  font-size: 16px;
-  font-weight: 500;
-  border-radius: 8px;
-  transition: all 0.3s ease;
+  display: grid;
+  grid-template-columns: 1fr 116px;
+  gap: 10px;
 }
 
-.login-button:hover {
-  background: #5bc0de;
-  border-color: #5bc0de;
-  transform: translateY(-1px);
+.submit-button {
+  width: 100%;
+  margin-top: 4px;
 }
 
-.login-button:active {
-  transform: translateY(0);
+@media (max-width: 520px) {
+  .auth-panel {
+    padding: 24px;
+  }
+
+  .captcha-row {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
