@@ -33,3 +33,8 @@ Youlan Kids Shop update log
 - Week 7 mini program reviews: added delivered-order review entry, review submission page, and approved review display on product details.
 - Week 7 verification: go test ./... passed; npm run build passed; node --check passed for mini program review pages.
 - Week 7 push retry: week 7 repair commits could not be pushed because GitHub port 443 was unreachable.
+- Redis cache: added Redis read-through caching for activity image detail/list queries and write-side invalidation for activity image changes.
+- Backend auth: replaced the web fake login with invited-phone activation, SMS captcha registration, password login, JWT backend token validation, and account status checks.
+- Web permissions: added backend token storage, route validation, permission-based side menu rendering, and an administrator account management page.
+- Verification: go test ./... passed; npm run build passed.
+- Push: commit e43f6b4 was pushed to origin/develop.
