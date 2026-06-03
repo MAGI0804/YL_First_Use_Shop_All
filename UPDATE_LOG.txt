@@ -13,3 +13,11 @@ Youlan Kids Shop update log
 - Web operations: order detail now shows payment status, final payment amount, discount details, and allows final payment confirmation after delivery.
 - Web operations: order detail now supports final amount adjustment, shipping, delivery confirmation, and final payment confirmation with the same state rules as the order list.
 - Mini program orders: checkout and order pages now show order amount, unpaid payment status, post-delivery settlement messaging, and call the real delivery confirmation endpoint.
+
+2026-06-03
+- Analytics: sales and paid amount now use paid orders' final_pay_amount; original_order_amount and discount_amount are returned for reconciliation.
+- Backend inventory: aligned inventory log change types with the development plan, while keeping legacy order_deduct rollback compatibility.
+- Backend inventory: added /inventory/transfer and /inventory/stock_check for transfer and stock count adjustments.
+- Tests: added inventory base repair validation and change-type coverage.
+- Web operations: added an Inventory page with query, warning, log, manual adjustment, transfer, and stock check workflows.
+- Verification: go test ./... passed; npm run build passed.

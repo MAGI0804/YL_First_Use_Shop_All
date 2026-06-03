@@ -22,6 +22,10 @@ func InitInventoryRoutes(router *gin.Engine) {
 		inventoryGroup.POST("logs", inventoryController.QueryInventoryLogs)
 		// 查询库存预警 - 查询库存低于预警阈值的商品
 		inventoryGroup.POST("warnings", inventoryController.QueryInventoryWarnings)
+		// 库存调拨 - 在源仓和目标仓之间记录调拨出入库
+		inventoryGroup.POST("transfer", inventoryController.TransferInventory)
+		// 库存盘点 - 按实盘数量修正库存并记录差异
+		inventoryGroup.POST("stock_check", inventoryController.StockCheckInventory)
 		// 同步聚水潭库存 - 从聚水潭同步库存数据
 		inventoryGroup.POST("sync_jushuitan", inventoryController.SyncJushuitanInventory)
 	}

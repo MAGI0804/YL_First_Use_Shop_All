@@ -564,3 +564,136 @@ export interface SetActivityDetailResponse {
 export const setActivityDetail = (params: SetActivityDetailParams) => {
   return http.post<SetActivityDetailResponse>('/activity/set_has_activity_detail', params)
 }
+
+export interface InventoryQueryParams {
+  commodity_id?: string
+  style_code?: string
+}
+
+export interface InventoryCommodity {
+  commodity_id: string
+  name: string
+  style_code: string
+  category: string
+  price: number
+  inventory: number
+  size?: string
+  color?: string
+}
+
+export interface InventoryQueryResponse {
+  code: number
+  data: {
+    commodity?: InventoryCommodity
+    commodities?: InventoryCommodity[]
+    total_inventory?: number
+    style_code?: string
+  }
+  msg: string
+}
+
+export interface InventoryWarningsParams {
+  threshold?: number
+  page: number
+  page_size: number
+}
+
+export interface InventoryWarningsResponse {
+  code: number
+  data: {
+    data: InventoryCommodity[]
+    total: number
+    threshold: number
+    page: number
+    page_size: number
+  }
+  msg: string
+}
+
+export interface InventoryLogItem {
+  id: number
+  commodity_id: string
+  style_code: string
+  warehouse_code: string
+  before_qty: number
+  change_qty: number
+  after_qty: number
+  change_type: string
+  related_order_id: string
+  related_sub_order_id: string
+  related_return_id: string
+  operator_id: string
+  remark: string
+  created_at: string
+}
+
+export interface InventoryLogsParams {
+  commodity_id?: string
+  style_code?: string
+  change_type?: string
+  related_order_id?: string
+  related_sub_order_id?: string
+  related_return_id?: string
+  page: number
+  page_size: number
+}
+
+export interface InventoryLogsResponse {
+  code: number
+  data: {
+    data: InventoryLogItem[]
+    total: number
+    page: number
+    page_size: number
+  }
+  msg: string
+}
+
+export interface InventoryAdjustParams {
+  commodity_id: string
+  change_qty: number
+  operator_id?: string
+  warehouse_code?: string
+  remark?: string
+}
+
+export interface InventoryTransferParams {
+  commodity_id: string
+  qty: number
+  source_warehouse_code: string
+  target_warehouse_code: string
+  operator_id?: string
+  remark?: string
+}
+
+export interface InventoryStockCheckParams {
+  commodity_id: string
+  actual_qty: number
+  warehouse_code?: string
+  operator_id?: string
+  remark?: string
+}
+
+export const queryInventory = (params: InventoryQueryParams) => {
+  return http.post<InventoryQueryResponse>('/inventory/query', params)
+}
+
+export const queryInventoryWarnings = (params: InventoryWarningsParams) => {
+  return http.post<InventoryWarningsResponse>('/inventory/warnings', params)
+}
+
+export const queryInventoryLogs = (params: InventoryLogsParams) => {
+  return http.post<InventoryLogsResponse>('/inventory/logs', params)
+}
+
+export const adjustInventory = (params: InventoryAdjustParams) => {
+  return http.post('/inventory/adjust', params)
+}
+
+export const transferInventory = (params: InventoryTransferParams) => {
+  return http.post('/inventory/transfer', params)
+}
+
+export const stockCheckInventory = (params: InventoryStockCheckParams) => {
+  return http.post('/inventory/stock_check', params)
+}

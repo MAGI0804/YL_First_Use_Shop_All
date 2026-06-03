@@ -14,11 +14,15 @@ import (
 )
 
 const (
-	InventoryChangeOrderDeduct        = "order_deduct"         // 订单扣减库存
-	InventoryChangeOrderCancelRestore = "order_cancel_restore" // 订单取消恢复库存
-	InventoryChangeReturnRestore      = "return_restore"       // 退货恢复库存
-	InventoryChangeManualAdjust       = "manual_adjust"        // 手动调整库存
-	InventoryChangeSyncJushuitan      = "sync_jushuitan"       // 同步聚水潭库存
+	InventoryChangeOrderDeduct        = "order_create_deduct"
+	InventoryChangeOrderCancelRestore = "order_cancel_restore"
+	InventoryChangeReturnRestore      = "return_completed_restore"
+	InventoryChangeManualAdjust       = "manual_adjust"
+	InventoryChangeSyncJushuitan      = "jushuitan_sync"
+	InventoryChangeStockTransfer      = "stock_transfer"
+	InventoryChangeStockCheck         = "stock_check"
+
+	legacyInventoryChangeOrderDeduct = "order_deduct"
 )
 
 // ChangeInventoryInput 库存变动输入参数
@@ -38,6 +42,23 @@ type ChangeInventoryInput struct {
 type OrderInventoryItem struct {
 	CommodityID string // 商品ID
 	Qty         int    // 数量
+}
+
+type InventoryTransferInput struct {
+	CommodityID         string
+	Qty                 int
+	SourceWarehouseCode string
+	TargetWarehouseCode string
+	OperatorID          string
+	Remark              string
+}
+
+type InventoryStockCheckInput struct {
+	CommodityID   string
+	ActualQty     int
+	WarehouseCode string
+	OperatorID    string
+	Remark        string
 }
 
 // ChangeInventory 变更库存（带事务）
@@ -104,6 +125,113 @@ func AdjustInventory(input ChangeInventoryInput) error {
 		input.Remark = "手动调整库存"
 	}
 	return ChangeInventory(input)
+}
+
+func TransferInventory(input InventoryTransferInput) error {
+	if err := validateInventoryTransferInput(&input); err != nil {
+		return err
+	}
+
+	remark := strings.TrimSpace(input.Remark)
+	if remark == "" {
+		remark = fmt.Sprintf("stock transfer %s -> %s", input.SourceWarehouseCode, input.TargetWarehouseCode)
+	}
+
+	return db.DB.Transaction(func(tx *gorm.DB) error {
+		if err := changeInventoryTx(tx, ChangeInventoryInput{
+			CommodityID:   input.CommodityID,
+			ChangeQty:     -input.Qty,
+			ChangeType:    InventoryChangeStockTransfer,
+			OperatorID:    input.OperatorID,
+			WarehouseCode: input.SourceWarehouseCode,
+			Remark:        remark + " out",
+		}); err != nil {
+			return err
+		}
+		return changeInventoryTx(tx, ChangeInventoryInput{
+			CommodityID:   input.CommodityID,
+			ChangeQty:     input.Qty,
+			ChangeType:    InventoryChangeStockTransfer,
+			OperatorID:    input.OperatorID,
+			WarehouseCode: input.TargetWarehouseCode,
+			Remark:        remark + " in",
+		})
+	})
+}
+
+func StockCheckInventory(input InventoryStockCheckInput) (map[string]any, error) {
+	if err := validateInventoryStockCheckInput(&input); err != nil {
+		return nil, err
+	}
+
+	var result map[string]any
+	err := db.DB.Transaction(func(tx *gorm.DB) error {
+		var commodity models.Commodity
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("commodity_id = ?", input.CommodityID).
+			First(&commodity).Error; err != nil {
+			return err
+		}
+
+		beforeQty := commodity.Inventory
+		changeQty := input.ActualQty - beforeQty
+		result = map[string]any{
+			"commodity_id":    input.CommodityID,
+			"before_qty":      beforeQty,
+			"actual_qty":      input.ActualQty,
+			"change_qty":      changeQty,
+			"warehouse_code":  input.WarehouseCode,
+			"inventory_equal": changeQty == 0,
+		}
+		if changeQty == 0 {
+			return nil
+		}
+
+		remark := strings.TrimSpace(input.Remark)
+		if remark == "" {
+			remark = "stock check adjustment"
+		}
+		return changeInventoryTx(tx, ChangeInventoryInput{
+			CommodityID:   input.CommodityID,
+			ChangeQty:     changeQty,
+			ChangeType:    InventoryChangeStockCheck,
+			OperatorID:    input.OperatorID,
+			WarehouseCode: input.WarehouseCode,
+			Remark:        remark,
+		})
+	})
+	return result, err
+}
+
+func validateInventoryTransferInput(input *InventoryTransferInput) error {
+	input.CommodityID = strings.TrimSpace(input.CommodityID)
+	if input.CommodityID == "" {
+		return fmt.Errorf("commodity_id不能为空")
+	}
+	if input.Qty <= 0 {
+		return fmt.Errorf("调拨数量必须大于0")
+	}
+	input.SourceWarehouseCode = strings.TrimSpace(input.SourceWarehouseCode)
+	input.TargetWarehouseCode = strings.TrimSpace(input.TargetWarehouseCode)
+	if input.SourceWarehouseCode == "" || input.TargetWarehouseCode == "" {
+		return fmt.Errorf("源仓库和目标仓库不能为空")
+	}
+	if input.SourceWarehouseCode == input.TargetWarehouseCode {
+		return fmt.Errorf("源仓库和目标仓库不能相同")
+	}
+	return nil
+}
+
+func validateInventoryStockCheckInput(input *InventoryStockCheckInput) error {
+	input.CommodityID = strings.TrimSpace(input.CommodityID)
+	if input.CommodityID == "" {
+		return fmt.Errorf("commodity_id不能为空")
+	}
+	if input.ActualQty < 0 {
+		return fmt.Errorf("实际库存不能小于0")
+	}
+	input.WarehouseCode = strings.TrimSpace(input.WarehouseCode)
+	return nil
 }
 
 // QueryInventoryLogs 查询库存变更日志
@@ -353,7 +481,7 @@ func changeInventoryTx(tx *gorm.DB, input ChangeInventoryInput) error {
 func restoreSubOrderInventoryTx(tx *gorm.DB, subOrder models.SubOrder, changeType, returnID, remark string) error {
 	var deductedCount int64
 	if err := tx.Model(&models.InventoryLog{}).
-		Where("change_type = ? AND related_sub_order_id = ?", InventoryChangeOrderDeduct, subOrder.SubOrderID).
+		Where("change_type IN ? AND related_sub_order_id = ?", []string{InventoryChangeOrderDeduct, legacyInventoryChangeOrderDeduct}, subOrder.SubOrderID).
 		Count(&deductedCount).Error; err != nil {
 		return err
 	}

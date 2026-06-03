@@ -24,6 +24,10 @@
             <el-icon><Goods /></el-icon>
             <span>商品管理</span>
           </el-menu-item>
+          <el-menu-item index="/inventory">
+            <el-icon><Box /></el-icon>
+            <span>库存管理</span>
+          </el-menu-item>
           <el-menu-item index="/order">
             <el-icon><Document /></el-icon>
             <span>订单管理</span>
@@ -75,7 +79,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { DataAnalysis, Document, Goods, PieChart, User, UserFilled, Service } from '@element-plus/icons-vue'
+import { Box, DataAnalysis, Document, Goods, PieChart, User, UserFilled, Service } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
 const route = useRoute()

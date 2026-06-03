@@ -34,26 +34,30 @@ type AnalyticsFilter struct {
 
 // SalesSummaryResult 是销售统计接口的返回结构。
 type SalesSummaryResult struct {
-	OrderCount         int64             `json:"order_count"`          // 订单总数
-	PaidOrderCount     int64             `json:"paid_order_count"`     // 已支付订单数
-	CanceledOrderCount int64             `json:"canceled_order_count"` // 已取消订单数
-	SalesAmount        float64           `json:"sales_amount"`         // 订单金额汇总
-	PaidAmount         float64           `json:"paid_amount"`          // 已支付订单金额汇总
-	RefundAmount       float64           `json:"refund_amount"`        // 已完成退款售后金额
-	AverageOrderValue  float64           `json:"average_order_value"`  // 客单价
-	Daily              []SalesDailyPoint `json:"daily"`                // 按天统计明细
+	OrderCount          int64             `json:"order_count"`           // 订单总数
+	PaidOrderCount      int64             `json:"paid_order_count"`      // 已支付订单数
+	CanceledOrderCount  int64             `json:"canceled_order_count"`  // 已取消订单数
+	SalesAmount         float64           `json:"sales_amount"`          // 实际销售额，按已支付订单 final_pay_amount 汇总
+	PaidAmount          float64           `json:"paid_amount"`           // 已支付订单最终实付金额汇总
+	OriginalOrderAmount float64           `json:"original_order_amount"` // 原订单金额汇总
+	DiscountAmount      float64           `json:"discount_amount"`       // 优惠金额汇总
+	RefundAmount        float64           `json:"refund_amount"`         // 已完成退款售后金额
+	AverageOrderValue   float64           `json:"average_order_value"`   // 客单价
+	Daily               []SalesDailyPoint `json:"daily"`                 // 按天统计明细
 }
 
 // SalesDailyPoint 表示某一天的销售统计。
 type SalesDailyPoint struct {
-	Date               string  `json:"date" gorm:"column:date"`
-	OrderCount         int64   `json:"order_count" gorm:"column:order_count"`
-	PaidOrderCount     int64   `json:"paid_order_count" gorm:"column:paid_order_count"`
-	CanceledOrderCount int64   `json:"canceled_order_count" gorm:"column:canceled_order_count"`
-	SalesAmount        float64 `json:"sales_amount" gorm:"column:sales_amount"`
-	PaidAmount         float64 `json:"paid_amount" gorm:"column:paid_amount"`
-	RefundAmount       float64 `json:"refund_amount" gorm:"column:refund_amount"`
-	AverageOrderValue  float64 `json:"average_order_value" gorm:"column:average_order_value"`
+	Date                string  `json:"date" gorm:"column:date"`
+	OrderCount          int64   `json:"order_count" gorm:"column:order_count"`
+	PaidOrderCount      int64   `json:"paid_order_count" gorm:"column:paid_order_count"`
+	CanceledOrderCount  int64   `json:"canceled_order_count" gorm:"column:canceled_order_count"`
+	SalesAmount         float64 `json:"sales_amount" gorm:"column:sales_amount"`
+	PaidAmount          float64 `json:"paid_amount" gorm:"column:paid_amount"`
+	OriginalOrderAmount float64 `json:"original_order_amount" gorm:"column:original_order_amount"`
+	DiscountAmount      float64 `json:"discount_amount" gorm:"column:discount_amount"`
+	RefundAmount        float64 `json:"refund_amount" gorm:"column:refund_amount"`
+	AverageOrderValue   float64 `json:"average_order_value" gorm:"column:average_order_value"`
 }
 
 // UserSummaryResult 是用户分析接口的返回结构。
@@ -142,16 +146,23 @@ func SalesSummary(filter AnalyticsFilter) (*SalesSummaryResult, error) {
 		return nil, err
 	}
 
-	result.SalesAmount, err = scanFloat(orderQuery(scope).Select("COALESCE(SUM(order_amount), 0)"))
+	result.OriginalOrderAmount, err = scanFloat(orderQuery(scope).Select("COALESCE(SUM(order_amount), 0)"))
+	if err != nil {
+		return nil, err
+	}
+	result.DiscountAmount, err = scanFloat(orderQuery(scope).
+		Where("pay_status = ?", "paid").
+		Select("COALESCE(SUM(discount_amount), 0)"))
 	if err != nil {
 		return nil, err
 	}
 	result.PaidAmount, err = scanFloat(orderQuery(scope).
 		Where("pay_status = ?", "paid").
-		Select("COALESCE(SUM(order_amount), 0)"))
+		Select("COALESCE(SUM(final_pay_amount), 0)"))
 	if err != nil {
 		return nil, err
 	}
+	result.SalesAmount = result.PaidAmount
 	result.RefundAmount, err = refundAmount(scope)
 	if err != nil {
 		return nil, err
@@ -507,8 +518,10 @@ func loadSalesDaily(scope analyticsScope, result *SalesSummaryResult) error {
 			COUNT(*) AS order_count,
 			SUM(CASE WHEN pay_status = 'paid' THEN 1 ELSE 0 END) AS paid_order_count,
 			SUM(CASE WHEN status IN ('canceled', 'cancelled') THEN 1 ELSE 0 END) AS canceled_order_count,
-			COALESCE(SUM(order_amount), 0) AS sales_amount,
-			COALESCE(SUM(CASE WHEN pay_status = 'paid' THEN order_amount ELSE 0 END), 0) AS paid_amount
+			COALESCE(SUM(CASE WHEN pay_status = 'paid' THEN final_pay_amount ELSE 0 END), 0) AS sales_amount,
+			COALESCE(SUM(CASE WHEN pay_status = 'paid' THEN final_pay_amount ELSE 0 END), 0) AS paid_amount,
+			COALESCE(SUM(order_amount), 0) AS original_order_amount,
+			COALESCE(SUM(CASE WHEN pay_status = 'paid' THEN discount_amount ELSE 0 END), 0) AS discount_amount
 		`).
 		Group("DATE(order_time)").
 		Order("date ASC").
@@ -527,6 +540,8 @@ func loadSalesDaily(scope analyticsScope, result *SalesSummaryResult) error {
 		}
 		daily[index].SalesAmount = roundFloat(daily[index].SalesAmount, 2)
 		daily[index].PaidAmount = roundFloat(daily[index].PaidAmount, 2)
+		daily[index].OriginalOrderAmount = roundFloat(daily[index].OriginalOrderAmount, 2)
+		daily[index].DiscountAmount = roundFloat(daily[index].DiscountAmount, 2)
 		daily[index].RefundAmount = roundFloat(daily[index].RefundAmount, 2)
 		daily[index].AverageOrderValue = roundFloat(daily[index].AverageOrderValue, 2)
 	}
@@ -699,6 +714,8 @@ func reviewSummaryQuery(scope analyticsScope) *gorm.DB {
 func roundSalesSummary(result *SalesSummaryResult) {
 	result.SalesAmount = roundFloat(result.SalesAmount, 2)
 	result.PaidAmount = roundFloat(result.PaidAmount, 2)
+	result.OriginalOrderAmount = roundFloat(result.OriginalOrderAmount, 2)
+	result.DiscountAmount = roundFloat(result.DiscountAmount, 2)
 	result.RefundAmount = roundFloat(result.RefundAmount, 2)
 	result.AverageOrderValue = roundFloat(result.AverageOrderValue, 2)
 }
