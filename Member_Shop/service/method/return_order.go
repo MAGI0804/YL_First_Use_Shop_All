@@ -639,6 +639,58 @@ func decorateSubOrderAfterSaleFields(result map[string]interface{}, subOrderID s
 	setAfterSaleDisplayFields(result, status)
 }
 
+func latestAfterSaleStatusByOrderIDs(orderIDs []string) map[string]string {
+	return latestAfterSaleStatusByIDs("order_id", orderIDs)
+}
+
+func latestAfterSaleStatusBySubOrderIDs(subOrderIDs []string) map[string]string {
+	return latestAfterSaleStatusByIDs("sub_order_id", subOrderIDs)
+}
+
+func latestAfterSaleStatusByIDs(column string, values []string) map[string]string {
+	result := make(map[string]string)
+	if len(values) == 0 {
+		return result
+	}
+
+	uniqueValues := make([]string, 0, len(values))
+	seen := make(map[string]bool, len(values))
+	for _, value := range values {
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		uniqueValues = append(uniqueValues, value)
+	}
+	if len(uniqueValues) == 0 {
+		return result
+	}
+
+	var returnOrders []models.ReturnOrder
+	if err := db.DB.Model(&models.ReturnOrder{}).
+		Where(column+" IN ?", uniqueValues).
+		Order(column + " ASC, request_time DESC, id DESC").
+		Find(&returnOrders).Error; err != nil {
+		return result
+	}
+
+	for _, returnOrder := range returnOrders {
+		var key string
+		if column == "sub_order_id" {
+			key = returnOrder.SubOrderID
+		} else {
+			key = returnOrder.OrderID
+		}
+		if key != "" {
+			if _, ok := result[key]; !ok {
+				result[key] = returnOrder.Status
+			}
+		}
+	}
+
+	return result
+}
+
 func latestAfterSaleStatus(query string, value interface{}) string {
 	if value == "" {
 		return ""

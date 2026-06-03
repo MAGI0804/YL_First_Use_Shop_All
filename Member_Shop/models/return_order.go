@@ -9,14 +9,14 @@ type ReturnOrder struct {
 	ID                  uint       `gorm:"column:id;primaryKey;autoIncrement;comment:主键ID" json:"id"`
 	UserID              int        `gorm:"column:user_id;not null;default:0" json:"user_id"`
 	ReturnID            string     `gorm:"column:return_id;size:30;not null;uniqueIndex;comment:退换货订单号" json:"return_id"`
-	OrderID             string     `gorm:"column:order_id;size:20;not null;comment:关联订单号" json:"order_id"`
-	SubOrderID          string     `gorm:"column:sub_order_id;size:30;null;comment:关联子订单号" json:"sub_order_id"`
+	OrderID             string     `gorm:"column:order_id;size:20;not null;index;comment:关联订单号" json:"order_id"`
+	SubOrderID          string     `gorm:"column:sub_order_id;size:30;null;index;comment:关联子订单号" json:"sub_order_id"`
 	SubOrderProductInfo string     `gorm:"column:sub_order_product_info;type:text;null;comment:子订单商品信息" json:"sub_order_product_info"`
 	OrderStatus         string     `gorm:"column:order_status;size:20;not null;default:'pending';comment:状态" json:"order_status"`
 	ProductList         string     `gorm:"column:product_list;type:text;not null;comment:商品列表" json:"product_list"`
 	Type                string     `gorm:"column:type;size:20;not null;comment:类型" json:"type"`
-	Status              string     `gorm:"column:status;size:20;not null;default:'pending';comment:状态" json:"status"`
-	RequestTime         *time.Time `gorm:"column:request_time;autoCreateTime;comment:申请时间" json:"request_time"`
+	Status              string     `gorm:"column:status;size:20;not null;index;default:'pending';comment:状态" json:"status"`
+	RequestTime         *time.Time `gorm:"column:request_time;autoCreateTime;index;comment:申请时间" json:"request_time"`
 	ShippedTime         *time.Time `gorm:"column:shipped_time;null;comment:发货时间" json:"shipped_time"`
 	CanceledTime        *time.Time `gorm:"column:canceled_time;null;comment:取消时间" json:"canceled_time"`
 	CompletedTime       *time.Time `gorm:"column:completed_time;null;comment:完成时间" json:"completed_time"`

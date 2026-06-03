@@ -53,6 +53,10 @@ func ValidateChangeStatus(status string) bool {
 
 // ConvertOrderToMap 将订单对象转换为Map
 func ConvertOrderToMap(order models.Order) map[string]interface{} {
+	return convertOrderToMap(order, nil)
+}
+
+func convertOrderToMap(order models.Order, afterSaleStatus *string) map[string]interface{} {
 	result := make(map[string]interface{})
 	result["order_id"] = order.OrderID
 	result["user_id"] = order.UserID
@@ -150,7 +154,11 @@ func ConvertOrderToMap(order models.Order) map[string]interface{} {
 	result["wms_co_id"] = order.WmsCoID
 	result["lcid"] = order.LCID
 	result["is_send_all"] = order.IsSendAll
-	decorateOrderAfterSaleFields(result, order.OrderID)
+	if afterSaleStatus != nil {
+		setAfterSaleDisplayFields(result, *afterSaleStatus)
+	} else {
+		decorateOrderAfterSaleFields(result, order.OrderID)
+	}
 
 	return result
 }
@@ -158,10 +166,22 @@ func ConvertOrderToMap(order models.Order) map[string]interface{} {
 // ConvertOrdersToMap 将订单数组转换为Map数组
 func ConvertOrdersToMap(orders []models.Order) []map[string]interface{} {
 	result := make([]map[string]interface{}, 0, len(orders))
+	afterSaleStatuses := latestAfterSaleStatusByOrderIDs(extractOrderIDs(orders))
 	for _, order := range orders {
-		result = append(result, ConvertOrderToMap(order))
+		status := afterSaleStatuses[order.OrderID]
+		result = append(result, convertOrderToMap(order, &status))
 	}
 	return result
+}
+
+func extractOrderIDs(orders []models.Order) []string {
+	orderIDs := make([]string, 0, len(orders))
+	for _, order := range orders {
+		if order.OrderID != "" {
+			orderIDs = append(orderIDs, order.OrderID)
+		}
+	}
+	return orderIDs
 }
 
 // GenerateOrderNo 生成订单号
@@ -296,17 +316,7 @@ func QueryOrdersByUserID(userID int, status string, page, pageSize int) (*QueryO
 		return nil, err
 	}
 
-	result := make([]map[string]interface{}, 0, len(orders))
-	for _, order := range orders {
-		orderMap := ConvertOrderToMap(order)
-		if order.LogisticsProcess != "" {
-			var logisticsProcess []interface{}
-			if err := json.Unmarshal([]byte(order.LogisticsProcess), &logisticsProcess); err == nil {
-				orderMap["logistics_process"] = logisticsProcess
-			}
-		}
-		result = append(result, orderMap)
-	}
+	result := ConvertOrdersToMap(orders)
 
 	return &QueryOrdersResult{
 		Orders: result,
@@ -374,11 +384,9 @@ func GetOrderList(userID int, status, beginTime, endTime, tid string, page, page
 		return nil, 0, err
 	}
 
-	result := make([]map[string]interface{}, 0, len(orders))
-	for _, order := range orders {
-		orderMap := ConvertOrderToMap(order)
+	result := ConvertOrdersToMap(orders)
+	for _, orderMap := range result {
 		orderMap["logistics_process"] = []interface{}{}
-		result = append(result, orderMap)
 	}
 
 	return result, total, nil
@@ -1043,17 +1051,7 @@ func BatchOrdersQuery(userID int, status, beginTime, endTime string, page, pageS
 		return nil, err
 	}
 
-	result := make([]map[string]interface{}, 0, len(orders))
-	for _, order := range orders {
-		orderMap := ConvertOrderToMap(order)
-		if order.LogisticsProcess != "" {
-			var logisticsProcess []interface{}
-			if err := json.Unmarshal([]byte(order.LogisticsProcess), &logisticsProcess); err == nil {
-				orderMap["logistics_process"] = logisticsProcess
-			}
-		}
-		result = append(result, orderMap)
-	}
+	result := ConvertOrdersToMap(orders)
 
 	return &BatchOrdersQueryResult{
 		Orders: result,
@@ -1140,17 +1138,7 @@ func SearchOrdersByProductName(userID int, productName, status, beginTime, endTi
 		return nil, err
 	}
 
-	result := make([]map[string]interface{}, 0, len(orders))
-	for _, order := range orders {
-		orderMap := ConvertOrderToMap(order)
-		if order.LogisticsProcess != "" {
-			var logisticsProcess []interface{}
-			if err := json.Unmarshal([]byte(order.LogisticsProcess), &logisticsProcess); err == nil {
-				orderMap["logistics_process"] = logisticsProcess
-			}
-		}
-		result = append(result, orderMap)
-	}
+	result := ConvertOrdersToMap(orders)
 
 	return &BatchOrdersQueryResult{
 		Orders: result,

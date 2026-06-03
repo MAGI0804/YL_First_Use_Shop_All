@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func CreateCommodity(cd *models.Commodity) error {
@@ -85,6 +86,276 @@ func ConvertImagesToMap(images []models.CommodityImage, c *gin.Context) []map[st
 	return result
 }
 
+type styleCodePageRow struct {
+	StyleCode string `gorm:"column:style_code"`
+}
+
+func applyCommoditySituationFilters(query *gorm.DB, category interface{}, status string, labelOne, labelTwo, labelThree, labelFour, labelSeven []string) (*gorm.DB, bool) {
+	hasFilters := false
+	situationQuery := db.DB.Model(&models.CommoditySituation{}).Select("commodity_id")
+
+	if status != "" {
+		hasFilters = true
+		situationQuery = situationQuery.Where("status = ?", status)
+	}
+	if category != nil {
+		if categoryList, ok := category.([]interface{}); ok {
+			stringList := make([]string, 0, len(categoryList))
+			for _, cat := range categoryList {
+				if strCat, ok := cat.(string); ok {
+					stringList = append(stringList, strCat)
+				}
+			}
+			if len(stringList) == 0 {
+				return query, hasFilters
+			}
+			hasFilters = true
+			situationQuery = situationQuery.Where("category IN ?", stringList)
+		} else if strCat, ok := category.(string); ok && strCat != "" {
+			hasFilters = true
+			situationQuery = situationQuery.Where("category = ?", strCat)
+		}
+	}
+	if len(labelOne) > 0 {
+		hasFilters = true
+		situationQuery = situationQuery.Where("label_one IN ?", labelOne)
+	}
+	if len(labelTwo) > 0 {
+		hasFilters = true
+		situationQuery = situationQuery.Where("label_two IN ?", labelTwo)
+	}
+	if len(labelThree) > 0 {
+		hasFilters = true
+		situationQuery = situationQuery.Where("label_three IN ?", labelThree)
+	}
+	if len(labelFour) > 0 {
+		hasFilters = true
+		situationQuery = situationQuery.Where("label_four IN ?", labelFour)
+	}
+	if len(labelSeven) > 0 {
+		hasFilters = true
+		situationQuery = situationQuery.Where("label_seven IN ?", labelSeven)
+	}
+	if !hasFilters {
+		return query, false
+	}
+	return query.Where("commodity_id IN (?)", situationQuery), true
+}
+
+func applyStyleStatusFilter(query *gorm.DB, status string) *gorm.DB {
+	styleStatus := status
+	if styleStatus == "" {
+		styleStatus = "online"
+	}
+	styleQuery := db.DB.Model(&models.StyleCodeSituation{}).
+		Select("style_code").
+		Where("status = ?", styleStatus)
+	return query.Where("style_code IN (?)", styleQuery)
+}
+
+func paginateStyleCodeCommodities(query *gorm.DB, page, pageSize int) ([]models.Commodity, int64, int64, error) {
+	var total int64
+	if err := query.Session(&gorm.Session{}).Distinct("style_code").Count(&total).Error; err != nil {
+		return nil, 0, 0, err
+	}
+
+	offset := (page - 1) * pageSize
+	var rows []styleCodePageRow
+	if err := query.Session(&gorm.Session{}).
+		Select("style_code, MAX(created_at) AS latest_created_at").
+		Group("style_code").
+		Order("latest_created_at DESC").
+		Offset(offset).
+		Limit(pageSize).
+		Scan(&rows).Error; err != nil {
+		return nil, 0, 0, err
+	}
+	if len(rows) == 0 {
+		return []models.Commodity{}, total, (total + int64(pageSize) - 1) / int64(pageSize), nil
+	}
+
+	styleCodes := make([]string, 0, len(rows))
+	styleCodeOrder := make(map[string]int, len(rows))
+	for i, row := range rows {
+		styleCodes = append(styleCodes, row.StyleCode)
+		styleCodeOrder[row.StyleCode] = i
+	}
+
+	var candidates []models.Commodity
+	if err := query.Session(&gorm.Session{}).
+		Where("style_code IN ?", styleCodes).
+		Order("created_at DESC").
+		Find(&candidates).Error; err != nil {
+		return nil, 0, 0, err
+	}
+
+	selected := make([]models.Commodity, len(styleCodes))
+	seen := make(map[string]bool, len(styleCodes))
+	for _, commodity := range candidates {
+		if seen[commodity.StyleCode] {
+			continue
+		}
+		if idx, ok := styleCodeOrder[commodity.StyleCode]; ok {
+			selected[idx] = commodity
+			seen[commodity.StyleCode] = true
+		}
+	}
+
+	commodities := make([]models.Commodity, 0, len(selected))
+	for _, commodity := range selected {
+		if commodity.StyleCode != "" {
+			commodities = append(commodities, commodity)
+		}
+	}
+
+	totalPages := (total + int64(pageSize) - 1) / int64(pageSize)
+	return commodities, total, totalPages, nil
+}
+
+func loadStyleSituations(commodities []models.Commodity) map[string]models.StyleCodeSituation {
+	styleCodes := make([]string, 0, len(commodities))
+	seen := make(map[string]bool, len(commodities))
+	for _, commodity := range commodities {
+		if commodity.StyleCode == "" || seen[commodity.StyleCode] {
+			continue
+		}
+		seen[commodity.StyleCode] = true
+		styleCodes = append(styleCodes, commodity.StyleCode)
+	}
+	if len(styleCodes) == 0 {
+		return map[string]models.StyleCodeSituation{}
+	}
+
+	var situations []models.StyleCodeSituation
+	if err := db.DB.Where("style_code IN ?", styleCodes).Find(&situations).Error; err != nil {
+		log.Printf("load style situations failed: %v", err)
+		return map[string]models.StyleCodeSituation{}
+	}
+
+	result := make(map[string]models.StyleCodeSituation, len(situations))
+	for _, situation := range situations {
+		result[situation.StyleCode] = situation
+	}
+	return result
+}
+
+func loadCommodityImages(commodities []models.Commodity) map[string][]models.CommodityImage {
+	commodityIDs := make([]string, 0, len(commodities))
+	for _, commodity := range commodities {
+		if commodity.CommodityID != "" {
+			commodityIDs = append(commodityIDs, commodity.CommodityID)
+		}
+	}
+	if len(commodityIDs) == 0 {
+		return map[string][]models.CommodityImage{}
+	}
+
+	var images []models.CommodityImage
+	if err := db.DB.Where("commodity_id IN ?", commodityIDs).Find(&images).Error; err != nil {
+		log.Printf("load commodity images failed: %v", err)
+		return map[string][]models.CommodityImage{}
+	}
+
+	result := make(map[string][]models.CommodityImage, len(commodityIDs))
+	for _, image := range images {
+		result[image.CommodityID] = append(result[image.CommodityID], image)
+	}
+	return result
+}
+
+func buildCommodityListResult(commodities []models.Commodity, demand string, c *gin.Context, includeStyleStatus bool) []map[string]interface{} {
+	result := make([]map[string]interface{}, 0, len(commodities))
+	proto := utils.GetRequestProto(c)
+	baseURL := fmt.Sprintf("%s://%s", proto, c.Request.Host)
+
+	styleSituations := map[string]models.StyleCodeSituation{}
+	if includeStyleStatus {
+		styleSituations = loadStyleSituations(commodities)
+	}
+	commodityImages := loadCommodityImages(commodities)
+
+	for _, commodity := range commodities {
+		images := commodityImages[commodity.CommodityID]
+		goodsData := make(map[string]interface{})
+		if demand == "style_code" || demand == "goods" {
+			goodsData["promo_image_url"] = buildPromoImageURL(commodity, images, baseURL)
+			goodsData["price"] = commodity.Price
+			goodsData["name"] = commodity.Name
+			goodsData["style_code"] = commodity.StyleCode
+			if includeStyleStatus {
+				setStyleSituationFields(goodsData, styleSituations[commodity.StyleCode])
+				goodsData["created_at"] = commodity.CreatedAt.Format("2006-01-02 15:04:05")
+			}
+		} else {
+			goodsData["commodity_id"] = commodity.CommodityID
+			goodsData["name"] = commodity.Name
+			goodsData["style"] = commodity.StyleCode
+			goodsData["category"] = commodity.Category
+			goodsData["price"] = commodity.Price
+			goodsData["promo_image_url"] = ""
+			if commodity.PromoImage != "" {
+				goodsData["promo_image_url"] = utils.BuildFullImageURL(baseURL, commodity.PromoImage, "media")
+			}
+			goodsData["created_at"] = commodity.CreatedAt.Format("2006-01-02 15:04:05")
+			if includeStyleStatus {
+				setStyleSituationFields(goodsData, styleSituations[commodity.StyleCode])
+			}
+			setCommodityImageFields(goodsData, images, baseURL)
+		}
+		result = append(result, goodsData)
+	}
+
+	return result
+}
+
+func buildPromoImageURL(commodity models.Commodity, images []models.CommodityImage, baseURL string) string {
+	if commodity.PromoImage != "" {
+		return utils.BuildFullImageURL(baseURL, commodity.PromoImage, "media")
+	}
+	if commodity.Image != "" {
+		return utils.BuildFullImageURL(baseURL, commodity.Image, "media")
+	}
+	for _, image := range images {
+		if image.IsMain {
+			return utils.BuildFullImageURL(baseURL, image.Image, "media")
+		}
+	}
+	return ""
+}
+
+func setStyleSituationFields(goodsData map[string]interface{}, situation models.StyleCodeSituation) {
+	goodsData["online_status"] = situation.Status
+	if situation.OnlineTime != nil {
+		goodsData["online_time"] = situation.OnlineTime.Format("2006-01-02 15:04:05")
+	} else {
+		goodsData["online_time"] = ""
+	}
+}
+
+func setCommodityImageFields(goodsData map[string]interface{}, images []models.CommodityImage, baseURL string) {
+	imageURLs := make([]map[string]interface{}, 0, len(images))
+	var mainImage map[string]interface{}
+	otherImages := make([]map[string]interface{}, 0)
+
+	for _, img := range images {
+		imgInfo := make(map[string]interface{})
+		imgInfo["id"] = img.ID
+		imgInfo["url"] = utils.BuildFullImageURL(baseURL, img.Image, "media")
+		imgInfo["is_main"] = img.IsMain
+		imgInfo["created_at"] = img.CreatedAt.Format("2006-01-02 15:04:05")
+		imageURLs = append(imageURLs, imgInfo)
+		if img.IsMain {
+			mainImage = imgInfo
+		} else {
+			otherImages = append(otherImages, imgInfo)
+		}
+	}
+
+	goodsData["images"] = imageURLs
+	goodsData["main_image"] = mainImage
+	goodsData["other_images"] = otherImages
+}
+
 // GetCommodityListByPage 获取商品列表（带分页）
 func GetCommodityListByPage(category, keyword string, pageNum, pageSize int) ([]models.Commodity, int64, error) {
 	var commodities []models.Commodity
@@ -140,7 +411,7 @@ func SearchStyleCodes(keyword string, category interface{}, page, pageSize int) 
 	// count 查询 - 暂时移除价格过滤以便调试
 	countQuery := db.DB.Model(&models.StyleCodeData{})
 	// countQuery = countQuery.Where("price > ?", 0)
-	
+
 	if category != nil && category != "" && category != "全部" {
 		if categoryList, ok := category.([]interface{}); ok {
 			stringList := make([]string, 0, len(categoryList))
@@ -154,11 +425,11 @@ func SearchStyleCodes(keyword string, category interface{}, page, pageSize int) 
 			countQuery = countQuery.Where("category = ?", strCat)
 		}
 	}
-	
+
 	if keyword != "" {
 		countQuery = countQuery.Where("style_code LIKE ? OR name LIKE ?", "%"+keyword+"%", "%"+keyword+"%")
 	}
-	
+
 	if err := countQuery.Count(&totalCount).Error; err != nil {
 		return nil, 0, err
 	}
@@ -167,7 +438,7 @@ func SearchStyleCodes(keyword string, category interface{}, page, pageSize int) 
 	// find 查询 - 全新的查询对象，也暂时移除价格过滤
 	findQuery := db.DB.Model(&models.StyleCodeData{})
 	// findQuery = findQuery.Where("price > ?", 0)
-	
+
 	if category != nil && category != "" && category != "全部" {
 		if categoryList, ok := category.([]interface{}); ok {
 			stringList := make([]string, 0, len(categoryList))
@@ -181,11 +452,11 @@ func SearchStyleCodes(keyword string, category interface{}, page, pageSize int) 
 			findQuery = findQuery.Where("category = ?", strCat)
 		}
 	}
-	
+
 	if keyword != "" {
 		findQuery = findQuery.Where("style_code LIKE ? OR name LIKE ?", "%"+keyword+"%", "%"+keyword+"%")
 	}
-	
+
 	if err := findQuery.Order("style_code").Offset(offset).Limit(pageSize).Find(&styleCodeDataList).Error; err != nil {
 		return nil, 0, err
 	}
@@ -346,59 +617,13 @@ func GetCommodityData(commodityID string, dataList []string, c *gin.Context) (ma
 
 // GetCommodityList 获取商品列表
 func GetCommodityList(demand, styleCode string, category interface{}, status string, labelOne, labelTwo, labelThree, labelFour, labelSeven []string, beginTime, endTime string, page, pageSize int, c *gin.Context) ([]map[string]interface{}, int64, int64, error) {
-	var commodities []models.Commodity
 	var commoditiesPage []models.Commodity
 	var total int64
 	var totalPages int64
 
-	// 首先从CommoditySituation中获取符合条件的商品ID
-	var commodityIDs []string
-	situationQuery := db.DB.Model(&models.CommoditySituation{})
+	query := db.DB.Model(&models.Commodity{}).Where("price > ?", 0).Where("inventory > ?", 0)
+	query, _ = applyCommoditySituationFilters(query, category, status, labelOne, labelTwo, labelThree, labelFour, labelSeven)
 
-	// 处理状态过滤 - CommoditySituation表的状态过滤
-	if status != "" {
-		situationQuery = situationQuery.Where("status = ?", status)
-	}
-
-	// 处理分类过滤
-	if category != nil {
-		if categoryList, ok := category.([]interface{}); ok {
-			stringList := make([]string, 0, len(categoryList))
-			for _, cat := range categoryList {
-				if strCat, ok := cat.(string); ok {
-					stringList = append(stringList, strCat)
-				}
-			}
-			situationQuery = situationQuery.Where("category IN ?", stringList)
-		} else if strCat, ok := category.(string); ok {
-			situationQuery = situationQuery.Where("category = ?", strCat)
-		}
-	}
-
-	// 处理标签过滤
-	if len(labelOne) > 0 {
-		situationQuery = situationQuery.Where("label_one IN ?", labelOne)
-	}
-	if len(labelTwo) > 0 {
-		situationQuery = situationQuery.Where("label_two IN ?", labelTwo)
-	}
-	if len(labelThree) > 0 {
-		situationQuery = situationQuery.Where("label_three IN ?", labelThree)
-	}
-	if len(labelFour) > 0 {
-		situationQuery = situationQuery.Where("label_four IN ?", labelFour)
-	}
-	if len(labelSeven) > 0 {
-		situationQuery = situationQuery.Where("label_seven IN ?", labelSeven)
-	}
-
-	// 获取符合条件的商品ID
-	situationQuery.Pluck("commodity_id", &commodityIDs)
-
-	// 然后到商品表查询信息，筛选掉价格为0和库存为0的商品
-	query := db.DB.Model(&models.Commodity{}).Where("price > ?", 0).Where("inventory > 0").Order("-created_at")
-
-	// 处理时间筛选
 	if beginTime != "" {
 		t, err := time.ParseInLocation("2006-01-02 15:04:05", beginTime, time.Local)
 		if err != nil {
@@ -427,420 +652,71 @@ func GetCommodityList(demand, styleCode string, category interface{}, status str
 		}
 	}
 
-	// 如果有符合条件的商品ID，使用ID过滤
-	if len(commodityIDs) > 0 {
-		query = query.Where("commodity_id IN ?", commodityIDs)
-	} else if !(demand == "style_code" || demand == "goods") && (status != "" || category != nil || len(labelOne) > 0 || len(labelTwo) > 0 || len(labelThree) > 0 || len(labelFour) > 0 || len(labelSeven) > 0 || beginTime != "" || endTime != "") {
-		// 如果有任何过滤条件但没有符合的商品ID，直接返回空结果
-		return []map[string]interface{}{}, 0, 0, nil
-	}
-
-	// 处理特定需求
 	if demand == "style_code" || demand == "goods" {
-		// 获取符合款式状态的款式代码
-		var styleCodes []string
-		styleQuery := db.DB.Model(&models.StyleCodeSituation{})
-		
-		// 如果指定了status，根据status筛选；否则默认筛选online
-		if status != "" {
-			styleQuery = styleQuery.Where("status = ?", status)
-		} else {
-			styleQuery = styleQuery.Where("status = ?", "online")
-		}
-		
-		// 调试日志：记录筛选条件
-		log.Printf("查询款式状态，demand: %s, status: %s", demand, status)
-		styleQuery.Pluck("style_code", &styleCodes)
-		log.Printf("找到的款式代码数量: %d, 款式代码: %v", len(styleCodes), styleCodes)
-
-		// 如果没有找到符合条件的款式代码，直接返回空结果
-		if len(styleCodes) == 0 {
-			return []map[string]interface{}{}, 0, 0, nil
-		}
-
-		query = query.Where("style_code IN ?", styleCodes)
-
-		// 根据style_code过滤
+		query = applyStyleStatusFilter(query, status)
 		if styleCode != "" {
 			query = query.Where("style_code = ?", styleCode)
 		}
 	}
 
-	// 根据模式选择不同的查询和分页策略
 	if demand == "style_code" {
-		// style_code模式：相同style_code只返回一条记录
-		// 首先获取所有符合条件的商品
-		query.Find(&commodities)
-
-		// 使用map去重，确保每个style_code只保留一条最新记录
-		uniqueCommodities := []models.Commodity{}
-		seenStyleCodes := make(map[string]bool)
-
-		for _, commodity := range commodities {
-			if !seenStyleCodes[commodity.StyleCode] {
-				seenStyleCodes[commodity.StyleCode] = true
-				uniqueCommodities = append(uniqueCommodities, commodity)
-			}
+		pageData, totalCount, pageCount, err := paginateStyleCodeCommodities(query, page, pageSize)
+		if err != nil {
+			return nil, 0, 0, err
 		}
-
-		// 手动处理分页
-		total = int64(len(uniqueCommodities))
-		start := (page - 1) * pageSize
-		end := start + pageSize
-
-		// 确保end不越界
-		if end > len(uniqueCommodities) {
-			end = len(uniqueCommodities)
-		}
-
-		// 获取当前页数据
-		if start < len(uniqueCommodities) {
-			commoditiesPage = uniqueCommodities[start:end]
-		} else {
-			commoditiesPage = []models.Commodity{}
-		}
-
-		totalPages = (total + int64(pageSize) - 1) / int64(pageSize)
+		commoditiesPage = pageData
+		total = totalCount
+		totalPages = pageCount
 	} else {
-		// 其他模式：标准分页处理
-		query.Count(&total)
+		if err := query.Count(&total).Error; err != nil {
+			return nil, 0, 0, err
+		}
 		offset := (page - 1) * pageSize
-		query.Offset(offset).Limit(pageSize).Find(&commoditiesPage)
+		if err := query.Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&commoditiesPage).Error; err != nil {
+			return nil, 0, 0, err
+		}
 		totalPages = (total + int64(pageSize) - 1) / int64(pageSize)
 	}
 
-	// 构建响应数据
-	result := make([]map[string]interface{}, 0, len(commoditiesPage))
-	// 获取请求的协议，考虑反向代理环境
-	proto := utils.GetRequestProto(c)
-	baseURL := fmt.Sprintf("%s://%s", proto, c.Request.Host)
-
-	for _, commodity := range commoditiesPage {
-		var goodsData map[string]interface{}
-
-		// 查询款式上线情况
-		var styleSituation models.StyleCodeSituation
-		var onlineStatus string
-		var onlineTime string
-		db.DB.Where("style_code = ?", commodity.StyleCode).First(&styleSituation)
-		if styleSituation.Status != "" {
-			onlineStatus = styleSituation.Status
-			if styleSituation.OnlineTime != nil {
-				onlineTime = styleSituation.OnlineTime.Format("2006-01-02 15:04:05")
-			}
-		} else {
-			onlineStatus = ""
-			onlineTime = ""
-		}
-
-		// 根据demand参数决定返回数据格式
-		if demand == "style_code" || demand == "goods" {
-			// 对于style_code或goods需求，只返回指定字段
-			goodsData = make(map[string]interface{})
-
-			// 构建promo_image_url，当为空时使用image的值
-			var promoImageURL string
-			if commodity.PromoImage != "" {
-				promoImageURL = utils.BuildFullImageURL(baseURL, commodity.PromoImage, "media")
-			} else if commodity.Image != "" {
-				promoImageURL = utils.BuildFullImageURL(baseURL, commodity.Image, "media")
-			} else {
-				// 查找第一个主图作为备用
-				var mainImage models.CommodityImage
-				db.DB.Where("commodity_id = ? AND is_main = ?", commodity.CommodityID, true).First(&mainImage)
-				if mainImage.ID > 0 {
-					promoImageURL = utils.BuildFullImageURL(baseURL, mainImage.Image, "media")
-				} else {
-					promoImageURL = ""
-				}
-			}
-
-			goodsData["promo_image_url"] = promoImageURL
-			goodsData["price"] = commodity.Price
-			goodsData["name"] = commodity.Name
-			goodsData["style_code"] = commodity.StyleCode
-			goodsData["created_at"] = commodity.CreatedAt.Format("2006-01-02 15:04:05")
-			goodsData["online_status"] = onlineStatus
-			goodsData["online_time"] = onlineTime
-		} else {
-			// 原始逻辑：返回所有字段
-			goodsData = make(map[string]interface{})
-			goodsData["commodity_id"] = commodity.CommodityID
-			goodsData["name"] = commodity.Name
-			goodsData["style"] = commodity.StyleCode
-			goodsData["category"] = commodity.Category
-			goodsData["price"] = commodity.Price
-
-			// 构建图片URL
-			if commodity.PromoImage != "" {
-				goodsData["promo_image_url"] = utils.BuildFullImageURL(baseURL, commodity.PromoImage, "media")
-			} else {
-				goodsData["promo_image_url"] = ""
-			}
-
-			// 格式化时间
-			goodsData["created_at"] = commodity.CreatedAt.Format("2006-01-02 15:04:05")
-			goodsData["online_status"] = onlineStatus
-			goodsData["online_time"] = onlineTime
-
-			// 构建图片列表
-			var commodityImages []models.CommodityImage
-			db.DB.Where("commodity_id = ?", commodity.CommodityID).Find(&commodityImages)
-
-			imageURLs := make([]map[string]interface{}, 0, len(commodityImages))
-			var mainImage map[string]interface{}
-			otherImages := make([]map[string]interface{}, 0)
-
-			for _, img := range commodityImages {
-				imgInfo := make(map[string]interface{})
-				imgInfo["id"] = img.ID
-				imgInfo["url"] = utils.BuildFullImageURL(baseURL, img.Image, "media")
-				imgInfo["is_main"] = img.IsMain
-				imgInfo["created_at"] = img.CreatedAt.Format("2006-01-02 15:04:05")
-
-				imageURLs = append(imageURLs, imgInfo)
-
-				if img.IsMain {
-					mainImage = imgInfo
-				} else {
-					otherImages = append(otherImages, imgInfo)
-				}
-			}
-
-			goodsData["images"] = imageURLs
-			goodsData["main_image"] = mainImage
-			goodsData["other_images"] = otherImages
-		}
-
-		result = append(result, goodsData)
-	}
-
-	return result, total, totalPages, nil
+	return buildCommodityListResult(commoditiesPage, demand, c, true), total, totalPages, nil
 }
 
 // GetCommodityListWX 商品查询（小程序专用，不包含新增的时间筛选和字段）
 func GetCommodityListWX(demand, styleCode string, category interface{}, status string, labelOne, labelTwo, labelThree, labelFour, labelSeven []string, page, pageSize int, c *gin.Context) ([]map[string]interface{}, int64, int64, error) {
-	var commodities []models.Commodity
 	var commoditiesPage []models.Commodity
 	var total int64
 	var totalPages int64
 
-	// 首先从CommoditySituation中获取符合条件的商品ID
-	var commodityIDs []string
-	situationQuery := db.DB.Model(&models.CommoditySituation{})
+	query := db.DB.Model(&models.Commodity{}).Where("price > ?", 0).Where("inventory > ?", 0)
+	query, _ = applyCommoditySituationFilters(query, category, status, labelOne, labelTwo, labelThree, labelFour, labelSeven)
 
-	// 处理状态过滤 - CommoditySituation表的状态过滤
-	if status != "" {
-		situationQuery = situationQuery.Where("status = ?", status)
-	}
-
-	// 处理分类过滤
-	if category != nil {
-		if categoryList, ok := category.([]interface{}); ok {
-			stringList := make([]string, 0, len(categoryList))
-			for _, cat := range categoryList {
-				if strCat, ok := cat.(string); ok {
-					stringList = append(stringList, strCat)
-				}
-			}
-			situationQuery = situationQuery.Where("category IN ?", stringList)
-		} else if strCat, ok := category.(string); ok {
-			situationQuery = situationQuery.Where("category = ?", strCat)
-		}
-	}
-
-	// 处理标签过滤
-	if len(labelOne) > 0 {
-		situationQuery = situationQuery.Where("label_one IN ?", labelOne)
-	}
-	if len(labelTwo) > 0 {
-		situationQuery = situationQuery.Where("label_two IN ?", labelTwo)
-	}
-	if len(labelThree) > 0 {
-		situationQuery = situationQuery.Where("label_three IN ?", labelThree)
-	}
-	if len(labelFour) > 0 {
-		situationQuery = situationQuery.Where("label_four IN ?", labelFour)
-	}
-	if len(labelSeven) > 0 {
-		situationQuery = situationQuery.Where("label_seven IN ?", labelSeven)
-	}
-
-	// 获取符合条件的商品ID
-	situationQuery.Pluck("commodity_id", &commodityIDs)
-
-	// 然后到商品表查询信息，筛选掉价格为0和库存为0的商品
-	query := db.DB.Model(&models.Commodity{}).Where("price > ?", 0).Where("inventory > 0").Order("-created_at")
-
-	// 如果有符合条件的商品ID，使用ID过滤
-	if len(commodityIDs) > 0 {
-		query = query.Where("commodity_id IN ?", commodityIDs)
-	} else if !(demand == "style_code" || demand == "goods") && (status != "" || category != nil || len(labelOne) > 0 || len(labelTwo) > 0 || len(labelThree) > 0 || len(labelFour) > 0 || len(labelSeven) > 0) {
-		// 如果有任何过滤条件但没有符合的商品ID，直接返回空结果
-		return []map[string]interface{}{}, 0, 0, nil
-	}
-
-	// 处理特定需求
 	if demand == "style_code" || demand == "goods" {
-		// 获取符合款式状态的款式代码
-		var styleCodes []string
-		styleQuery := db.DB.Model(&models.StyleCodeSituation{})
-		
-		// 如果指定了status，根据status筛选；否则默认筛选online
-		if status != "" {
-			styleQuery = styleQuery.Where("status = ?", status)
-		} else {
-			styleQuery = styleQuery.Where("status = ?", "online")
-		}
-		
-		// 调试日志：记录筛选条件
-		log.Printf("查询款式状态，demand: %s, status: %s", demand, status)
-		styleQuery.Pluck("style_code", &styleCodes)
-		log.Printf("找到的款式代码数量: %d, 款式代码: %v", len(styleCodes), styleCodes)
-
-		// 如果没有找到符合条件的款式代码，直接返回空结果
-		if len(styleCodes) == 0 {
-			return []map[string]interface{}{}, 0, 0, nil
-		}
-
-		query = query.Where("style_code IN ?", styleCodes)
-
-		// 根据style_code过滤
+		query = applyStyleStatusFilter(query, status)
 		if styleCode != "" {
 			query = query.Where("style_code = ?", styleCode)
 		}
 	}
 
-	// 根据模式选择不同的查询和分页策略
 	if demand == "style_code" {
-		// style_code模式：相同style_code只返回一条记录
-		// 首先获取所有符合条件的商品
-		query.Find(&commodities)
-
-		// 使用map去重，确保每个style_code只保留一条最新记录
-		uniqueCommodities := []models.Commodity{}
-		seenStyleCodes := make(map[string]bool)
-
-		for _, commodity := range commodities {
-			if !seenStyleCodes[commodity.StyleCode] {
-				seenStyleCodes[commodity.StyleCode] = true
-				uniqueCommodities = append(uniqueCommodities, commodity)
-			}
+		pageData, totalCount, pageCount, err := paginateStyleCodeCommodities(query, page, pageSize)
+		if err != nil {
+			return nil, 0, 0, err
 		}
-
-		// 手动处理分页
-		total = int64(len(uniqueCommodities))
-		start := (page - 1) * pageSize
-		end := start + pageSize
-
-		// 确保end不越界
-		if end > len(uniqueCommodities) {
-			end = len(uniqueCommodities)
-		}
-
-		// 获取当前页数据
-		if start < len(uniqueCommodities) {
-			commoditiesPage = uniqueCommodities[start:end]
-		} else {
-			commoditiesPage = []models.Commodity{}
-		}
-
-		totalPages = (total + int64(pageSize) - 1) / int64(pageSize)
+		commoditiesPage = pageData
+		total = totalCount
+		totalPages = pageCount
 	} else {
-		// 其他模式：标准分页处理
-		query.Count(&total)
+		if err := query.Count(&total).Error; err != nil {
+			return nil, 0, 0, err
+		}
 		offset := (page - 1) * pageSize
-		query.Offset(offset).Limit(pageSize).Find(&commoditiesPage)
+		if err := query.Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&commoditiesPage).Error; err != nil {
+			return nil, 0, 0, err
+		}
 		totalPages = (total + int64(pageSize) - 1) / int64(pageSize)
 	}
 
-	// 构建响应数据
-	result := make([]map[string]interface{}, 0, len(commoditiesPage))
-	// 获取请求的协议，考虑反向代理环境
-	proto := utils.GetRequestProto(c)
-	baseURL := fmt.Sprintf("%s://%s", proto, c.Request.Host)
-
-	for _, commodity := range commoditiesPage {
-		var goodsData map[string]interface{}
-
-		// 根据demand参数决定返回数据格式
-		if demand == "style_code" || demand == "goods" {
-			// 对于style_code或goods需求，只返回指定字段
-			goodsData = make(map[string]interface{})
-
-			// 构建promo_image_url，当为空时使用image的值
-			var promoImageURL string
-			if commodity.PromoImage != "" {
-				promoImageURL = utils.BuildFullImageURL(baseURL, commodity.PromoImage, "media")
-			} else if commodity.Image != "" {
-				promoImageURL = utils.BuildFullImageURL(baseURL, commodity.Image, "media")
-			} else {
-				// 查找第一个主图作为备用
-				var mainImage models.CommodityImage
-				db.DB.Where("commodity_id = ? AND is_main = ?", commodity.CommodityID, true).First(&mainImage)
-				if mainImage.ID > 0 {
-					promoImageURL = utils.BuildFullImageURL(baseURL, mainImage.Image, "media")
-				} else {
-					promoImageURL = ""
-				}
-			}
-
-			goodsData["promo_image_url"] = promoImageURL
-			goodsData["price"] = commodity.Price
-			goodsData["name"] = commodity.Name
-			goodsData["style_code"] = commodity.StyleCode
-		} else {
-			// 原始逻辑：返回所有字段
-			goodsData = make(map[string]interface{})
-			goodsData["commodity_id"] = commodity.CommodityID
-			goodsData["name"] = commodity.Name
-			goodsData["style"] = commodity.StyleCode
-			goodsData["category"] = commodity.Category
-			goodsData["price"] = commodity.Price
-
-			// 构建图片URL
-			if commodity.PromoImage != "" {
-				goodsData["promo_image_url"] = utils.BuildFullImageURL(baseURL, commodity.PromoImage, "media")
-			} else {
-				goodsData["promo_image_url"] = ""
-			}
-
-			// 格式化时间
-			goodsData["created_at"] = commodity.CreatedAt.Format("2006-01-02 15:04:05")
-
-			// 构建图片列表
-			var commodityImages []models.CommodityImage
-			db.DB.Where("commodity_id = ?", commodity.CommodityID).Find(&commodityImages)
-
-			imageURLs := make([]map[string]interface{}, 0, len(commodityImages))
-			var mainImage map[string]interface{}
-			otherImages := make([]map[string]interface{}, 0)
-
-			for _, img := range commodityImages {
-				imgInfo := make(map[string]interface{})
-				imgInfo["id"] = img.ID
-				imgInfo["url"] = utils.BuildFullImageURL(baseURL, img.Image, "media")
-				imgInfo["is_main"] = img.IsMain
-				imgInfo["created_at"] = img.CreatedAt.Format("2006-01-02 15:04:05")
-
-				imageURLs = append(imageURLs, imgInfo)
-
-				if img.IsMain {
-					mainImage = imgInfo
-				} else {
-					otherImages = append(otherImages, imgInfo)
-				}
-			}
-
-			goodsData["images"] = imageURLs
-			goodsData["main_image"] = mainImage
-			goodsData["other_images"] = otherImages
-		}
-
-		result = append(result, goodsData)
-	}
-
-	return result, total, totalPages, nil
+	return buildCommodityListResult(commoditiesPage, demand, c, false), total, totalPages, nil
 }
 
 // UpdateCommodity 更新商品信息

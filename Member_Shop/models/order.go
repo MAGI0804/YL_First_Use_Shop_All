@@ -9,7 +9,7 @@ import (
 // Order 订单模型
 type Order struct {
 	OrderID           string    `gorm:"column:order_id;primaryKey;size:20;comment:订单ID/订单号" json:"order_id"`                 //订单id
-	UserID            int       `gorm:"column:user_id;not null;default:0;comment:用户ID" json:"user_id"`                       //用户ID
+	UserID            int       `gorm:"column:user_id;not null;default:0;index;comment:用户ID" json:"user_id"`                 //用户ID
 	InternalId        int       `gorm:"column:internal_id;not null;default:0;comment:内部ID" json:"internal_id"`               //内部ID
 	ReceiverName      string    `gorm:"column:receiver_name;size:100;not null;comment:收货人姓名" json:"receiver_name"`           //收货人姓名
 	ReceiverPhone     string    `gorm:"column:receiver_phone;size:15;null;comment:收货人电话" json:"receiver_phone"`              //收货人电话
@@ -26,14 +26,14 @@ type Order struct {
 	FinalPayAmount    float64   `gorm:"column:final_pay_amount;type:decimal(10,2);not null;default:0;comment:final payment amount" json:"final_pay_amount"`
 	DiscountAmount    float64   `gorm:"column:discount_amount;type:decimal(10,2);not null;default:0;comment:discount amount" json:"discount_amount"`
 	DiscountReason    string    `gorm:"column:discount_reason;type:text;null;comment:discount reason" json:"discount_reason"`
-	Status            string    `gorm:"column:status;size:20;not null;default:'pending';comment:order lifecycle status: pending/shipped/delivered/canceled" json:"status"` // Lifecycle status. Payment happens after delivered.
-	PayStatus         string    `gorm:"column:pay_status;size:20;not null;default:'unpaid';comment:payment status: unpaid/paid" json:"pay_status"`                         // Payment status. It is separate from shipping/signing status.
+	Status            string    `gorm:"column:status;size:20;not null;index;default:'pending';comment:order lifecycle status: pending/shipped/delivered/canceled" json:"status"` // Lifecycle status. Payment happens after delivered.
+	PayStatus         string    `gorm:"column:pay_status;size:20;not null;default:'unpaid';comment:payment status: unpaid/paid" json:"pay_status"`                               // Payment status. It is separate from shipping/signing status.
 	PaymentOperatorID int       `gorm:"column:payment_operator_id;default:0;comment:payment operator id" json:"payment_operator_id"`
 	PaymentRemark     string    `gorm:"column:payment_remark;type:text;null;comment:payment remark" json:"payment_remark"`
 	PriceAdjustedBy   int       `gorm:"column:price_adjusted_by;default:0;comment:price adjusted by" json:"price_adjusted_by"`
 	PriceAdjustedAt   time.Time `gorm:"column:price_adjusted_at;null;comment:price adjusted at" json:"price_adjusted_at"`
-	OrderTime         time.Time `gorm:"column:order_time;autoCreateTime;comment:下单时间" json:"order_time"` //下单时间
-	Remarks           string    `gorm:"column:remarks;type:text;null;comment:备注" json:"remarks"`         //备注
+	OrderTime         time.Time `gorm:"column:order_time;autoCreateTime;index;comment:下单时间" json:"order_time"` //下单时间
+	Remarks           string    `gorm:"column:remarks;type:text;null;comment:备注" json:"remarks"`               //备注
 	PaymentMethod     string    `gorm:"column:payment_method;size:20;null;comment:支付方式" json:"payment_method"`
 	DeliveryMethod    string    `gorm:"column:delivery_method;size:20;null;comment:配送方式" json:"delivery_method"`
 	PaymentTime       time.Time `gorm:"column:payment_time;null;comment:支付时间" json:"payment_time"`                              //支付时间
