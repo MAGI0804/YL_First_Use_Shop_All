@@ -48,6 +48,22 @@ type ReturnOrderCreateInput struct {
 	Remark          string
 }
 
+type ReturnReasonRank struct {
+	Reason string `json:"reason" gorm:"column:reason"`
+	Count  int64  `json:"count" gorm:"column:count"`
+}
+
+type ReturnOrderStatisticsResult struct {
+	TotalCount      int64              `json:"total_count"`
+	PendingCount    int64              `json:"pending_count"`
+	CompletedCount  int64              `json:"completed_count"`
+	AfterSaleRate   float64            `json:"after_sale_rate"`
+	AfterSaleAmount float64            `json:"after_sale_amount"`
+	ReasonRank      []ReturnReasonRank `json:"reason_rank"`
+	CompletedOrders int64              `json:"completed_orders"`
+	AfterSaleOrders int64              `json:"after_sale_orders"`
+}
+
 func ConvertReturnOrderToMap(returnOrder models.ReturnOrder) map[string]interface{} {
 	result := make(map[string]interface{})
 	result["id"] = returnOrder.ID
@@ -142,6 +158,133 @@ func CreateReturnOrderFromInput(input ReturnOrderCreateInput) (*ReturnOrderResul
 		return nil
 	})
 	return result, err
+}
+
+func ReturnOrderStatistics(beginTime, endTime string) (*ReturnOrderStatisticsResult, error) {
+	begin, end, err := parseReturnOrderTimeRange(beginTime, endTime)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &ReturnOrderStatisticsResult{ReasonRank: []ReturnReasonRank{}}
+	query := returnOrderStatisticsQuery(begin, end)
+	if err := query.Count(&result.TotalCount).Error; err != nil {
+		return nil, err
+	}
+	if err := returnOrderStatisticsQuery(begin, end).Where("status = ?", ReturnOrderStatusPending).Count(&result.PendingCount).Error; err != nil {
+		return nil, err
+	}
+	if err := returnOrderStatisticsQuery(begin, end).Where("status IN ?", []string{ReturnOrderStatusCompleted, "returned"}).Count(&result.CompletedCount).Error; err != nil {
+		return nil, err
+	}
+	if err := returnOrderStatisticsQuery(begin, end).
+		Select("COUNT(DISTINCT order_id)").
+		Scan(&result.AfterSaleOrders).Error; err != nil {
+		return nil, err
+	}
+	if err := completedOrderStatisticsQuery(begin, end).Count(&result.CompletedOrders).Error; err != nil {
+		return nil, err
+	}
+	result.AfterSaleRate = calculateAfterSaleRate(result.AfterSaleOrders, result.CompletedOrders)
+
+	if err := returnOrderAmountQuery(begin, end).
+		Scan(&result.AfterSaleAmount).Error; err != nil {
+		return nil, err
+	}
+	result.AfterSaleAmount = roundFloat(result.AfterSaleAmount, 2)
+
+	if err := returnOrderStatisticsQuery(begin, end).
+		Select("reason, COUNT(*) AS count").
+		Where("reason <> ''").
+		Group("reason").
+		Order("count DESC").
+		Limit(10).
+		Scan(&result.ReasonRank).Error; err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func returnOrderStatisticsQuery(begin, end *time.Time) *gorm.DB {
+	query := db.DB.Model(&models.ReturnOrder{})
+	if begin != nil {
+		query = query.Where("request_time >= ?", *begin)
+	}
+	if end != nil {
+		query = query.Where("request_time <= ?", *end)
+	}
+	return query
+}
+
+func completedOrderStatisticsQuery(begin, end *time.Time) *gorm.DB {
+	query := db.DB.Model(&models.Order{}).Where("status = ?", "delivered")
+	if begin != nil {
+		query = query.Where("delivered_time >= ?", *begin)
+	}
+	if end != nil {
+		query = query.Where("delivered_time <= ?", *end)
+	}
+	return query
+}
+
+func returnOrderAmountQuery(begin, end *time.Time) *gorm.DB {
+	query := db.DB.Table("return_order_data AS r").
+		Joins("LEFT JOIN sub_order_data AS s ON s.sub_order_id = r.sub_order_id").
+		Joins("LEFT JOIN order_data AS o ON o.order_id = r.order_id").
+		Where("r.status IN ?", []string{ReturnOrderStatusCompleted, "returned"}).
+		Where("r.type IN ?", []string{"refund", "return", "return_refund"})
+	if begin != nil {
+		query = query.Where("r.completed_time >= ?", *begin)
+	}
+	if end != nil {
+		query = query.Where("r.completed_time <= ?", *end)
+	}
+	return query.Select("COALESCE(SUM(COALESCE(s.sub_amount, o.final_pay_amount, o.order_amount, 0)), 0)")
+}
+
+func parseReturnOrderTimeRange(beginTime, endTime string) (*time.Time, *time.Time, error) {
+	begin, err := parseReturnOrderTime(beginTime, false)
+	if err != nil {
+		return nil, nil, err
+	}
+	end, err := parseReturnOrderTime(endTime, true)
+	if err != nil {
+		return nil, nil, err
+	}
+	if begin != nil && end != nil && begin.After(*end) {
+		return nil, nil, fmt.Errorf("begin_time cannot be after end_time")
+	}
+	return begin, end, nil
+}
+
+func parseReturnOrderTime(value string, isEnd bool) (*time.Time, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil, nil
+	}
+	layouts := []string{
+		time.RFC3339,
+		"2006-01-02 15:04:05",
+		"2006-01-02",
+	}
+	for _, layout := range layouts {
+		parsed, err := time.ParseInLocation(layout, value, time.Local)
+		if err != nil {
+			continue
+		}
+		if isEnd && layout == "2006-01-02" {
+			parsed = parsed.AddDate(0, 0, 1).Add(-time.Nanosecond)
+		}
+		return &parsed, nil
+	}
+	return nil, fmt.Errorf("invalid return order time %q", value)
+}
+
+func calculateAfterSaleRate(afterSaleOrders, completedOrders int64) float64 {
+	if completedOrders <= 0 {
+		return 0
+	}
+	return roundFloat(float64(afterSaleOrders)/float64(completedOrders), 4)
 }
 
 func buildReturnOrderForCreate(tx *gorm.DB, input ReturnOrderCreateInput) (*models.Order, *models.ReturnOrder, error) {

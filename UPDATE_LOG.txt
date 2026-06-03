@@ -21,3 +21,5 @@ Youlan Kids Shop update log
 - Tests: added inventory base repair validation and change-type coverage.
 - Web operations: added an Inventory page with query, warning, log, manual adjustment, transfer, and stock check workflows.
 - Verification: go test ./... passed; npm run build passed.
+- Week 6 backend after-sales: added /return_order/statistics, after-sale rate/amount/reason ranking, and relaxed create-time buyer address validation for refund-only requests.
+- Week 6 tests: added after-sales statistics rate and time-range coverage.

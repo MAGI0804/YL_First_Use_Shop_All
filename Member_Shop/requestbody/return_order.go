@@ -13,11 +13,11 @@ type ReturnOrderCreateRequest struct {
 	SpecificReasons string   `json:"specific_reasons"`
 	ReturnAmount    float64  `json:"return_amount"`
 	ProductIDs      []string `json:"product_ids"`
-	BuyerProvince   string   `json:"buyer_province" binding:"required"`
-	BuyerCity       string   `json:"buyer_city" binding:"required"`
-	BuyerCounty     string   `json:"buyer_county" binding:"required"`
-	BuyerAddress    string   `json:"buyer_address" binding:"required"`
-	BuyerPhone      string   `json:"buyer_phone" binding:"required"`
+	BuyerProvince   string   `json:"buyer_province"`
+	BuyerCity       string   `json:"buyer_city"`
+	BuyerCounty     string   `json:"buyer_county"`
+	BuyerAddress    string   `json:"buyer_address"`
+	BuyerPhone      string   `json:"buyer_phone"`
 	Remark          string   `json:"remark"`
 }
 
@@ -42,4 +42,9 @@ type ReturnOrderApproveRequest struct {
 // ReturnOrderDetailRequest 退货订单详情查询请求体
 type ReturnOrderDetailRequest struct {
 	ReturnOrderID string `json:"return_order_id" binding:"required"`
+}
+
+type ReturnOrderStatisticsRequest struct {
+	BeginTime string `json:"begin_time"`
+	EndTime   string `json:"end_time"`
 }

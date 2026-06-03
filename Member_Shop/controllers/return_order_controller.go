@@ -65,6 +65,28 @@ func (roc *ReturnOrderController) CreateReturnOrder(c *gin.Context) {
 	c.JSON(http.StatusOK, msg.SuccessResponse("创建退货订单成功", &info))
 }
 
+// ReturnOrderStatistics returns after-sales summary metrics for operations.
+func (roc *ReturnOrderController) ReturnOrderStatistics(c *gin.Context) {
+	var req requestbody.ReturnOrderStatisticsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponse("请求参数错误", err))
+		c.Abort()
+		return
+	}
+
+	statistics, err := method.ReturnOrderStatistics(req.BeginTime, req.EndTime)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr(err.Error()))
+		c.Abort()
+		return
+	}
+
+	info := map[string]any{
+		"statistics": statistics,
+	}
+	c.JSON(http.StatusOK, msg.SuccessResponse("success", &info))
+}
+
 // ReturnOrderDeliver 退货订单发货
 func (roc *ReturnOrderController) ReturnOrderDeliver(c *gin.Context) {
 	var req requestbody.ReturnOrderDeliverRequest

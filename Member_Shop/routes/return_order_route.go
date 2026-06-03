@@ -30,5 +30,7 @@ func InitReturnOrderRoutes(router *gin.Engine) {
 		returnOrderGroup.POST("query", returnOrderController.QueryReturnOrder)
 		// 退货订单详情路由
 		returnOrderGroup.POST("detail", returnOrderController.GetReturnOrderDetail)
+		// 售后统计路由
+		returnOrderGroup.POST("statistics", returnOrderController.ReturnOrderStatistics)
 	}
 }
