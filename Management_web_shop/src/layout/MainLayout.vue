@@ -36,6 +36,10 @@
             <el-icon><Service /></el-icon>
             <span>售后中心</span>
           </el-menu-item>
+          <el-menu-item index="/reviews">
+            <el-icon><ChatDotRound /></el-icon>
+            <span>评价管理</span>
+          </el-menu-item>
           <el-menu-item index="/member">
             <el-icon><UserFilled /></el-icon>
             <span>会员管理</span>
@@ -79,7 +83,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Box, DataAnalysis, Document, Goods, PieChart, User, UserFilled, Service } from '@element-plus/icons-vue'
+import { Box, ChatDotRound, DataAnalysis, Document, Goods, PieChart, User, UserFilled, Service } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
 const route = useRoute()

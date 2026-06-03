@@ -111,6 +111,214 @@ export const getReportData = (params: any) => {
   return http.get('/report/data', { params })
 }
 
+export interface AnalyticsFilterParams {
+  begin_time?: string
+  end_time?: string
+  shopname?: string
+  category?: string
+  style_code?: string
+  low_inventory_threshold?: number
+  slow_sales_threshold?: number
+  limit?: number
+}
+
+export interface SalesDailyPoint {
+  date: string
+  order_count: number
+  paid_order_count: number
+  canceled_order_count: number
+  sales_amount: number
+  paid_amount: number
+  original_order_amount: number
+  discount_amount: number
+  refund_amount: number
+  average_order_value: number
+}
+
+export interface SalesSummaryData {
+  order_count: number
+  paid_order_count: number
+  canceled_order_count: number
+  sales_amount: number
+  paid_amount: number
+  original_order_amount: number
+  discount_amount: number
+  refund_amount: number
+  average_order_value: number
+  daily: SalesDailyPoint[]
+}
+
+export interface UserPreferencePoint {
+  name: string
+  user_count: number
+  sales_qty: number
+}
+
+export interface UserSummaryData {
+  new_user_count: number
+  new_member_count: number
+  order_user_count: number
+  paid_user_count: number
+  repurchase_user_count: number
+  category_preferences: UserPreferencePoint[]
+  style_preferences: UserPreferencePoint[]
+}
+
+export interface ProductSalesPoint {
+  commodity_id: string
+  name: string
+  style_code: string
+  category: string
+  sales_qty: number
+  sales_amount: number
+  inventory: number
+}
+
+export interface StyleSalesPoint {
+  style_code: string
+  sales_qty: number
+  sales_amount: number
+  inventory: number
+}
+
+export interface ProductSummaryData {
+  hot_skus: ProductSalesPoint[]
+  hot_style_codes: StyleSalesPoint[]
+  slow_moving_products: ProductSalesPoint[]
+  inventory_turnover_rate: number
+  low_inventory_count: number
+  average_rating: number
+  good_rate: number
+}
+
+export interface AnalyticsSummaryResponse<T> {
+  code: number
+  data: {
+    summary: T
+  }
+  msg: string
+}
+
+export interface AnalyticsExportResponse {
+  code: number
+  data: {
+    export: {
+      sales: SalesSummaryData
+      users: UserSummaryData
+      products: ProductSummaryData
+      traffic?: any
+    }
+  }
+  msg: string
+}
+
+export const querySalesSummary = (params: AnalyticsFilterParams) => {
+  return http.post<AnalyticsSummaryResponse<SalesSummaryData>>('/analytics/sales_summary', params)
+}
+
+export const queryUserSummary = (params: AnalyticsFilterParams) => {
+  return http.post<AnalyticsSummaryResponse<UserSummaryData>>('/analytics/user_summary', params)
+}
+
+export const queryProductSummary = (params: AnalyticsFilterParams) => {
+  return http.post<AnalyticsSummaryResponse<ProductSummaryData>>('/analytics/product_summary', params)
+}
+
+export const exportAnalytics = (params: AnalyticsFilterParams) => {
+  return http.post<AnalyticsExportResponse>('/analytics/export', params)
+}
+
+export interface ReviewReplyItem {
+  id: number
+  review_id: number
+  operator_id: string
+  content: string
+  created_at: string
+}
+
+export interface ReviewItem {
+  id: number
+  user_id: number
+  order_id: string
+  sub_order_id: string
+  commodity_id: string
+  style_code: string
+  rating: number
+  content: string
+  images: string
+  tags: string
+  status: string
+  audit_remark: string
+  created_at: string
+  updated_at: string
+  replies?: ReviewReplyItem[]
+}
+
+export interface ReviewBackendQueryParams {
+  user_id?: number
+  order_id?: string
+  sub_order_id?: string
+  commodity_id?: string
+  style_code?: string
+  status?: string
+  page: number
+  page_size: number
+}
+
+export interface ReviewQueryResponse {
+  code: number
+  data: {
+    data: ReviewItem[]
+    total: number
+    page: number
+    page_size: number
+  }
+  msg: string
+}
+
+export interface ReviewAuditParams {
+  review_id: number
+  status: 'approved' | 'rejected' | 'hidden'
+  audit_remark?: string
+}
+
+export interface ReviewReplyParams {
+  review_id: number
+  operator_id: string
+  content: string
+}
+
+export interface ReviewStatisticsData {
+  total: number
+  average_rating: number
+  good_rate: number
+  rating_distribution: Record<string, number>
+}
+
+export interface ReviewStatisticsResponse {
+  code: number
+  data: {
+    statistics: ReviewStatisticsData
+  }
+  msg: string
+}
+
+export const queryBackendReviews = (params: ReviewBackendQueryParams) => {
+  return http.post<ReviewQueryResponse>('/review/query_backend', params)
+}
+
+export const auditReview = (params: ReviewAuditParams) => {
+  return http.post('/review/audit', params)
+}
+
+export const replyReview = (params: ReviewReplyParams) => {
+  return http.post('/review/reply', params)
+}
+
+export const queryReviewStatistics = (params: { commodity_id?: string; style_code?: string }) => {
+  return http.post<ReviewStatisticsResponse>('/review/statistics', params)
+}
+
 export interface OrderDetailQueryParams {
   order_id: string
   inquired_list: string[]

@@ -90,6 +90,12 @@ const routes: RouteRecordRaw[] = [
         name: 'AfterSales',
         component: () => import('@/views/AfterSales.vue'),
         meta: { title: '售后中心' }
+      },
+      {
+        path: 'reviews',
+        name: 'Reviews',
+        component: () => import('@/views/Reviews.vue'),
+        meta: { title: '评价管理' }
       }
     ]
   },
