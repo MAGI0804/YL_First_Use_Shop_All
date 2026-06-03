@@ -2,6 +2,51 @@
 const app = getApp();
 const globalUserInfo = app.globalData.userInfo || {};
 const userId = parseInt(globalUserInfo.user_id || app.globalData.user_id || wx.getStorageSync('user_id') || 0);
+
+const statusTextMap = {
+  pending: '待发货',
+  shipped: '已发货',
+  delivered: '已签收',
+  canceled: '已取消',
+  processing: '售后中'
+};
+
+const payStatusTextMap = {
+  unpaid: '未支付',
+  paid: '已支付',
+  partial_paid: '部分支付'
+};
+
+function formatMoney(value) {
+  return Number(value || 0).toFixed(2);
+}
+
+function mapOrderItem(item) {
+  const payStatus = item.pay_status || 'unpaid';
+  const orderAmount = Number(item.order_amount || 0);
+  const finalPayAmount = Number(item.final_pay_amount || item.order_amount || 0);
+
+  return {
+    id: item.order_id,
+    status: item.status,
+    statusText: statusTextMap[item.status] || item.status,
+    payStatus,
+    payStatusText: payStatusTextMap[payStatus] || '未支付',
+    createTime: item.order_time,
+    totalPrice: formatMoney(orderAmount),
+    finalPayAmount: formatMoney(finalPayAmount),
+    productCount: Array.isArray(item.product_list) ? item.product_list.length : 0,
+    process_num: item.process_num || item.return_order_id || '',
+    products: Array.isArray(item.product_list) ? item.product_list.map((productId) => ({
+      id: productId.toString(),
+      name: '加载中...',
+      price: '0.00',
+      quantity: 1,
+      image: '/images/products.png'
+    })) : []
+  };
+}
+
 Page({
   /**
    * 页面的初始数据
@@ -10,9 +55,9 @@ Page({
     // 订单状态列表
     statusList: [
       { key: 'all', name: '全部' },
-      { key: 'pending', name: '待处理' },
+      { key: 'pending', name: '待发货' },
       { key: 'shipped', name: '已发货' },
-      { key: 'delivered', name: '已送达' },
+      { key: 'delivered', name: '已签收' },
       { key: 'canceled', name: '已取消' },
       { key: 'processing', name: '售后中' }
     ],
@@ -45,6 +90,7 @@ Page({
         '全部': 'all',
         '待发货': 'pending',
         '已发货': 'shipped',
+        '已签收': 'delivered',
         '已送达': 'delivered',
         '已取消': 'canceled',
         '售后中': 'processing'
@@ -154,33 +200,7 @@ Page({
         // 处理成功响应
         if (res && res.code === 200 && res.data && res.data.data && Array.isArray(res.data.data)) {
           // 将API返回的数据转换为页面需要的数据格式
-          const orders = res.data.data.map(item => {
-            // 根据状态获取对应的中文名称
-            const statusMap = {
-              'pending': '待处理',
-              'shipped': '已发货',
-              'delivered': '已送达',
-              'canceled': '已取消',
-              'processing': '售后中'
-            };
-            
-            return {
-              id: item.order_id,
-              status: item.status,
-              statusText: statusMap[item.status] || item.status,
-              createTime: item.order_time,
-              totalPrice: parseFloat(item.order_amount).toFixed(2),
-              productCount: Array.isArray(item.product_list) ? item.product_list.length : 0,
-              process_num: item.process_num || item.return_order_id || '',
-              products: Array.isArray(item.product_list) ? item.product_list.map((productId) => ({
-                id: productId.toString(),
-                name: '加载中...',
-                price: '0.00',
-                quantity: 1,
-                image: '/images/products.png'
-              })) : []
-            };
-          });
+          const orders = res.data.data.map(mapOrderItem);
           
           // 提取所有商品ID
           const allProductIds = [];
@@ -276,33 +296,7 @@ Page({
         // 处理成功响应
         if (res && res.code === 200 && res.data && res.data.data && Array.isArray(res.data.data)) {
           // 将API返回的数据转换为页面需要的数据格式
-          const orders = res.data.data.map(item => {
-            // 根据状态获取对应的中文名称
-            const statusMap = {
-              'pending': '待处理',
-              'shipped': '已发货',
-              'delivered': '已送达',
-              'canceled': '已取消',
-              'processing': '售后中'
-            };
-            
-            return {
-              id: item.order_id,
-              status: item.status,
-              statusText: statusMap[item.status] || item.status,
-              createTime: item.order_time,
-              totalPrice: parseFloat(item.order_amount).toFixed(2),
-              productCount: Array.isArray(item.product_list) ? item.product_list.length : 0,
-              process_num: item.process_num || item.return_order_id || '',
-              products: Array.isArray(item.product_list) ? item.product_list.map((productId) => ({
-                id: productId.toString(),
-                name: '加载中...',
-                price: '0.00',
-                quantity: 1,
-                image: '/images/products.png'
-              })) : []
-            };
-          });
+          const orders = res.data.data.map(mapOrderItem);
           
           // 提取所有商品ID
           const allProductIds = [];

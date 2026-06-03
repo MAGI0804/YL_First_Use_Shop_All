@@ -70,7 +70,7 @@ Page({
         totalPrice: totalPrice,
         totalPriceFormatted: totalPrice.toFixed(2),  // 预先格式化总价
         finalPrice: finalPrice,
-        finalPriceFormatted: finalPrice.toFixed(2)  // 预先格式化实付款
+        finalPriceFormatted: finalPrice.toFixed(2)  // 预先格式化订单金额
       })
       console.log('接收购物车数据并转换格式:', formattedItems)
       console.log('计算后的总价:', totalPrice)
@@ -342,7 +342,7 @@ Page({
   },
 
   /**
-   * 计算实付款价格
+   * 计算订单金额
    */
   calculateFinalPrice(totalPrice, discount) {
     return totalPrice - discount
@@ -457,7 +457,7 @@ Page({
           
           // 显示成功提示
           wx.showToast({
-            title: '订单创建成功',
+            title: '订单已提交',
             icon: 'success',
             duration: 2000,
             success: () => {

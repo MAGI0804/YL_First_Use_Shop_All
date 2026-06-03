@@ -6,6 +6,24 @@ function getUserId() {
   return globalUserInfo.user_id || app.globalData.user_id || wx.getStorageSync('user_id') || '';
 }
 
+const statusTextMap = {
+  pending: '待发货',
+  shipped: '已发货',
+  delivered: '已签收',
+  canceled: '已取消',
+  processing: '售后中'
+};
+
+const payStatusTextMap = {
+  unpaid: '未支付',
+  paid: '已支付',
+  partial_paid: '部分支付'
+};
+
+function formatMoney(value) {
+  return Number(value || 0).toFixed(2);
+}
+
 Page({
   /**
    * 页面的初始数据
@@ -58,7 +76,7 @@ Page({
     // 准备请求参数
     const requestData = {
       order_id: this.data.orderId,
-      inquired_list: ["order_id", "order_amount", "product_list", "province", "city", "county", "detailed_address", "status", "remarks", "order_time","receiver_phone","express_company","express_number", "process_num", "processing_time"]
+      inquired_list: ["order_id", "order_amount", "final_pay_amount", "discount_amount", "discount_reason", "pay_status", "payment_time", "payment_remark", "product_list", "province", "city", "county", "detailed_address", "status", "remarks", "order_time", "receiver_name", "receiver_phone", "express_company", "express_number", "shipped_time", "delivered_time", "canceled_time", "process_num", "processing_time"]
     };
     
     // 使用app.js中的req.post方法调用API
@@ -71,14 +89,7 @@ Page({
           // 将API返回的数据转换为页面需要的数据格式
           const orderData = res.data.data || res.data;
           
-          // 根据状态获取对应的中文名称
-          const statusMap = {
-            'pending': '待处理',
-            'shipped': '已发货',
-            'delivered': '已送达',
-            'canceled': '已取消',
-            'processing': '售后中'
-          };
+          const payStatus = orderData.pay_status || 'unpaid';
           
           // 解析商品列表（兼容字符串和数组格式）
           let productList = [];
@@ -133,7 +144,9 @@ Page({
           const orderDetail = {
             id: orderData.order_id,
             status: orderData.status,
-            statusText: statusMap[orderData.status] || orderData.status,
+            statusText: statusTextMap[orderData.status] || orderData.status,
+            payStatus,
+            payStatusText: payStatusTextMap[payStatus] || '未支付',
             // 下单时间
             orderTime: orderData.order_time || new Date().toLocaleString(),
             // 发货时间
@@ -146,12 +159,17 @@ Page({
             processingTime: orderData.processing_time || '',
             // 售后订单号
             process_num: orderData.process_num || '',
-            totalPrice: orderData.order_amount,
+            totalPrice: formatMoney(orderData.order_amount),
+            finalPayAmount: formatMoney(orderData.final_pay_amount || orderData.order_amount),
+            discountAmount: formatMoney(orderData.discount_amount),
+            discountReason: orderData.discount_reason || '',
+            paymentTime: orderData.payment_time || '',
+            paymentRemark: orderData.payment_remark || '',
             productCount: productList.length,
             products: productList,
             address: address,
             logistics: logisticsInfo,
-            paymentMethod: '会员支付',
+            paymentMethod: payStatus === 'paid' ? '线下结算' : '收货后线下结算',
             orderNumber: orderData.order_id,
             remarks: orderData.remarks || ''
           };
@@ -482,33 +500,34 @@ Page({
   },
 
   /**
-   * 确认收货
+   * 确认签收
    */
   confirmReceipt() {
     const that = this;
     wx.showModal({
-      title: '确认收货',
-      content: '确认已收到商品吗？',
+      title: '确认签收',
+      content: '确认已收到商品并完成签收吗？',
       success(res) {
         if (res.confirm) {
-          // 模拟确认收货操作
-          setTimeout(() => {
-            const updatedOrder = {
-              ...that.data.orderDetail,
-              status: 'delivered',
-              statusText: '已送达',
-              receiveTime: new Date().toLocaleString()
-            };
-            
-            that.setData({
-              orderDetail: updatedOrder
-            });
-            
+          wx.showLoading({ title: '确认中...' });
+          app.req.post('/order/order_receive', {
+            order_id: that.data.orderId,
+            user_id: Number(getUserId())
+          }, () => {
+            wx.hideLoading();
             wx.showToast({
-              title: '收货成功',
+              title: '已签收',
               icon: 'success'
             });
-          }, 500);
+            that.loadOrderDetail();
+          }, (err) => {
+            console.error('确认签收失败:', err);
+            wx.hideLoading();
+            wx.showToast({
+              title: '确认签收失败',
+              icon: 'none'
+            });
+          });
         }
       }
     });

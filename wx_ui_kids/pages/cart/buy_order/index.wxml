@@ -57,7 +57,7 @@
 
   <!-- 价格信息区域 -->
   <view class="price-section">
-    <view class="section-title">价格详情</view>
+    <view class="section-title">订单金额</view>
     <view class="price-list">
       <view class="price-item">
         <text class="price-label">商品总价</text>
@@ -117,8 +117,9 @@
   <!-- 底部结算栏 -->
   <view class="bottom-bar">
     <view class="total-price">
-      <text class="total-label">实付款：</text>
+      <text class="total-label">订单金额：</text>
       <text class="total-amount">¥{{finalPriceFormatted || '0.00'}}</text>
+      <text class="settlement-tip">收货后线下结算</text>
     </view>
     <button class="submit-btn" bindtap="submitOrder">
       提交订单

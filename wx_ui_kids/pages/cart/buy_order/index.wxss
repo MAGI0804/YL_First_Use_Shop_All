@@ -334,6 +334,8 @@
 .total-price {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  max-width: 420rpx;
 }
 
 .total-label {
@@ -345,6 +347,13 @@
   font-size: 36rpx;
   color: #ff6700;
   font-weight: 600;
+}
+
+.settlement-tip {
+  width: 100%;
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: #999999;
 }
 
 .submit-btn {

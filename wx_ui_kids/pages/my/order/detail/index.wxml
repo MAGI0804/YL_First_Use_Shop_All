@@ -14,9 +14,10 @@
     <view class="order-status-info">
       <text class="order-status-text">{{orderDetail.statusText}}</text>
       <text class="order-status-desc">
-        <text wx:if="{{orderDetail.status === 'pending'}}">等待商家处理</text>
+        <text wx:if="{{orderDetail.status === 'pending'}}">订单已提交，请等待商家发货</text>
         <text wx:elif="{{orderDetail.status === 'shipped'}}">商品已发出，请耐心等待</text>
-        <text wx:elif="{{orderDetail.status === 'delivered'}}">商品已送达，感谢您的购买</text>
+        <text wx:elif="{{orderDetail.status === 'delivered' && orderDetail.payStatus !== 'paid'}}">商品已签收，等待商家确认线下收款</text>
+        <text wx:elif="{{orderDetail.status === 'delivered'}}">商品已签收，感谢您的购买</text>
         <text wx:elif="{{orderDetail.status === 'canceled'}}">订单已取消</text>
         <text wx:elif="{{orderDetail.status === 'processing'}}">售后处理中</text>
       </text>
@@ -80,8 +81,12 @@
         <text class="info-label">订单编号</text>
         <text class="info-value">{{orderDetail.orderNumber}}</text>
       </view>
+      <view class="info-item">
+        <text class="info-label">支付状态</text>
+        <text class="info-value">{{orderDetail.payStatusText}}</text>
+      </view>
       
-      <!-- 待处理状态：只显示下单时间 -->
+      <!-- 待发货状态：只显示下单时间 -->
       <block wx:if="{{orderDetail.status === 'pending'}}">
         <view class="info-item">
           <text class="info-label">下单时间</text>
@@ -101,7 +106,7 @@
         </view>
       </block>
       
-      <!-- 已送达状态：显示下单时间、发货时间、完成时间 -->
+      <!-- 已签收状态：显示下单时间、发货时间、签收时间 -->
       <block wx:elif="{{orderDetail.status === 'delivered'}}">
         <view class="info-item">
           <text class="info-label">下单时间</text>
@@ -112,7 +117,7 @@
           <text class="info-value">{{orderDetail.shippedTime}}</text>
         </view>
         <view class="info-item" wx:if="{{orderDetail.deliveredTime}}">
-          <text class="info-label">完成时间</text>
+          <text class="info-label">签收时间</text>
           <text class="info-value">{{orderDetail.deliveredTime}}</text>
         </view>
       </block>
@@ -145,10 +150,18 @@
         </view>
       </block>
       
-      <!-- <view class="info-item">
-        <text class="info-label">支付方式</text>
+      <view class="info-item">
+        <text class="info-label">结算方式</text>
         <text class="info-value">{{orderDetail.paymentMethod}}</text>
-      </view> -->
+      </view>
+      <view class="info-item" wx:if="{{orderDetail.paymentTime}}">
+        <text class="info-label">支付时间</text>
+        <text class="info-value">{{orderDetail.paymentTime}}</text>
+      </view>
+      <view class="info-item" wx:if="{{orderDetail.paymentRemark}}">
+        <text class="info-label">支付备注</text>
+        <text class="info-value">{{orderDetail.paymentRemark}}</text>
+      </view>
     </view>
   </view>
 
@@ -157,16 +170,27 @@
     <view class="section-title">金额信息</view>
     <view class="price-list">
       <view class="price-item">
-        <text class="price-label">商品总价</text>
+        <text class="price-label">订单金额</text>
         <text class="price-value">¥{{orderDetail.totalPrice}}</text>
+      </view>
+      <view class="price-item" wx:if="{{orderDetail.discountAmount !== '0.00'}}">
+        <text class="price-label">优惠金额</text>
+        <text class="price-value discount">-¥{{orderDetail.discountAmount}}</text>
+      </view>
+      <view class="price-item" wx:if="{{orderDetail.discountReason}}">
+        <text class="price-label">优惠原因</text>
+        <text class="price-value">{{orderDetail.discountReason}}</text>
       </view>
       <view class="price-item">
         <text class="price-label">运费</text>
         <text class="price-value">¥0.00</text>
       </view>
       <view class="price-item total">
-        <text class="price-label">实付金额</text>
-        <text class="price-value total-price">¥{{orderDetail.totalPrice}}</text>
+        <text class="price-label">最终结算金额</text>
+        <view class="price-final">
+          <text class="price-value total-price">¥{{orderDetail.finalPayAmount}}</text>
+          <text class="payment-note" wx:if="{{orderDetail.payStatus !== 'paid'}}">收货后线下结算</text>
+        </view>
       </view>
     </view>
   </view>
@@ -182,7 +206,7 @@
       </block>
       
       <block wx:elif="{{orderDetail.status === 'shipped'}}">
-        <button class="action-button primary" bindtap="confirmReceipt">确认收货</button>
+        <button class="action-button primary" bindtap="confirmReceipt">确认签收</button>
       </block>
       
       <block wx:elif="{{orderDetail.status === 'delivered' || orderDetail.status === 'processing'}}">

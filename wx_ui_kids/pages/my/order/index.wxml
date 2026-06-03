@@ -46,7 +46,10 @@
               <text class="order-number">订单号：{{item.id}}</text>
               <text class="order-time">{{item.createTime}}</text>
             </view>
-            <text class="order-status">{{item.statusText}}</text>
+            <view class="status-stack">
+              <text class="order-status">{{item.statusText}}</text>
+              <text class="pay-status">{{item.payStatusText}}</text>
+            </view>
           </view>
 
         <!-- 订单商品列表 -->
@@ -66,12 +69,13 @@
         <!-- 订单底部信息 -->
         <view class="order-footer">
           <view class="order-total">
-            <text>共{{item.productCount}}件商品 合计：</text>
-            <text class="total-price">¥{{item.totalPrice}}</text>
+            <text>共{{item.productCount}}件商品 订单金额：</text>
+            <text class="total-price">¥{{item.finalPayAmount}}</text>
+            <text class="settlement-text" wx:if="{{item.payStatus !== 'paid'}}">收货后结算</text>
           </view>
           <!-- 订单操作按钮 -->
           <view class="order-actions">
-            <!-- 待处理状态显示联系客服和取消订单 -->
+            <!-- 待发货状态显示联系客服和取消订单 -->
             <block wx:if="{{item.status === 'pending'}}">
               <button class="action-button secondary" catchtap="contactService">联系客服</button>
               <button class="action-button primary" catchtap="cancelOrder" data-id="{{item.id}}">取消订单</button>

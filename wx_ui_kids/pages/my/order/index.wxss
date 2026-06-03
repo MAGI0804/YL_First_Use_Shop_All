@@ -162,6 +162,19 @@
   box-sizing: border-box;
 }
 
+.status-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6rpx;
+  flex-shrink: 0;
+}
+
+.pay-status {
+  font-size: 22rpx;
+  color: #999;
+}
+
 /* 订单商品列表 */
 .order-products {
   border-top: 1rpx solid #f0f0f0;
@@ -249,6 +262,8 @@
   box-sizing: border-box;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  max-width: 500rpx;
 }
 
 .total-price {
@@ -257,6 +272,13 @@
   font-weight: bold;
   margin-left: 8rpx;
   box-sizing: border-box;
+}
+
+.settlement-text {
+  width: 100%;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #999;
 }
 
 .order-actions {

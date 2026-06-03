@@ -305,12 +305,30 @@
 .price-value {
   font-size: 26rpx;
   color: #333;
+  text-align: right;
+  max-width: 420rpx;
+}
+
+.price-value.discount {
+  color: #ff6700;
 }
 
 .price-value.total-price {
   font-size: 32rpx;
   color: #e64340;
   font-weight: bold;
+}
+
+.price-final {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.payment-note {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #999;
 }
 
 /* 操作按钮区域 */
