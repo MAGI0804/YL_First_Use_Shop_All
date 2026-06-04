@@ -52,6 +52,9 @@ func GetTokenProd() (string, error) {
 	sign := md5Encrypt(convertedStr)
 
 	url := cfg.JushuitanConfig.GetTokenURLProd
+	if strings.TrimSpace(url) == "" {
+		return "", fmt.Errorf("JST_GET_TOKEN_URL_PROD未配置")
+	}
 	data := fmt.Sprintf("app_key=%s&grant_type=%s&timestamp=%d&code=%s&charset=%s&sign=%s",
 		cfg.JushuitanConfig.AppKeyProd, grantType, timestamp, code, charset, sign)
 

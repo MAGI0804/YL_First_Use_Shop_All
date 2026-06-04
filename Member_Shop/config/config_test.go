@@ -45,8 +45,11 @@ func TestLoadConfigReadsEnvironmentOverrides(t *testing.T) {
 	t.Setenv("REDIS_DB", "3")
 	t.Setenv("JWT_SECRET", "jwt-from-env")
 	t.Setenv("WECHAT_APP_ID", "wx-from-env")
+	t.Setenv("WECHAT_LOGIN_URL", "https://wechat.example.com/login")
 	t.Setenv("ALIYUN_SMS_TEMPLATE_CODE", "sms-template")
 	t.Setenv("JST_APP_KEY_PROD", "jst-key")
+	t.Setenv("JST_ORDER_UPLOAD_URL_TEST", "https://jst.example.com/order-upload")
+	t.Setenv("JST_INVENTORY_QUERY_URL_PROD", "https://jst.example.com/inventory-query")
 
 	cfg := LoadConfig()
 
@@ -68,11 +71,20 @@ func TestLoadConfigReadsEnvironmentOverrides(t *testing.T) {
 	if cfg.WechatConfig.AppID != "wx-from-env" {
 		t.Fatalf("expected WeChat env override")
 	}
+	if cfg.WechatConfig.LoginURL != "https://wechat.example.com/login" {
+		t.Fatalf("expected WeChat login URL env override")
+	}
 	if cfg.SMSConfig.TemplateCode != "sms-template" {
 		t.Fatalf("expected SMS env override")
 	}
 	if cfg.JushuitanConfig.AppKeyProd != "jst-key" {
 		t.Fatalf("expected Jushuitan env override")
+	}
+	if cfg.JushuitanConfig.OrderUploadURLTest != "https://jst.example.com/order-upload" {
+		t.Fatalf("expected Jushuitan order upload URL env override")
+	}
+	if cfg.JushuitanConfig.InventoryQueryURLProd != "https://jst.example.com/inventory-query" {
+		t.Fatalf("expected Jushuitan inventory query URL env override")
 	}
 }
 

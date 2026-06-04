@@ -1,6 +1,7 @@
 package jushuitan
 
 import (
+	"Member_shop/config"
 	"encoding/json"
 	"fmt"
 )
@@ -69,7 +70,8 @@ func QueryLogistic(accessToken string, query LogisticQueryRequest) (*LogisticQue
 		query.PageSize = 50
 	}
 
-	body, err := postOpenAPI(accessToken, "/open/logistic/query", query)
+	cfg := config.LoadConfig()
+	body, err := postOpenAPI(accessToken, cfg.JushuitanConfig.LogisticQueryURLTest, query)
 	if err != nil {
 		return nil, "", err
 	}

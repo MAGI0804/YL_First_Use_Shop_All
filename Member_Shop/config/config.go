@@ -57,16 +57,30 @@ type SMSConfig struct {
 }
 
 type JushuitanConfig struct {
-	AppKeyTest      string
-	AppSecretTest   string
-	AppKeyProd      string
-	AppSecretProd   string
-	AuthCodeProd    string
-	AccessTokenTest string
-	GetTokenURLTest string
-	GetTokenURLProd string
-	OpenAPIURLTest  string
-	OpenAPIURLProd  string
+	AppKeyTest                    string
+	AppSecretTest                 string
+	AppKeyProd                    string
+	AppSecretProd                 string
+	AuthCodeProd                  string
+	AccessTokenTest               string
+	GetTokenURLTest               string
+	GetTokenURLProd               string
+	OpenAPIURLTest                string
+	OpenAPIURLProd                string
+	ShopQueryURLTest              string
+	ShopQueryURLProd              string
+	OrderUploadURLTest            string
+	OrderUploadURLProd            string
+	AfterSaleUploadURLTest        string
+	AfterSaleUploadURLProd        string
+	AfterSaleReceivedQueryURLTest string
+	AfterSaleReceivedQueryURLProd string
+	LogisticQueryURLTest          string
+	LogisticQueryURLProd          string
+	InventoryQueryURLTest         string
+	InventoryQueryURLProd         string
+	SkuMapQueryURLProd            string
+	SkuQueryURLProd               string
 }
 
 func LoadConfig() Config {
@@ -103,7 +117,7 @@ func LoadConfig() Config {
 		WechatConfig: WechatConfig{
 			AppID:     getEnv("WECHAT_APP_ID", ""),
 			AppSecret: getEnv("WECHAT_APP_SECRET", ""),
-			LoginURL:  getEnv("WECHAT_LOGIN_URL", "https://api.weixin.qq.com/sns/jscode2session"),
+			LoginURL:  getEnv("WECHAT_LOGIN_URL", ""),
 		},
 		SMSConfig: SMSConfig{
 			AccessKeyID:     getEnv("ALIYUN_SMS_ACCESS_KEY_ID", ""),
@@ -113,16 +127,30 @@ func LoadConfig() Config {
 			Endpoint:        getEnv("ALIYUN_SMS_ENDPOINT", "dysmsapi.aliyuncs.com"),
 		},
 		JushuitanConfig: JushuitanConfig{
-			AppKeyTest:      getEnv("JST_APP_KEY_TEST", ""),
-			AppSecretTest:   getEnv("JST_APP_SECRET_TEST", ""),
-			AppKeyProd:      getEnv("JST_APP_KEY_PROD", ""),
-			AppSecretProd:   getEnv("JST_APP_SECRET_PROD", ""),
-			AuthCodeProd:    getEnv("JST_AUTH_CODE_PROD", ""),
-			AccessTokenTest: getEnv("JST_ACCESS_TOKEN_TEST", ""),
-			GetTokenURLTest: getEnv("JST_GET_TOKEN_URL_TEST", "https://dev-api.jushuitan.com/openWebIsv/auth/getInitToken"),
-			GetTokenURLProd: getEnv("JST_GET_TOKEN_URL_PROD", "https://openapi.jushuitan.com/openWeb/auth/getInitToken"),
-			OpenAPIURLTest:  getEnv("JST_OPEN_API_URL_TEST", "https://dev-api.jushuitan.com"),
-			OpenAPIURLProd:  getEnv("JST_OPEN_API_URL_PROD", "https://openapi.jushuitan.com"),
+			AppKeyTest:                    getEnv("JST_APP_KEY_TEST", ""),
+			AppSecretTest:                 getEnv("JST_APP_SECRET_TEST", ""),
+			AppKeyProd:                    getEnv("JST_APP_KEY_PROD", ""),
+			AppSecretProd:                 getEnv("JST_APP_SECRET_PROD", ""),
+			AuthCodeProd:                  getEnv("JST_AUTH_CODE_PROD", ""),
+			AccessTokenTest:               getEnv("JST_ACCESS_TOKEN_TEST", ""),
+			GetTokenURLTest:               getEnv("JST_GET_TOKEN_URL_TEST", ""),
+			GetTokenURLProd:               getEnv("JST_GET_TOKEN_URL_PROD", ""),
+			OpenAPIURLTest:                getEnv("JST_OPEN_API_URL_TEST", ""),
+			OpenAPIURLProd:                getEnv("JST_OPEN_API_URL_PROD", ""),
+			ShopQueryURLTest:              getEnv("JST_SHOP_QUERY_URL_TEST", ""),
+			ShopQueryURLProd:              getEnv("JST_SHOP_QUERY_URL_PROD", ""),
+			OrderUploadURLTest:            getEnv("JST_ORDER_UPLOAD_URL_TEST", ""),
+			OrderUploadURLProd:            getEnv("JST_ORDER_UPLOAD_URL_PROD", ""),
+			AfterSaleUploadURLTest:        getEnv("JST_AFTERSALE_UPLOAD_URL_TEST", ""),
+			AfterSaleUploadURLProd:        getEnv("JST_AFTERSALE_UPLOAD_URL_PROD", ""),
+			AfterSaleReceivedQueryURLTest: getEnv("JST_AFTERSALE_RECEIVED_QUERY_URL_TEST", ""),
+			AfterSaleReceivedQueryURLProd: getEnv("JST_AFTERSALE_RECEIVED_QUERY_URL_PROD", ""),
+			LogisticQueryURLTest:          getEnv("JST_LOGISTIC_QUERY_URL_TEST", ""),
+			LogisticQueryURLProd:          getEnv("JST_LOGISTIC_QUERY_URL_PROD", ""),
+			InventoryQueryURLTest:         getEnv("JST_INVENTORY_QUERY_URL_TEST", ""),
+			InventoryQueryURLProd:         getEnv("JST_INVENTORY_QUERY_URL_PROD", ""),
+			SkuMapQueryURLProd:            getEnv("JST_SKUMAP_QUERY_URL_PROD", ""),
+			SkuQueryURLProd:               getEnv("JST_SKU_QUERY_URL_PROD", ""),
 		},
 	}
 }

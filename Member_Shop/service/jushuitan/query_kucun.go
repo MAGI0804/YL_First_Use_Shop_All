@@ -105,8 +105,10 @@ func QueryInventoryWithRequest(accessToken string, query InventoryQueryRequest) 
 		cfg.JushuitanConfig.AppSecretProd, accessToken, cfg.JushuitanConfig.AppKeyProd, string(biz), charset, timestamp, Version)
 	sign := md5Encrypt(convertedStr)
 
-	// 使用生产环境接口
-	url := strings.TrimRight(cfg.JushuitanConfig.OpenAPIURLProd, "/") + "/open/inventory/query"
+	apiURL := strings.TrimSpace(cfg.JushuitanConfig.InventoryQueryURLProd)
+	if apiURL == "" {
+		return nil, fmt.Errorf("JST_INVENTORY_QUERY_URL_PROD未配置")
+	}
 
 	// 构建POST表单数据
 	data := fmt.Sprintf("app_key=%s&access_token=%s&timestamp=%s&charset=%s&version=%d&sign=%s&biz=%s",
@@ -115,7 +117,7 @@ func QueryInventoryWithRequest(accessToken string, query InventoryQueryRequest) 
 	log.Printf("库存查询请求已生成: sku_ids=%s page=%d page_size=%d", query.SkuIDs, query.PageIndex, query.PageSize)
 
 	// 发送HTTP请求
-	resp, err := http.Post(url, "application/x-www-form-urlencoded", strings.NewReader(data))
+	resp, err := http.Post(apiURL, "application/x-www-form-urlencoded", strings.NewReader(data))
 	if err != nil {
 		return nil, err
 	}

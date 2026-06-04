@@ -46,14 +46,7 @@ type ShopInfo struct {
 	Status   string `json:"status"`    // 状态
 }
 
-// API地址常量
-const (
-	URLShopQueryTest   = "https://dev-api.jushuitan.com/open/shops/query"             // 测试环境店铺查询
-	URLShopQueryProd   = "https://openapi.jushuitan.com/open/shops/query"             // 生产环境店铺查询
-	URLOrderUploadTest = "https://dev-api.jushuitan.com/open/jushuitan/orders/upload" // 测试环境订单上传
-	URLOrderUploadProd = "https://openapi.jushuitan.com/open/jushuitan/orders/upload" // 生产环境订单上传
-	Version            = 2                                                            // API版本号
-)
+const Version = 2 // API版本号
 
 // QueryShops 查询店铺信息
 // accessToken: 访问令牌
@@ -84,11 +77,14 @@ func QueryShops(accessToken string, shopIDs []int, pageIndex, pageSize int) (str
 		cfg.JushuitanConfig.AppSecretTest, accessToken, appKey, string(biz), charset, timestamp, Version)
 	sign := md5Encrypt(convertedStr)
 
-	url := strings.TrimRight(cfg.JushuitanConfig.OpenAPIURLTest, "/") + "/open/shops/query"
+	apiURL := strings.TrimSpace(cfg.JushuitanConfig.ShopQueryURLTest)
+	if apiURL == "" {
+		return "", fmt.Errorf("JST_SHOP_QUERY_URL_TEST未配置")
+	}
 	data := fmt.Sprintf("app_key=%s&access_token=%s&timestamp=%s&charset=%s&version=%d&sign=%s&biz=%s",
 		appKey, accessToken, timestamp, charset, Version, sign, string(biz))
 
-	resp, err := http.Post(url, "application/x-www-form-urlencoded", strings.NewReader(data))
+	resp, err := http.Post(apiURL, "application/x-www-form-urlencoded", strings.NewReader(data))
 	if err != nil {
 		return "", err
 	}
@@ -187,13 +183,16 @@ func SendOrder(accessToken string, orderData OrderData) (string, error) {
 		cfg.JushuitanConfig.AppSecretTest, accessToken, appKey, string(biz), charset, timestamp, Version)
 	sign := md5Encrypt(convertedStr)
 
-	url := strings.TrimRight(cfg.JushuitanConfig.OpenAPIURLTest, "/") + "/open/jushuitan/orders/upload"
+	apiURL := strings.TrimSpace(cfg.JushuitanConfig.OrderUploadURLTest)
+	if apiURL == "" {
+		return "", fmt.Errorf("JST_ORDER_UPLOAD_URL_TEST未配置")
+	}
 	data := fmt.Sprintf("app_key=%s&access_token=%s&timestamp=%s&charset=%s&version=%d&sign=%s&biz=%s",
 		appKey, accessToken, timestamp, charset, Version, sign, string(biz))
 
 	log.Printf("聚水潭订单上传请求已生成: so_id=%s item_count=%d", orderData.SoID, len(orderData.Items))
 
-	resp, err := http.Post(url, "application/x-www-form-urlencoded", strings.NewReader(data))
+	resp, err := http.Post(apiURL, "application/x-www-form-urlencoded", strings.NewReader(data))
 	if err != nil {
 		return "", err
 	}

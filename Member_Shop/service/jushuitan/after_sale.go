@@ -13,13 +13,6 @@ import (
 	"time"
 )
 
-const (
-	URLAfterSaleUploadTest        = "https://dev-api.jushuitan.com/open/aftersale/upload"
-	URLAfterSaleUploadProd        = "https://openapi.jushuitan.com/open/aftersale/upload"
-	URLAfterSaleReceivedQueryTest = "https://dev-api.jushuitan.com/open/aftersale/received/query"
-	URLAfterSaleReceivedQueryProd = "https://openapi.jushuitan.com/open/aftersale/received/query"
-)
-
 // AfterSaleItem 售后商品明细。
 // 字段按聚水潭售后上传接口的外部单号、商品编码、数量等核心字段组织。
 type AfterSaleItem struct {
@@ -71,7 +64,8 @@ type apiResponse struct {
 }
 
 func SendAfterSale(accessToken string, data AfterSaleData) (string, error) {
-	body, err := postOpenAPI(accessToken, "/open/aftersale/upload", data)
+	cfg := config.LoadConfig()
+	body, err := postOpenAPI(accessToken, cfg.JushuitanConfig.AfterSaleUploadURLTest, data)
 	if err != nil {
 		return "", err
 	}
@@ -93,7 +87,8 @@ func QueryAfterSaleReceived(accessToken string, query AfterSaleReceivedQuery) (s
 	if query.PageSize <= 0 {
 		query.PageSize = 50
 	}
-	body, err := postOpenAPI(accessToken, "/open/aftersale/received/query", query)
+	cfg := config.LoadConfig()
+	body, err := postOpenAPI(accessToken, cfg.JushuitanConfig.AfterSaleReceivedQueryURLTest, query)
 	if err != nil {
 		return "", err
 	}
@@ -108,13 +103,17 @@ func QueryAfterSaleReceived(accessToken string, query AfterSaleReceivedQuery) (s
 	return body, nil
 }
 
-func postOpenAPI(accessToken, path string, bizValue interface{}) (string, error) {
+func postOpenAPI(accessToken, apiURL string, bizValue interface{}) (string, error) {
 	cfg := config.LoadConfig()
 	if cfg.JushuitanConfig.AppKeyTest == "" || cfg.JushuitanConfig.AppSecretTest == "" {
 		return "", fmt.Errorf("聚水潭测试应用配置未完整设置")
 	}
 	if strings.TrimSpace(accessToken) == "" {
 		return "", fmt.Errorf("聚水潭access_token不能为空")
+	}
+	apiURL = strings.TrimSpace(apiURL)
+	if apiURL == "" {
+		return "", fmt.Errorf("聚水潭接口URL未配置")
 	}
 
 	appKey := cfg.JushuitanConfig.AppKeyTest
@@ -138,8 +137,7 @@ func postOpenAPI(accessToken, path string, bizValue interface{}) (string, error)
 	form.Set("sign", sign)
 	form.Set("biz", string(biz))
 
-	apiURL := strings.TrimRight(cfg.JushuitanConfig.OpenAPIURLTest, "/") + path
-	log.Printf("聚水潭售后请求已生成: path=%s biz=%s", path, string(biz))
+	log.Printf("聚水潭请求已生成: api_url=%s biz=%s", apiURL, string(biz))
 
 	resp, err := http.Post(apiURL, "application/x-www-form-urlencoded", strings.NewReader(form.Encode()))
 	if err != nil {

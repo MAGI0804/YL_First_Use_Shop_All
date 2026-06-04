@@ -99,7 +99,10 @@ func GetToken() (string, error) {
 
 	sign := MD5Encrypt(convertedStr)
 
-	apiURL := "https://openapi.jushuitan.com/openWeb/auth/getInitToken"
+	apiURL := strings.TrimSpace(getEnv("JST_GET_TOKEN_URL_PROD", ""))
+	if apiURL == "" {
+		return "", fmt.Errorf("JST_GET_TOKEN_URL_PROD未配置")
+	}
 
 	data := url.Values{}
 	data.Set("app_key", AppKey)
@@ -143,7 +146,10 @@ func GetToken() (string, error) {
 }
 
 func SendInventoryQuery(appKey, accessToken, timestamp, charset string, version int, sign, biz string) (*InventoryResponse, error) {
-	apiURL := "https://openapi.jushuitan.com/open/skumap/query"
+	apiURL := strings.TrimSpace(getEnv("JST_SKUMAP_QUERY_URL_PROD", ""))
+	if apiURL == "" {
+		return nil, fmt.Errorf("JST_SKUMAP_QUERY_URL_PROD未配置")
+	}
 
 	data := url.Values{}
 	data.Set("app_key", appKey)
@@ -831,7 +837,12 @@ func ProcessCommodityBatch(skuIDs string) bool {
 	sign := MD5Encrypt(convertedStr)
 
 	// 发送请求 - 使用新的API端点
-	apiURL := "https://openapi.jushuitan.com/open/sku/query"
+	apiURL := strings.TrimSpace(getEnv("JST_SKU_QUERY_URL_PROD", ""))
+	if apiURL == "" {
+		fmt.Println("JST_SKU_QUERY_URL_PROD未配置")
+		DeleteCommoditiesNotFound(batchIDList, []string{})
+		return false
+	}
 
 	formData := url.Values{}
 	formData.Set("app_key", AppKey)
