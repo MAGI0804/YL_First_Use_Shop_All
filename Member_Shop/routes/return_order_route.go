@@ -32,5 +32,11 @@ func InitReturnOrderRoutes(router *gin.Engine) {
 		returnOrderGroup.POST("detail", returnOrderController.GetReturnOrderDetail)
 		// 售后统计路由
 		returnOrderGroup.POST("statistics", returnOrderController.ReturnOrderStatistics)
+		// 聚水潭售后上传重试
+		returnOrderGroup.POST("push_jushuitan", returnOrderController.PushReturnOrderToJushuitan)
+		// 聚水潭售后状态主动推送
+		returnOrderGroup.POST("jushuitan_after_sale_push", returnOrderController.JushuitanAfterSalePush)
+		// 聚水潭实际收货查询
+		returnOrderGroup.POST("jushuitan_after_sale_received_query", returnOrderController.QueryJushuitanAfterSaleReceived)
 	}
 }

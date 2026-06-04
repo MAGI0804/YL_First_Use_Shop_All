@@ -946,14 +946,19 @@ func ReturnOrderReceive(returnOrderID string) error {
 			return err
 		}
 
-		if returnOrder.Status != ReturnOrderStatusBuyerShipped && returnOrder.Status != "shipped" && !(returnOrder.Type == "refund" && returnOrder.Status == ReturnOrderStatusApproved) {
+		if returnOrder.Status != ReturnOrderStatusBuyerShipped &&
+			returnOrder.Status != ReturnOrderStatusReceived &&
+			returnOrder.Status != "shipped" &&
+			!(returnOrder.Type == "refund" && returnOrder.Status == ReturnOrderStatusApproved) {
 			return fmt.Errorf("退货订单状态不允许签收")
 		}
 
-		// receive 这个旧接口在当前系统里同时承担“仓库收货”和“售后完成”两个动作，
-		// 因此只在这里做库存回滚，避免申请/审核/买家寄回阶段提前改库存。
-		if err := RestoreInventoryForReturn(tx, returnOrder); err != nil {
-			return err
+		// ERP 入库推送会先把售后置为 received 并回滚库存；
+		// 旧接口仍兼容 buyer_shipped/shipped 直接完成的场景。
+		if returnOrder.Status != ReturnOrderStatusReceived {
+			if err := RestoreInventoryForReturn(tx, returnOrder); err != nil {
+				return err
+			}
 		}
 
 		returnOrder.Status = "completed"

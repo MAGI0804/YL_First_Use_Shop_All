@@ -48,3 +48,35 @@ type ReturnOrderStatisticsRequest struct {
 	BeginTime string `json:"begin_time"`
 	EndTime   string `json:"end_time"`
 }
+
+type ReturnOrderPushJushuitanRequest struct {
+	ReturnOrderID string `json:"return_order_id" binding:"required"`
+}
+
+type JushuitanAfterSalePushRequest struct {
+	ReturnOrderID        string                       `json:"outer_as_id"`
+	JushuitanAfterSaleID string                       `json:"as_id"`
+	OrderID              string                       `json:"so_id"`
+	Status               string                       `json:"status"`
+	ShopStatus           string                       `json:"shop_status"`
+	RefundStatus         string                       `json:"refund_status"`
+	Type                 string                       `json:"type"`
+	Modified             string                       `json:"modified"`
+	Items                []JushuitanAfterSalePushItem `json:"items"`
+}
+
+type JushuitanAfterSalePushItem struct {
+	OuterOiID string `json:"outer_oi_id"`
+	SkuID     string `json:"sku_id"`
+	Qty       int    `json:"qty"`
+}
+
+type JushuitanAfterSaleReceivedQueryRequest struct {
+	PageIndex     int    `json:"page_index"`
+	PageSize      int    `json:"page_size"`
+	ModifiedBegin string `json:"modified_begin"`
+	ModifiedEnd   string `json:"modified_end"`
+	OrderID       string `json:"so_id"`
+	ReturnOrderID string `json:"outer_as_id"`
+	ASID          string `json:"as_id"`
+}

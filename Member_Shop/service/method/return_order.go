@@ -3,8 +3,10 @@ package method
 import (
 	"Member_shop/db"
 	"Member_shop/models"
+	"Member_shop/service/jushuitan"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,8 +19,13 @@ const (
 	ReturnOrderStatusApproved     = "approved"
 	ReturnOrderStatusRejected     = "rejected"
 	ReturnOrderStatusBuyerShipped = "buyer_shipped"
+	ReturnOrderStatusReceived     = "received"
 	ReturnOrderStatusCompleted    = "completed"
 	ReturnOrderStatusCanceled     = "canceled"
+
+	JushuitanPushStatusPending = "pending"
+	JushuitanPushStatusSuccess = "success"
+	JushuitanPushStatusFailed  = "failed"
 )
 
 var returnOrderTerminalStatuses = map[string]bool{
@@ -89,6 +96,9 @@ func ConvertReturnOrderToMap(returnOrder models.ReturnOrder) map[string]interfac
 	result["buyer_address"] = returnOrder.BuyerAddress
 	result["buyer_phone"] = returnOrder.BuyerPhone
 	result["remarks"] = returnOrder.Remarks
+	result["jushuitan_after_sale_id"] = returnOrder.JushuitanAfterSaleID
+	result["jushuitan_push_status"] = returnOrder.JushuitanPushStatus
+	result["jushuitan_push_response"] = returnOrder.JushuitanPushResponse
 
 	if returnOrder.RequestTime != nil {
 		result["request_time"] = returnOrder.RequestTime.Format("2006-01-02 15:04:05")
@@ -112,6 +122,12 @@ func ConvertReturnOrderToMap(returnOrder models.ReturnOrder) map[string]interfac
 		result["completed_time"] = returnOrder.CompletedTime.Format("2006-01-02 15:04:05")
 	} else {
 		result["completed_time"] = ""
+	}
+
+	if returnOrder.JushuitanUpdatedTime != nil {
+		result["jushuitan_updated_time"] = returnOrder.JushuitanUpdatedTime.Format("2006-01-02 15:04:05")
+	} else {
+		result["jushuitan_updated_time"] = ""
 	}
 
 	return result
@@ -157,7 +173,16 @@ func CreateReturnOrderFromInput(input ReturnOrderCreateInput) (*ReturnOrderResul
 		}
 		return nil
 	})
-	return result, err
+	if err != nil {
+		return nil, err
+	}
+
+	if pushErr := PushReturnOrderToJushuitan(result.ReturnID); pushErr != nil {
+		result.ReturnOrder.JushuitanPushStatus = JushuitanPushStatusFailed
+		result.ReturnOrder.JushuitanPushResponse = pushErr.Error()
+	}
+	_ = db.DB.Where("return_id = ?", result.ReturnID).First(result.ReturnOrder).Error
+	return result, nil
 }
 
 func ReturnOrderStatistics(beginTime, endTime string) (*ReturnOrderStatisticsResult, error) {
@@ -376,6 +401,7 @@ func buildReturnOrderForCreate(tx *gorm.DB, input ReturnOrderCreateInput) (*mode
 		BuyerAddress:        input.BuyerAddress,
 		BuyerPhone:          input.BuyerPhone,
 		Remarks:             input.Remark,
+		JushuitanPushStatus: JushuitanPushStatusPending,
 	}
 	return &order, &returnOrder, nil
 }
@@ -719,6 +745,364 @@ func isAfterSaleCompleted(status string) bool {
 
 func shouldDisplayGrayForAfterSale(status string) bool {
 	return status == ReturnOrderStatusCompleted || status == "returned"
+}
+
+func PushReturnOrderToJushuitan(returnOrderID string) error {
+	var returnOrder models.ReturnOrder
+	if err := db.DB.Where("return_id = ?", returnOrderID).First(&returnOrder).Error; err != nil {
+		return err
+	}
+
+	var order models.Order
+	if err := db.DB.Where("order_id = ?", returnOrder.OrderID).First(&order).Error; err != nil {
+		return err
+	}
+
+	token, err := jushuitan.GetTokenTest()
+	if err != nil {
+		_ = updateReturnOrderJushuitanPushResult(returnOrder.ReturnID, JushuitanPushStatusFailed, "", err.Error())
+		return err
+	}
+
+	payload := buildJushuitanAfterSaleData(order, returnOrder)
+	resp, err := jushuitan.SendAfterSale(token, payload)
+	if err != nil {
+		_ = updateReturnOrderJushuitanPushResult(returnOrder.ReturnID, JushuitanPushStatusFailed, "", err.Error())
+		return err
+	}
+
+	jushuitanAfterSaleID := extractJushuitanAfterSaleID(resp)
+	return updateReturnOrderJushuitanPushResult(returnOrder.ReturnID, JushuitanPushStatusSuccess, jushuitanAfterSaleID, resp)
+}
+
+func updateReturnOrderJushuitanPushResult(returnID, status, jushuitanAfterSaleID, response string) error {
+	updates := map[string]interface{}{
+		"jushuitan_push_status":   status,
+		"jushuitan_push_response": response,
+		"jushuitan_updated_time":  time.Now(),
+	}
+	if jushuitanAfterSaleID != "" {
+		updates["jushuitan_after_sale_id"] = jushuitanAfterSaleID
+	}
+	return db.DB.Model(&models.ReturnOrder{}).Where("return_id = ?", returnID).Updates(updates).Error
+}
+
+func buildJushuitanAfterSaleData(order models.Order, returnOrder models.ReturnOrder) jushuitan.AfterSaleData {
+	requestTime := time.Now()
+	if returnOrder.RequestTime != nil {
+		requestTime = *returnOrder.RequestTime
+	}
+	receiverState := firstNonEmpty(returnOrder.BuyerProvince, order.Province)
+	receiverCity := firstNonEmpty(returnOrder.BuyerCity, order.City)
+	receiverDistrict := firstNonEmpty(returnOrder.BuyerCounty, order.County)
+	receiverAddress := strings.TrimSpace(returnOrder.BuyerAddress)
+	if receiverAddress == "" {
+		receiverAddress = fmt.Sprintf("%s_%s_%s_%s", order.Province, order.City, order.County, order.DetailedAddress)
+	}
+
+	return jushuitan.AfterSaleData{
+		ShopID:           10395227,
+		OuterASID:        returnOrder.ReturnID,
+		SoID:             returnOrder.OrderID,
+		Type:             jushuitanAfterSaleType(returnOrder.Type),
+		ShopStatus:       "TRADE_AFTER_SALE",
+		QuestionType:     returnOrder.Reason,
+		Reason:           returnOrder.SpecificReasons,
+		Remark:           returnOrder.Remarks,
+		Created:          requestTime.In(time.FixedZone("CST", 8*3600)).Format("2006-01-02 15:04:05"),
+		Modified:         time.Now().In(time.FixedZone("CST", 8*3600)).Format("2006-01-02 15:04:05"),
+		BuyerAccount:     strconv.Itoa(returnOrder.UserID),
+		ReceiverState:    receiverState,
+		ReceiverCity:     receiverCity,
+		ReceiverDistrict: receiverDistrict,
+		ReceiverAddress:  receiverAddress,
+		ReceiverPhone:    firstNonEmpty(returnOrder.BuyerPhone, order.ReceiverPhone),
+		Items:            buildJushuitanAfterSaleItems(returnOrder),
+	}
+}
+
+func buildJushuitanAfterSaleItems(returnOrder models.ReturnOrder) []jushuitan.AfterSaleItem {
+	productList := strings.TrimSpace(returnOrder.ProductList)
+	if returnOrder.SubOrderProductInfo != "" {
+		productList = returnOrder.SubOrderProductInfo
+	}
+
+	rawItems := parseAfterSaleProductItems(productList)
+	if len(rawItems) == 0 {
+		return []jushuitan.AfterSaleItem{{
+			OuterOiID: returnOrder.SubOrderID,
+			SkuID:     returnOrder.SubOrderID,
+			Qty:       1,
+		}}
+	}
+
+	items := make([]jushuitan.AfterSaleItem, 0, len(rawItems))
+	for _, raw := range rawItems {
+		qty := firstIntValue(raw, 1, "qty", "quantity", "num")
+		if qty <= 0 {
+			qty = 1
+		}
+		items = append(items, jushuitan.AfterSaleItem{
+			OuterOiID: firstNonEmpty(returnOrder.SubOrderID, firstStringValue(raw, "outer_oi_id", "sub_order_id")),
+			SkuID:     firstStringValue(raw, "sku_id", "commodity_id", "product_id", "id"),
+			ShopSkuID: firstStringValue(raw, "shop_sku_id", "commodity_id", "sku_id"),
+			Name:      firstStringValue(raw, "name", "product_name", "commodity_name"),
+			Qty:       qty,
+			Amount:    firstFloatValue(raw, "amount", "sub_amount", "price"),
+		})
+	}
+	if len(items) == 0 {
+		return []jushuitan.AfterSaleItem{{
+			OuterOiID: returnOrder.SubOrderID,
+			SkuID:     returnOrder.SubOrderID,
+			Qty:       1,
+		}}
+	}
+	return items
+}
+
+func parseAfterSaleProductItems(productList string) []map[string]interface{} {
+	var rawItems []map[string]interface{}
+	if err := json.Unmarshal([]byte(productList), &rawItems); err == nil {
+		return rawItems
+	}
+
+	var rawItem map[string]interface{}
+	if err := json.Unmarshal([]byte(productList), &rawItem); err == nil && len(rawItem) > 0 {
+		return []map[string]interface{}{rawItem}
+	}
+	return nil
+}
+
+func firstFloatValue(m map[string]interface{}, keys ...string) float64 {
+	for _, key := range keys {
+		value, ok := m[key]
+		if !ok || value == nil {
+			continue
+		}
+		switch v := value.(type) {
+		case float64:
+			return v
+		case int:
+			return float64(v)
+		case int64:
+			return float64(v)
+		case json.Number:
+			parsed, _ := v.Float64()
+			return parsed
+		case string:
+			parsed, _ := strconv.ParseFloat(strings.TrimSpace(v), 64)
+			return parsed
+		}
+	}
+	return 0
+}
+
+func jushuitanAfterSaleType(returnType string) string {
+	switch normalizeReturnType(returnType) {
+	case "refund":
+		return "仅退款"
+	case "exchange":
+		return "换货"
+	default:
+		return "退货退款"
+	}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
+func extractJushuitanAfterSaleID(resp string) string {
+	var parsed map[string]interface{}
+	if err := json.Unmarshal([]byte(resp), &parsed); err != nil {
+		return ""
+	}
+	for _, key := range []string{"as_id", "jushuitan_after_sale_id"} {
+		if value, ok := parsed[key]; ok {
+			return fmt.Sprint(value)
+		}
+	}
+	if data, ok := parsed["data"].(map[string]interface{}); ok {
+		for _, key := range []string{"as_id", "jushuitan_after_sale_id"} {
+			if value, ok := data[key]; ok {
+				return fmt.Sprint(value)
+			}
+		}
+	}
+	return ""
+}
+
+type JushuitanAfterSaleUpdateInput struct {
+	ReturnID             string
+	JushuitanAfterSaleID string
+	OrderID              string
+	Status               string
+	Response             string
+}
+
+func ApplyJushuitanAfterSaleUpdate(input JushuitanAfterSaleUpdateInput) error {
+	normalizedStatus := NormalizeJushuitanAfterSaleStatus(input.Status)
+	if normalizedStatus == "" {
+		return fmt.Errorf("聚水潭售后状态不能为空")
+	}
+
+	return db.DB.Transaction(func(tx *gorm.DB) error {
+		returnOrder, err := lockReturnOrderForJushuitanUpdate(tx, input)
+		if err != nil {
+			return err
+		}
+
+		updates := map[string]interface{}{
+			"status":                  normalizedStatus,
+			"jushuitan_push_response": input.Response,
+			"jushuitan_updated_time":  time.Now(),
+		}
+		if input.JushuitanAfterSaleID != "" {
+			updates["jushuitan_after_sale_id"] = input.JushuitanAfterSaleID
+		}
+
+		switch normalizedStatus {
+		case ReturnOrderStatusApproved:
+			if err := markOrderAfterSaleProcessingTx(tx, *returnOrder); err != nil {
+				return err
+			}
+		case ReturnOrderStatusReceived:
+			if err := RestoreInventoryForReturn(tx, *returnOrder); err != nil {
+				return err
+			}
+		case ReturnOrderStatusCompleted:
+			now := time.Now()
+			updates["completed_time"] = &now
+		case ReturnOrderStatusCanceled:
+			now := time.Now()
+			updates["canceled_time"] = &now
+		}
+
+		return tx.Model(&models.ReturnOrder{}).Where("return_id = ?", returnOrder.ReturnID).Updates(updates).Error
+	})
+}
+
+func ApplyJushuitanAfterSaleReceivedResponse(response string) (int, error) {
+	decoder := json.NewDecoder(strings.NewReader(response))
+	decoder.UseNumber()
+	var payload interface{}
+	if err := decoder.Decode(&payload); err != nil {
+		return 0, fmt.Errorf("解析聚水潭实际收货响应失败: %v", err)
+	}
+
+	updates := extractJushuitanAfterSaleUpdates(payload)
+	applied := 0
+	for _, update := range updates {
+		if update.ReturnID == "" && update.JushuitanAfterSaleID == "" && update.OrderID == "" {
+			continue
+		}
+		if update.Status == "" {
+			update.Status = ReturnOrderStatusReceived
+		}
+		if update.Response == "" {
+			update.Response = response
+		}
+		if err := ApplyJushuitanAfterSaleUpdate(update); err != nil {
+			return applied, err
+		}
+		applied++
+	}
+	return applied, nil
+}
+
+func extractJushuitanAfterSaleUpdates(value interface{}) []JushuitanAfterSaleUpdateInput {
+	switch typed := value.(type) {
+	case []interface{}:
+		result := make([]JushuitanAfterSaleUpdateInput, 0, len(typed))
+		for _, item := range typed {
+			result = append(result, extractJushuitanAfterSaleUpdates(item)...)
+		}
+		return result
+	case map[string]interface{}:
+		if update, ok := jushuitanAfterSaleUpdateFromMap(typed); ok {
+			return []JushuitanAfterSaleUpdateInput{update}
+		}
+		result := []JushuitanAfterSaleUpdateInput{}
+		for _, item := range typed {
+			result = append(result, extractJushuitanAfterSaleUpdates(item)...)
+		}
+		return result
+	default:
+		return nil
+	}
+}
+
+func jushuitanAfterSaleUpdateFromMap(item map[string]interface{}) (JushuitanAfterSaleUpdateInput, bool) {
+	update := JushuitanAfterSaleUpdateInput{
+		ReturnID:             firstStringValue(item, "outer_as_id", "return_id", "return_order_id", "as_outer_id"),
+		JushuitanAfterSaleID: firstStringValue(item, "as_id", "aftersale_id", "jushuitan_after_sale_id"),
+		OrderID:              firstStringValue(item, "so_id", "order_id", "tid"),
+		Status:               firstNonEmpty(firstStringValue(item, "status"), firstStringValue(item, "shop_status"), firstStringValue(item, "refund_status")),
+	}
+	if update.Status == "" && looksLikeReceivedAfterSale(item) {
+		update.Status = ReturnOrderStatusReceived
+	}
+	raw, _ := json.Marshal(item)
+	update.Response = string(raw)
+	return update, update.ReturnID != "" || update.JushuitanAfterSaleID != "" || update.OrderID != ""
+}
+
+func looksLikeReceivedAfterSale(item map[string]interface{}) bool {
+	for _, key := range []string{"received_date", "receive_date", "inout_date", "io_date", "wms_co_id"} {
+		if firstStringValue(item, key) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func lockReturnOrderForJushuitanUpdate(tx *gorm.DB, input JushuitanAfterSaleUpdateInput) (*models.ReturnOrder, error) {
+	var returnOrder models.ReturnOrder
+
+	if input.ReturnID != "" {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("return_id = ?", input.ReturnID).First(&returnOrder).Error; err == nil {
+			return &returnOrder, nil
+		}
+	}
+	if input.JushuitanAfterSaleID != "" {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("jushuitan_after_sale_id = ?", input.JushuitanAfterSaleID).First(&returnOrder).Error; err == nil {
+			return &returnOrder, nil
+		}
+	}
+	if input.OrderID != "" {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("order_id = ?", input.OrderID).Order("request_time DESC, id DESC").First(&returnOrder).Error; err == nil {
+			return &returnOrder, nil
+		}
+	}
+	return nil, gorm.ErrRecordNotFound
+}
+
+func NormalizeJushuitanAfterSaleStatus(status string) string {
+	status = strings.TrimSpace(status)
+	if status == "" {
+		return ""
+	}
+	lower := strings.ToLower(status)
+	switch {
+	case strings.Contains(lower, "reject") || strings.Contains(status, "拒"):
+		return ReturnOrderStatusRejected
+	case strings.Contains(lower, "cancel") || strings.Contains(lower, "close") || strings.Contains(status, "取消") || strings.Contains(status, "关闭"):
+		return ReturnOrderStatusCanceled
+	case strings.Contains(lower, "received") || strings.Contains(lower, "stockin") || strings.Contains(status, "入库") || strings.Contains(status, "收货"):
+		return ReturnOrderStatusReceived
+	case strings.Contains(lower, "complete") || strings.Contains(lower, "finish") || strings.Contains(status, "完成") || strings.Contains(status, "退款成功"):
+		return ReturnOrderStatusCompleted
+	case strings.Contains(lower, "approve") || strings.Contains(lower, "agree") || strings.Contains(status, "审核通过") || strings.Contains(status, "同意"):
+		return ReturnOrderStatusApproved
+	default:
+		return ReturnOrderStatusPending
+	}
 }
 
 // UpdateReturnOrderStatus 更新退货订单状态
