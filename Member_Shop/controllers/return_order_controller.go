@@ -349,7 +349,7 @@ func (roc *ReturnOrderController) QueryJushuitanAfterSaleReceived(c *gin.Context
 		return
 	}
 
-	token, err := jushuitan.GetTokenTest()
+	token, err := jushuitan.GetToken()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, msg.ErrResponse("获取聚水潭token失败", err))
 		c.Abort()

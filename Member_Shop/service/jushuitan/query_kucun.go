@@ -4,12 +4,8 @@ import (
 	"Member_shop/config"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
-	"strconv"
 	"strings"
-	"time"
 )
 
 // InventoryQueryRequest 库存查询请求结构
@@ -77,9 +73,6 @@ func QueryInventory(accessToken string, skuIDs []string, pageIndex, pageSize int
 
 func QueryInventoryWithRequest(accessToken string, query InventoryQueryRequest) (*InventoryQueryResponse, error) {
 	cfg := config.LoadConfig()
-	if cfg.JushuitanConfig.AppKeyProd == "" || cfg.JushuitanConfig.AppSecretProd == "" {
-		return nil, fmt.Errorf("聚水潭生产应用配置未完整设置")
-	}
 	if query.PageIndex <= 0 {
 		query.PageIndex = 1
 	}
@@ -90,50 +83,29 @@ func QueryInventoryWithRequest(accessToken string, query InventoryQueryRequest) 
 		query.PageSize = 100
 	}
 
-	// 构建请求时间戳
-	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
-	charset := "UTF-8"
-
-	// 序列化业务参数
-	biz, err := json.Marshal(query)
+	apiURL, err := activeURL(
+		cfg,
+		cfg.JushuitanConfig.InventoryQueryURLTest,
+		cfg.JushuitanConfig.InventoryQueryURLProd,
+		"JST_INVENTORY_QUERY_URL_TEST",
+		"JST_INVENTORY_QUERY_URL_PROD",
+	)
 	if err != nil {
-		return nil, fmt.Errorf("序列化biz参数失败: %v", err)
+		return nil, err
 	}
-
-	// 构建签名参数并计算签名
-	convertedStr := fmt.Sprintf("%saccess_token%sapp_key%sbiz%scharset%stimestamp%sversion%d",
-		cfg.JushuitanConfig.AppSecretProd, accessToken, cfg.JushuitanConfig.AppKeyProd, string(biz), charset, timestamp, Version)
-	sign := md5Encrypt(convertedStr)
-
-	apiURL := strings.TrimSpace(cfg.JushuitanConfig.InventoryQueryURLProd)
-	if apiURL == "" {
-		return nil, fmt.Errorf("JST_INVENTORY_QUERY_URL_PROD未配置")
-	}
-
-	// 构建POST表单数据
-	data := fmt.Sprintf("app_key=%s&access_token=%s&timestamp=%s&charset=%s&version=%d&sign=%s&biz=%s",
-		cfg.JushuitanConfig.AppKeyProd, accessToken, timestamp, charset, Version, sign, string(biz))
 
 	log.Printf("库存查询请求已生成: sku_ids=%s page=%d page_size=%d", query.SkuIDs, query.PageIndex, query.PageSize)
 
-	// 发送HTTP请求
-	resp, err := http.Post(apiURL, "application/x-www-form-urlencoded", strings.NewReader(data))
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	// 读取响应内容
-	body, err := io.ReadAll(resp.Body)
+	body, err := postOpenAPI(accessToken, apiURL, query)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Printf("库存查询响应: %s", string(body))
+	log.Printf("库存查询响应: %s", body)
 
 	// 解析响应JSON
 	var invResp InventoryQueryResponse
-	if err := json.Unmarshal(body, &invResp); err != nil {
+	if err := json.Unmarshal([]byte(body), &invResp); err != nil {
 		return nil, fmt.Errorf("解析响应失败: %v", err)
 	}
 

@@ -193,7 +193,7 @@ func (oc *OrderController) OrderCreate(c *gin.Context) {
 	c.Set("created_order_user_id", req.UserID)
 
 	// 同步到聚水潭
-	token, err := jushuitan.GetTokenTest()
+	token, err := jushuitan.GetToken()
 	if err != nil {
 		log.Printf("获取聚水潭token失败: %v", err)
 		c.JSON(http.StatusInternalServerError, msg.ErrResponseStr("同步到聚水潭失败"))
@@ -431,7 +431,7 @@ func (oc *OrderController) OrderCancel(c *gin.Context) {
 	log.Printf("最终 items: %+v", items)
 
 	// 获取聚水潭token
-	token, err := jushuitan.GetTokenTest()
+	token, err := jushuitan.GetToken()
 	if err != nil {
 		log.Printf("获取聚水潭token失败: %v", err)
 		c.JSON(http.StatusInternalServerError, msg.ErrResponseStr("同步到聚水潭失败"))
@@ -734,7 +734,7 @@ func (oc *OrderController) queryJushuitanLogistic(c *gin.Context, req requestbod
 		return
 	}
 
-	token, err := jushuitan.GetTokenTest()
+	token, err := jushuitan.GetToken()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, msg.ErrResponseStr("获取聚水潭token失败: "+err.Error()))
 		return

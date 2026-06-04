@@ -65,7 +65,18 @@ type apiResponse struct {
 
 func SendAfterSale(accessToken string, data AfterSaleData) (string, error) {
 	cfg := config.LoadConfig()
-	body, err := postOpenAPI(accessToken, cfg.JushuitanConfig.AfterSaleUploadURLTest, data)
+	apiURL, err := activeURL(
+		cfg,
+		cfg.JushuitanConfig.AfterSaleUploadURLTest,
+		cfg.JushuitanConfig.AfterSaleUploadURLProd,
+		"JST_AFTERSALE_UPLOAD_URL_TEST",
+		"JST_AFTERSALE_UPLOAD_URL_PROD",
+	)
+	if err != nil {
+		return "", err
+	}
+
+	body, err := postOpenAPI(accessToken, apiURL, data)
 	if err != nil {
 		return "", err
 	}
@@ -88,7 +99,18 @@ func QueryAfterSaleReceived(accessToken string, query AfterSaleReceivedQuery) (s
 		query.PageSize = 50
 	}
 	cfg := config.LoadConfig()
-	body, err := postOpenAPI(accessToken, cfg.JushuitanConfig.AfterSaleReceivedQueryURLTest, query)
+	apiURL, err := activeURL(
+		cfg,
+		cfg.JushuitanConfig.AfterSaleReceivedQueryURLTest,
+		cfg.JushuitanConfig.AfterSaleReceivedQueryURLProd,
+		"JST_AFTERSALE_RECEIVED_QUERY_URL_TEST",
+		"JST_AFTERSALE_RECEIVED_QUERY_URL_PROD",
+	)
+	if err != nil {
+		return "", err
+	}
+
+	body, err := postOpenAPI(accessToken, apiURL, query)
 	if err != nil {
 		return "", err
 	}
@@ -105,8 +127,9 @@ func QueryAfterSaleReceived(accessToken string, query AfterSaleReceivedQuery) (s
 
 func postOpenAPI(accessToken, apiURL string, bizValue interface{}) (string, error) {
 	cfg := config.LoadConfig()
-	if cfg.JushuitanConfig.AppKeyTest == "" || cfg.JushuitanConfig.AppSecretTest == "" {
-		return "", fmt.Errorf("聚水潭测试应用配置未完整设置")
+	apiEnv, err := activeOpenAPIEnvironment(cfg)
+	if err != nil {
+		return "", err
 	}
 	if strings.TrimSpace(accessToken) == "" {
 		return "", fmt.Errorf("聚水潭access_token不能为空")
@@ -116,7 +139,6 @@ func postOpenAPI(accessToken, apiURL string, bizValue interface{}) (string, erro
 		return "", fmt.Errorf("聚水潭接口URL未配置")
 	}
 
-	appKey := cfg.JushuitanConfig.AppKeyTest
 	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
 	charset := "UTF-8"
 	biz, err := json.Marshal(bizValue)
@@ -125,11 +147,11 @@ func postOpenAPI(accessToken, apiURL string, bizValue interface{}) (string, erro
 	}
 
 	convertedStr := fmt.Sprintf("%saccess_token%sapp_key%sbiz%scharset%stimestamp%sversion%d",
-		cfg.JushuitanConfig.AppSecretTest, accessToken, appKey, string(biz), charset, timestamp, Version)
+		apiEnv.AppSecret, accessToken, apiEnv.AppKey, string(biz), charset, timestamp, Version)
 	sign := md5Encrypt(convertedStr)
 
 	form := url.Values{}
-	form.Set("app_key", appKey)
+	form.Set("app_key", apiEnv.AppKey)
 	form.Set("access_token", accessToken)
 	form.Set("timestamp", timestamp)
 	form.Set("charset", charset)

@@ -71,7 +71,18 @@ func QueryLogistic(accessToken string, query LogisticQueryRequest) (*LogisticQue
 	}
 
 	cfg := config.LoadConfig()
-	body, err := postOpenAPI(accessToken, cfg.JushuitanConfig.LogisticQueryURLTest, query)
+	apiURL, err := activeURL(
+		cfg,
+		cfg.JushuitanConfig.LogisticQueryURLTest,
+		cfg.JushuitanConfig.LogisticQueryURLProd,
+		"JST_LOGISTIC_QUERY_URL_TEST",
+		"JST_LOGISTIC_QUERY_URL_PROD",
+	)
+	if err != nil {
+		return nil, "", err
+	}
+
+	body, err := postOpenAPI(accessToken, apiURL, query)
 	if err != nil {
 		return nil, "", err
 	}

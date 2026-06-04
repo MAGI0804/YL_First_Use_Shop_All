@@ -198,9 +198,9 @@ func (ic *InventoryController) queryJushuitanInventory(c *gin.Context, req reque
 		return
 	}
 
-	token, err := jushuitan.GetTokenProd()
+	token, err := jushuitan.GetToken()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, msg.ErrResponseStr("获取聚水潭生产token失败: "+err.Error()))
+		c.JSON(http.StatusInternalServerError, msg.ErrResponseStr("获取聚水潭token失败: "+err.Error()))
 		return
 	}
 

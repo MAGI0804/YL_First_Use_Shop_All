@@ -762,7 +762,7 @@ func PushReturnOrderToJushuitan(returnOrderID string) error {
 		return err
 	}
 
-	token, err := jushuitan.GetTokenTest()
+	token, err := jushuitan.GetToken()
 	if err != nil {
 		_ = updateReturnOrderJushuitanPushResult(returnOrder.ReturnID, JushuitanPushStatusFailed, "", err.Error())
 		return err

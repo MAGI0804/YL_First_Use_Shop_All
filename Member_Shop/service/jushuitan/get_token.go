@@ -36,6 +36,14 @@ func GetTokenTest() (string, error) {
 	return cfg.JushuitanConfig.AccessTokenTest, nil
 }
 
+func GetToken() (string, error) {
+	cfg := config.LoadConfig()
+	if useJushuitanTestEnvironment(cfg) {
+		return GetTokenTest()
+	}
+	return GetTokenProd()
+}
+
 func GetTokenProd() (string, error) {
 	cfg := config.LoadConfig()
 	if cfg.JushuitanConfig.AppKeyProd == "" || cfg.JushuitanConfig.AppSecretProd == "" || cfg.JushuitanConfig.AuthCodeProd == "" {

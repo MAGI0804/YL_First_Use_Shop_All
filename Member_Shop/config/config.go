@@ -57,12 +57,14 @@ type SMSConfig struct {
 }
 
 type JushuitanConfig struct {
+	Stage                         string
 	AppKeyTest                    string
 	AppSecretTest                 string
 	AppKeyProd                    string
 	AppSecretProd                 string
 	AuthCodeProd                  string
 	AccessTokenTest               string
+	ShopID                        string
 	GetTokenURLTest               string
 	GetTokenURLProd               string
 	OpenAPIURLTest                string
@@ -79,7 +81,9 @@ type JushuitanConfig struct {
 	LogisticQueryURLProd          string
 	InventoryQueryURLTest         string
 	InventoryQueryURLProd         string
+	SkuMapQueryURLTest            string
 	SkuMapQueryURLProd            string
+	SkuQueryURLTest               string
 	SkuQueryURLProd               string
 }
 
@@ -127,12 +131,14 @@ func LoadConfig() Config {
 			Endpoint:        getEnv("ALIYUN_SMS_ENDPOINT", "dysmsapi.aliyuncs.com"),
 		},
 		JushuitanConfig: JushuitanConfig{
+			Stage:                         getEnv("JST_ENV_STAGE", "develop"),
 			AppKeyTest:                    getEnv("JST_APP_KEY_TEST", ""),
 			AppSecretTest:                 getEnv("JST_APP_SECRET_TEST", ""),
 			AppKeyProd:                    getEnv("JST_APP_KEY_PROD", ""),
 			AppSecretProd:                 getEnv("JST_APP_SECRET_PROD", ""),
 			AuthCodeProd:                  getEnv("JST_AUTH_CODE_PROD", ""),
 			AccessTokenTest:               getEnv("JST_ACCESS_TOKEN_TEST", ""),
+			ShopID:                        getEnv("JST_SHOP_ID", ""),
 			GetTokenURLTest:               getEnv("JST_GET_TOKEN_URL_TEST", ""),
 			GetTokenURLProd:               getEnv("JST_GET_TOKEN_URL_PROD", ""),
 			OpenAPIURLTest:                getEnv("JST_OPEN_API_URL_TEST", ""),
@@ -149,7 +155,9 @@ func LoadConfig() Config {
 			LogisticQueryURLProd:          getEnv("JST_LOGISTIC_QUERY_URL_PROD", ""),
 			InventoryQueryURLTest:         getEnv("JST_INVENTORY_QUERY_URL_TEST", ""),
 			InventoryQueryURLProd:         getEnv("JST_INVENTORY_QUERY_URL_PROD", ""),
+			SkuMapQueryURLTest:            getEnv("JST_SKUMAP_QUERY_URL_TEST", ""),
 			SkuMapQueryURLProd:            getEnv("JST_SKUMAP_QUERY_URL_PROD", ""),
+			SkuQueryURLTest:               getEnv("JST_SKU_QUERY_URL_TEST", ""),
 			SkuQueryURLProd:               getEnv("JST_SKU_QUERY_URL_PROD", ""),
 		},
 	}

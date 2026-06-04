@@ -4,12 +4,7 @@ import (
 	"Member_shop/config"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
-	"strconv"
-	"strings"
-	"time"
 )
 
 // ShopQueryRequest 店铺查询请求
@@ -56,48 +51,29 @@ const Version = 2 // API版本号
 // 返回JSON字符串和错误信息
 func QueryShops(accessToken string, shopIDs []int, pageIndex, pageSize int) (string, error) {
 	cfg := config.LoadConfig()
-	if cfg.JushuitanConfig.AppKeyTest == "" || cfg.JushuitanConfig.AppSecretTest == "" {
-		return "", fmt.Errorf("聚水潭测试应用配置未完整设置")
+	apiURL, err := activeURL(
+		cfg,
+		cfg.JushuitanConfig.ShopQueryURLTest,
+		cfg.JushuitanConfig.ShopQueryURLProd,
+		"JST_SHOP_QUERY_URL_TEST",
+		"JST_SHOP_QUERY_URL_PROD",
+	)
+	if err != nil {
+		return "", err
 	}
 
-	appKey := cfg.JushuitanConfig.AppKeyTest
-	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
-	charset := "UTF-8"
-
-	biz, err := json.Marshal(ShopQueryRequest{
+	body, err := postOpenAPI(accessToken, apiURL, ShopQueryRequest{
 		PageIndex: pageIndex,
 		PageSize:  pageSize,
 		ShopIDs:   shopIDs,
 	})
 	if err != nil {
-		return "", fmt.Errorf("序列化biz参数失败: %v", err)
-	}
-
-	convertedStr := fmt.Sprintf("%saccess_token%sapp_key%sbiz%scharset%stimestamp%sversion%d",
-		cfg.JushuitanConfig.AppSecretTest, accessToken, appKey, string(biz), charset, timestamp, Version)
-	sign := md5Encrypt(convertedStr)
-
-	apiURL := strings.TrimSpace(cfg.JushuitanConfig.ShopQueryURLTest)
-	if apiURL == "" {
-		return "", fmt.Errorf("JST_SHOP_QUERY_URL_TEST未配置")
-	}
-	data := fmt.Sprintf("app_key=%s&access_token=%s&timestamp=%s&charset=%s&version=%d&sign=%s&biz=%s",
-		appKey, accessToken, timestamp, charset, Version, sign, string(biz))
-
-	resp, err := http.Post(apiURL, "application/x-www-form-urlencoded", strings.NewReader(data))
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
 		return "", err
 	}
 
-	fmt.Printf("QueryShops response: %s\n", string(body))
+	fmt.Printf("QueryShops response: %s\n", body)
 
-	return string(body), nil
+	return body, nil
 }
 
 // OrderItem 订单商品明细
@@ -166,47 +142,28 @@ type OrderUploadResponse struct {
 // 返回JSON字符串和错误信息
 func SendOrder(accessToken string, orderData OrderData) (string, error) {
 	cfg := config.LoadConfig()
-	if cfg.JushuitanConfig.AppKeyTest == "" || cfg.JushuitanConfig.AppSecretTest == "" {
-		return "", fmt.Errorf("聚水潭测试应用配置未完整设置")
-	}
-
-	appKey := cfg.JushuitanConfig.AppKeyTest
-	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
-	charset := "UTF-8"
-
-	biz, err := json.Marshal([]OrderData{orderData})
+	apiURL, err := activeURL(
+		cfg,
+		cfg.JushuitanConfig.OrderUploadURLTest,
+		cfg.JushuitanConfig.OrderUploadURLProd,
+		"JST_ORDER_UPLOAD_URL_TEST",
+		"JST_ORDER_UPLOAD_URL_PROD",
+	)
 	if err != nil {
-		return "", fmt.Errorf("序列化biz参数失败: %v", err)
+		return "", err
 	}
-
-	convertedStr := fmt.Sprintf("%saccess_token%sapp_key%sbiz%scharset%stimestamp%sversion%d",
-		cfg.JushuitanConfig.AppSecretTest, accessToken, appKey, string(biz), charset, timestamp, Version)
-	sign := md5Encrypt(convertedStr)
-
-	apiURL := strings.TrimSpace(cfg.JushuitanConfig.OrderUploadURLTest)
-	if apiURL == "" {
-		return "", fmt.Errorf("JST_ORDER_UPLOAD_URL_TEST未配置")
-	}
-	data := fmt.Sprintf("app_key=%s&access_token=%s&timestamp=%s&charset=%s&version=%d&sign=%s&biz=%s",
-		appKey, accessToken, timestamp, charset, Version, sign, string(biz))
 
 	log.Printf("聚水潭订单上传请求已生成: so_id=%s item_count=%d", orderData.SoID, len(orderData.Items))
 
-	resp, err := http.Post(apiURL, "application/x-www-form-urlencoded", strings.NewReader(data))
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
+	body, err := postOpenAPI(accessToken, apiURL, []OrderData{orderData})
 	if err != nil {
 		return "", err
 	}
 
-	fmt.Printf("SendOrder response: %s\n", string(body))
+	fmt.Printf("SendOrder response: %s\n", body)
 
 	var uploadResp OrderUploadResponse
-	if err := json.Unmarshal(body, &uploadResp); err != nil {
+	if err := json.Unmarshal([]byte(body), &uploadResp); err != nil {
 		return "", fmt.Errorf("解析响应失败: %v", err)
 	}
 
@@ -214,5 +171,5 @@ func SendOrder(accessToken string, orderData OrderData) (string, error) {
 		return "", fmt.Errorf("上传失败: %s", uploadResp.Message)
 	}
 
-	return string(body), nil
+	return body, nil
 }

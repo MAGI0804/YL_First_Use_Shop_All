@@ -16,23 +16,55 @@ import (
 	"sync"
 	"time"
 
+	"Member_shop/config"
 	"Member_shop/db"
 	"Member_shop/models"
 )
 
 var (
-	AppKey    = os.Getenv("JST_APP_KEY_PROD")
-	AppSelect = os.Getenv("JST_APP_SECRET_PROD")
-	ShopID    = getEnv("JST_SHOP_ID", "")
-	Code      = os.Getenv("JST_AUTH_CODE_PROD")
+	AppKey    string
+	AppSelect string
+	ShopID    string
+	Code      string
 )
 
-func getEnv(key, defaultValue string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		return defaultValue
+func refreshJushuitanAutomationEnv() config.Config {
+	cfg := config.LoadConfig()
+	ShopID = cfg.JushuitanConfig.ShopID
+	if automationUsesTestJushuitan(cfg) {
+		AppKey = cfg.JushuitanConfig.AppKeyTest
+		AppSelect = cfg.JushuitanConfig.AppSecretTest
+		Code = ""
+		return cfg
 	}
-	return value
+	AppKey = cfg.JushuitanConfig.AppKeyProd
+	AppSelect = cfg.JushuitanConfig.AppSecretProd
+	Code = cfg.JushuitanConfig.AuthCodeProd
+	return cfg
+}
+
+func automationUsesTestJushuitan(cfg config.Config) bool {
+	switch strings.ToLower(strings.TrimSpace(cfg.JushuitanConfig.Stage)) {
+	case "", "test", "develop", "development", "dev":
+		return true
+	case "prod", "production", "formal", "release", "main", "master":
+		return false
+	default:
+		return true
+	}
+}
+
+func automationJushuitanURL(cfg config.Config, testURL, prodURL, testEnvName, prodEnvName string) (string, error) {
+	apiURL := strings.TrimSpace(testURL)
+	envName := testEnvName
+	if !automationUsesTestJushuitan(cfg) {
+		apiURL = strings.TrimSpace(prodURL)
+		envName = prodEnvName
+	}
+	if apiURL == "" {
+		return "", fmt.Errorf("%s未配置", envName)
+	}
+	return apiURL, nil
 }
 
 type ImageCache struct {
@@ -89,6 +121,17 @@ func MD5Encrypt(input string) string {
 }
 
 func GetToken() (string, error) {
+	cfg := refreshJushuitanAutomationEnv()
+	if automationUsesTestJushuitan(cfg) {
+		if cfg.JushuitanConfig.AccessTokenTest == "" {
+			return "", fmt.Errorf("JST_ACCESS_TOKEN_TEST未配置")
+		}
+		return cfg.JushuitanConfig.AccessTokenTest, nil
+	}
+	if AppKey == "" || AppSelect == "" || Code == "" {
+		return "", fmt.Errorf("聚水潭正式应用配置未完整设置")
+	}
+
 	timestamp := time.Now().Unix()
 	charset := "uft-8" // 注意：Python代码中使用了错误的拼写，API可能期望这个值
 	grantType := "authorization_code"
@@ -99,9 +142,15 @@ func GetToken() (string, error) {
 
 	sign := MD5Encrypt(convertedStr)
 
-	apiURL := strings.TrimSpace(getEnv("JST_GET_TOKEN_URL_PROD", ""))
-	if apiURL == "" {
-		return "", fmt.Errorf("JST_GET_TOKEN_URL_PROD未配置")
+	apiURL, err := automationJushuitanURL(
+		cfg,
+		cfg.JushuitanConfig.GetTokenURLTest,
+		cfg.JushuitanConfig.GetTokenURLProd,
+		"JST_GET_TOKEN_URL_TEST",
+		"JST_GET_TOKEN_URL_PROD",
+	)
+	if err != nil {
+		return "", err
 	}
 
 	data := url.Values{}
@@ -146,9 +195,16 @@ func GetToken() (string, error) {
 }
 
 func SendInventoryQuery(appKey, accessToken, timestamp, charset string, version int, sign, biz string) (*InventoryResponse, error) {
-	apiURL := strings.TrimSpace(getEnv("JST_SKUMAP_QUERY_URL_PROD", ""))
-	if apiURL == "" {
-		return nil, fmt.Errorf("JST_SKUMAP_QUERY_URL_PROD未配置")
+	cfg := refreshJushuitanAutomationEnv()
+	apiURL, err := automationJushuitanURL(
+		cfg,
+		cfg.JushuitanConfig.SkuMapQueryURLTest,
+		cfg.JushuitanConfig.SkuMapQueryURLProd,
+		"JST_SKUMAP_QUERY_URL_TEST",
+		"JST_SKUMAP_QUERY_URL_PROD",
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	data := url.Values{}
@@ -836,10 +892,16 @@ func ProcessCommodityBatch(skuIDs string) bool {
 		AppSelect, accessToken, AppKey, biz, charset, timestamp, version)
 	sign := MD5Encrypt(convertedStr)
 
-	// 发送请求 - 使用新的API端点
-	apiURL := strings.TrimSpace(getEnv("JST_SKU_QUERY_URL_PROD", ""))
-	if apiURL == "" {
-		fmt.Println("JST_SKU_QUERY_URL_PROD未配置")
+	cfg := refreshJushuitanAutomationEnv()
+	apiURL, err := automationJushuitanURL(
+		cfg,
+		cfg.JushuitanConfig.SkuQueryURLTest,
+		cfg.JushuitanConfig.SkuQueryURLProd,
+		"JST_SKU_QUERY_URL_TEST",
+		"JST_SKU_QUERY_URL_PROD",
+	)
+	if err != nil {
+		fmt.Println(err.Error())
 		DeleteCommoditiesNotFound(batchIDList, []string{})
 		return false
 	}

@@ -47,9 +47,12 @@ func TestLoadConfigReadsEnvironmentOverrides(t *testing.T) {
 	t.Setenv("WECHAT_APP_ID", "wx-from-env")
 	t.Setenv("WECHAT_LOGIN_URL", "https://wechat.example.com/login")
 	t.Setenv("ALIYUN_SMS_TEMPLATE_CODE", "sms-template")
+	t.Setenv("JST_ENV_STAGE", "test")
 	t.Setenv("JST_APP_KEY_PROD", "jst-key")
+	t.Setenv("JST_SHOP_ID", "10001")
 	t.Setenv("JST_ORDER_UPLOAD_URL_TEST", "https://jst.example.com/order-upload")
 	t.Setenv("JST_INVENTORY_QUERY_URL_PROD", "https://jst.example.com/inventory-query")
+	t.Setenv("JST_SKUMAP_QUERY_URL_TEST", "https://jst.example.com/skumap-query")
 
 	cfg := LoadConfig()
 
@@ -80,11 +83,17 @@ func TestLoadConfigReadsEnvironmentOverrides(t *testing.T) {
 	if cfg.JushuitanConfig.AppKeyProd != "jst-key" {
 		t.Fatalf("expected Jushuitan env override")
 	}
+	if cfg.JushuitanConfig.Stage != "test" || cfg.JushuitanConfig.ShopID != "10001" {
+		t.Fatalf("expected Jushuitan stage/shop overrides, got stage=%q shop_id=%q", cfg.JushuitanConfig.Stage, cfg.JushuitanConfig.ShopID)
+	}
 	if cfg.JushuitanConfig.OrderUploadURLTest != "https://jst.example.com/order-upload" {
 		t.Fatalf("expected Jushuitan order upload URL env override")
 	}
 	if cfg.JushuitanConfig.InventoryQueryURLProd != "https://jst.example.com/inventory-query" {
 		t.Fatalf("expected Jushuitan inventory query URL env override")
+	}
+	if cfg.JushuitanConfig.SkuMapQueryURLTest != "https://jst.example.com/skumap-query" {
+		t.Fatalf("expected Jushuitan skumap test URL env override")
 	}
 }
 
