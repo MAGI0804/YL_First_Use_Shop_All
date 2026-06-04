@@ -28,5 +28,9 @@ func InitInventoryRoutes(router *gin.Engine) {
 		inventoryGroup.POST("stock_check", inventoryController.StockCheckInventory)
 		// 同步聚水潭库存 - 从聚水潭同步库存数据
 		inventoryGroup.POST("sync_jushuitan", inventoryController.SyncJushuitanInventory)
+		// 查询聚水潭库存 - 只返回ERP库存，不应用本地库存
+		inventoryGroup.POST("query_jushuitan", inventoryController.QueryJushuitanInventory)
+		// 接收聚水潭库存同步消息 business_sku_syn
+		inventoryGroup.POST("jushuitan_sku_sync", inventoryController.JushuitanSkuSync)
 	}
 }

@@ -1,10 +1,19 @@
 package controllers
 
 import (
+	"Member_shop/db"
+	"Member_shop/models"
 	"Member_shop/requestbody"
+	"Member_shop/service/jushuitan"
 	"Member_shop/service/method"
 	"Member_shop/service/msg"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -161,18 +170,192 @@ func (ic *InventoryController) StockCheckInventory(c *gin.Context) {
 	c.JSON(http.StatusOK, msg.SuccessResponse("success", &data))
 }
 
-// SyncJushuitanInventory 处理库存同步聚水潭请求
-// 将指定商品的库存数据同步到聚水潭系统（当前为预留接口）
+// SyncJushuitanInventory 从聚水潭查询库存并应用到本地商品库存。
 func (ic *InventoryController) SyncJushuitanInventory(c *gin.Context) {
 	var req requestbody.InventorySyncJushuitanRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, msg.ErrResponse("invalid request", err))
 		return
 	}
+	req.Apply = true
+	ic.queryJushuitanInventory(c, req)
+}
+
+func (ic *InventoryController) QueryJushuitanInventory(c *gin.Context) {
+	var req requestbody.InventorySyncJushuitanRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponse("invalid request", err))
+		return
+	}
+	req.Apply = false
+	ic.queryJushuitanInventory(c, req)
+}
+
+func (ic *InventoryController) queryJushuitanInventory(c *gin.Context, req requestbody.InventorySyncJushuitanRequest) {
+	skuIDs := normalizedInventorySkuIDs(req)
+	if len(skuIDs) == 0 && (strings.TrimSpace(req.ModifiedBegin) == "" || strings.TrimSpace(req.ModifiedEnd) == "") {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr("sku_ids/commodity_ids或modified_begin+modified_end不能为空"))
+		return
+	}
+
+	token, err := jushuitan.GetTokenProd()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, msg.ErrResponseStr("获取聚水潭生产token失败: "+err.Error()))
+		return
+	}
+
+	pageIndex := req.PageIndex
+	if pageIndex <= 0 {
+		pageIndex = 1
+	}
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = 100
+	}
+	resp, err := jushuitan.QueryInventoryWithRequest(token, jushuitan.InventoryQueryRequest{
+		PageIndex:     pageIndex,
+		PageSize:      pageSize,
+		SkuIDs:        strings.Join(skuIDs, ","),
+		ModifiedBegin: req.ModifiedBegin,
+		ModifiedEnd:   req.ModifiedEnd,
+	})
+	if err != nil {
+		c.JSON(http.StatusBadGateway, msg.ErrResponseStr(err.Error()))
+		return
+	}
+
+	applyResults := []method.JushuitanInventorySyncResult{}
+	if req.Apply {
+		for _, item := range resp.Data.Inventorys {
+			result, applyErr := method.ApplyJushuitanInventorySync(method.JushuitanInventorySyncInput{
+				SkuID:      item.SkuID,
+				IID:        item.IID,
+				Name:       item.Name,
+				Qty:        item.Qty,
+				VirtualQty: item.VirtualQty,
+				OrderLock:  item.OrderLock,
+				PickLock:   item.PickLock,
+				Modified:   item.Modified,
+			})
+			if applyErr != nil {
+				log.Printf("应用聚水潭库存查询结果失败, sku_id=%s: %v", item.SkuID, applyErr)
+				continue
+			}
+			applyResults = append(applyResults, *result)
+		}
+	}
 
 	data := map[string]any{
-		"commodity_ids": req.CommodityIDs,
-		"status":        "reserved",
+		"jushuitan_inventory": resp,
+		"applied":             req.Apply,
+		"apply_results":       applyResults,
+		"applied_count":       len(applyResults),
 	}
-	c.JSON(http.StatusNotImplemented, msg.SuccessResponse("sync_jushuitan route is reserved; token-based sync will be implemented in the jushuitan phase", &data))
+	c.JSON(http.StatusOK, msg.SuccessResponse("success", &data))
+}
+
+func (ic *InventoryController) JushuitanSkuSync(c *gin.Context) {
+	req, rawData, err := parseJushuitanInventorySkuSyncRequest(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": "-1", "msg": "执行失败"})
+		return
+	}
+
+	items := req.Items
+	if len(items) == 0 {
+		var single requestbody.JushuitanInventorySkuItem
+		if err := json.Unmarshal([]byte(rawData), &single); err == nil && firstInventorySkuID(single) != "" {
+			items = []requestbody.JushuitanInventorySkuItem{single}
+		}
+	}
+
+	results := make([]method.JushuitanInventorySyncResult, 0, len(items))
+	for _, item := range items {
+		result, applyErr := method.ApplyJushuitanInventorySync(method.JushuitanInventorySyncInput{
+			SkuID:         firstInventorySkuID(item),
+			IID:           firstNonEmptyInventoryString(item.IID, item.IIDSnake),
+			Name:          item.Name,
+			Qty:           item.Qty,
+			VirtualQty:    firstNonZeroInventoryInt(item.VirtualQty, item.VirtualQtyRaw),
+			OrderLock:     firstNonZeroInventoryInt(item.OrderLock, item.OrderLockRaw),
+			PickLock:      firstNonZeroInventoryInt(item.PickLock, item.PickLockRaw),
+			Modified:      item.Modified,
+			WarehouseCode: firstNonEmptyInventoryString(fmt.Sprint(item.WmsCoID), fmt.Sprint(item.CoID)),
+		})
+		if applyErr != nil {
+			log.Printf("应用聚水潭库存推送失败, sku_id=%s: %v", firstInventorySkuID(item), applyErr)
+			continue
+		}
+		results = append(results, *result)
+	}
+
+	responseResult := `code=0&msg=执行成功`
+	rawRecord := models.JushuitanPushRawData{
+		RequestURL:  c.Request.URL.String(),
+		RequestIP:   c.ClientIP(),
+		RequestTime: time.Now(),
+		Response:    responseResult,
+		RawData:     rawData,
+		Remarks:     fmt.Sprintf("库存同步: msg_type=%s, item_count=%d, applied_count=%d", req.MsgType, len(items), len(results)),
+	}
+	if err := db.DB.Create(&rawRecord).Error; err != nil {
+		log.Printf("保存聚水潭库存推送原始数据失败: %v", err)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": "0", "msg": "执行成功", "data": gin.H{"applied_count": len(results)}})
+}
+
+func parseJushuitanInventorySkuSyncRequest(c *gin.Context) (requestbody.JushuitanInventorySkuSyncRequest, string, error) {
+	var req requestbody.JushuitanInventorySkuSyncRequest
+	bizData := c.PostForm("biz")
+	if strings.TrimSpace(bizData) == "" {
+		body, err := io.ReadAll(c.Request.Body)
+		if err != nil {
+			return req, "", err
+		}
+		bizData = string(body)
+	}
+	if strings.TrimSpace(bizData) == "" {
+		return req, "", fmt.Errorf("biz不能为空")
+	}
+	if err := json.Unmarshal([]byte(bizData), &req); err != nil {
+		return req, bizData, err
+	}
+	return req, bizData, nil
+}
+
+func normalizedInventorySkuIDs(req requestbody.InventorySyncJushuitanRequest) []string {
+	seen := map[string]bool{}
+	result := []string{}
+	for _, value := range append(req.SkuIDs, req.CommodityIDs...) {
+		value = strings.TrimSpace(value)
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		result = append(result, value)
+	}
+	return result
+}
+
+func firstInventorySkuID(item requestbody.JushuitanInventorySkuItem) string {
+	return firstNonEmptyInventoryString(item.SkuID, item.SkuIDSnake)
+}
+
+func firstNonEmptyInventoryString(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" && strings.TrimSpace(value) != "0" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
+func firstNonZeroInventoryInt(values ...int) int {
+	for _, value := range values {
+		if value != 0 {
+			return value
+		}
+	}
+	return 0
 }

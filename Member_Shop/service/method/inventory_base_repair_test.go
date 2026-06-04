@@ -30,6 +30,29 @@ func TestInventoryChangeTypeNamesMatchPlan(t *testing.T) {
 	}
 }
 
+func TestCalculateJushuitanAvailableQty(t *testing.T) {
+	tests := []struct {
+		name       string
+		qty        int
+		orderLock  int
+		virtualQty int
+		want       int
+	}{
+		{name: "main stock minus order lock plus virtual", qty: 10, orderLock: 3, virtualQty: 2, want: 9},
+		{name: "floors at zero", qty: 1, orderLock: 5, virtualQty: 0, want: 0},
+		{name: "virtual can increase available", qty: 0, orderLock: 0, virtualQty: 4, want: 4},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := calculateJushuitanAvailableQty(tt.qty, tt.orderLock, tt.virtualQty)
+			if got != tt.want {
+				t.Fatalf("available = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestValidateInventoryTransferInput(t *testing.T) {
 	tests := []struct {
 		name    string

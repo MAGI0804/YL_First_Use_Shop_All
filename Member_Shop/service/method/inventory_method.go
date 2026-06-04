@@ -61,11 +61,138 @@ type InventoryStockCheckInput struct {
 	Remark        string
 }
 
+type JushuitanInventorySyncInput struct {
+	SkuID         string
+	IID           string
+	Name          string
+	Qty           int
+	VirtualQty    int
+	OrderLock     int
+	PickLock      int
+	Modified      string
+	WarehouseCode string
+}
+
+type JushuitanInventorySyncResult struct {
+	CommodityID string `json:"commodity_id"`
+	SkuID       string `json:"sku_id"`
+	BeforeQty   int    `json:"before_qty"`
+	AfterQty    int    `json:"after_qty"`
+	ChangeQty   int    `json:"change_qty"`
+	Modified    string `json:"modified"`
+	Skipped     bool   `json:"skipped"`
+	SkipReason  string `json:"skip_reason"`
+}
+
 // ChangeInventory 变更库存（带事务）
 func ChangeInventory(input ChangeInventoryInput) error {
 	return db.DB.Transaction(func(tx *gorm.DB) error {
 		return changeInventoryTx(tx, input)
 	})
+}
+
+func ApplyJushuitanInventorySync(input JushuitanInventorySyncInput) (*JushuitanInventorySyncResult, error) {
+	input.SkuID = strings.TrimSpace(input.SkuID)
+	input.IID = strings.TrimSpace(input.IID)
+	input.Modified = strings.TrimSpace(input.Modified)
+	if input.SkuID == "" && input.IID == "" {
+		return nil, fmt.Errorf("sku_id或i_id不能为空")
+	}
+
+	var result *JushuitanInventorySyncResult
+	err := db.DB.Transaction(func(tx *gorm.DB) error {
+		var commodity models.Commodity
+		query := tx.Clauses(clause.Locking{Strength: "UPDATE"})
+		if input.SkuID != "" && input.IID != "" {
+			query = query.Where("commodity_id = ? OR spec_code = ? OR style_code = ?", input.SkuID, input.SkuID, input.IID)
+		} else if input.SkuID != "" {
+			query = query.Where("commodity_id = ? OR spec_code = ?", input.SkuID, input.SkuID)
+		} else {
+			query = query.Where("style_code = ?", input.IID)
+		}
+		if err := query.First(&commodity).Error; err != nil {
+			return err
+		}
+
+		if input.Modified != "" {
+			var count int64
+			if err := tx.Model(&models.InventoryLog{}).
+				Where("commodity_id = ? AND change_type = ? AND related_sub_order_id = ?", commodity.CommodityID, InventoryChangeSyncJushuitan, input.Modified).
+				Count(&count).Error; err != nil {
+				return err
+			}
+			if count > 0 {
+				result = &JushuitanInventorySyncResult{
+					CommodityID: commodity.CommodityID,
+					SkuID:       input.SkuID,
+					BeforeQty:   commodity.Inventory,
+					AfterQty:    commodity.Inventory,
+					Modified:    input.Modified,
+					Skipped:     true,
+					SkipReason:  "duplicate_modified",
+				}
+				return nil
+			}
+		}
+
+		beforeQty := commodity.Inventory
+		afterQty := calculateJushuitanAvailableQty(input.Qty, input.OrderLock, input.VirtualQty)
+		changeQty := afterQty - beforeQty
+		result = &JushuitanInventorySyncResult{
+			CommodityID: commodity.CommodityID,
+			SkuID:       input.SkuID,
+			BeforeQty:   beforeQty,
+			AfterQty:    afterQty,
+			ChangeQty:   changeQty,
+			Modified:    input.Modified,
+		}
+		if changeQty == 0 {
+			result.Skipped = true
+			result.SkipReason = "inventory_unchanged"
+			return nil
+		}
+
+		if err := tx.Model(&models.Commodity{}).
+			Where("commodity_id = ?", commodity.CommodityID).
+			Update("inventory", afterQty).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&models.CommoditySituation{}).
+			Where("commodity_id = ?", commodity.CommodityID).
+			Update("inventory", afterQty).Error; err != nil {
+			return err
+		}
+		if commodity.StyleCode != "" {
+			if err := refreshStyleCodeInventoryTx(tx, commodity.StyleCode); err != nil {
+				return err
+			}
+		}
+
+		remark := fmt.Sprintf("聚水潭库存同步 sku_id=%s i_id=%s qty=%d order_lock=%d virtual_qty=%d pick_lock=%d modified=%s",
+			input.SkuID, input.IID, input.Qty, input.OrderLock, input.VirtualQty, input.PickLock, input.Modified)
+		log := models.InventoryLog{
+			CommodityID:       commodity.CommodityID,
+			StyleCode:         commodity.StyleCode,
+			WarehouseCode:     input.WarehouseCode,
+			BeforeQty:         beforeQty,
+			ChangeQty:         changeQty,
+			AfterQty:          afterQty,
+			ChangeType:        InventoryChangeSyncJushuitan,
+			RelatedSubOrderID: input.Modified,
+			OperatorID:        "jushuitan",
+			Remark:            remark,
+		}
+		return tx.Create(&log).Error
+	})
+	return result, err
+}
+
+func calculateJushuitanAvailableQty(qty, orderLock, virtualQty int) int {
+	available := qty - orderLock + virtualQty
+	if available < 0 {
+		return 0
+	}
+	return available
 }
 
 // QueryInventory 查询库存信息

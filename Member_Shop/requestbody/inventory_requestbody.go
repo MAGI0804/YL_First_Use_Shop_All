@@ -41,7 +41,36 @@ type InventoryWarningsRequest struct {
 // InventorySyncJushuitanRequest 库存同步聚水潭请求结构体
 // 用于将指定商品的库存同步到聚水潭系统
 type InventorySyncJushuitanRequest struct {
-	CommodityIDs []string `json:"commodity_ids"` // 要同步的商品ID列表
+	CommodityIDs  []string `json:"commodity_ids"`  // 要同步的商品ID列表
+	SkuIDs        []string `json:"sku_ids"`        // 聚水潭商品编码，优先用于查询聚水潭
+	PageIndex     int      `json:"page_index"`     // 页码，默认1
+	PageSize      int      `json:"page_size"`      // 每页数量，默认100
+	ModifiedBegin string   `json:"modified_begin"` // 修改开始时间
+	ModifiedEnd   string   `json:"modified_end"`   // 修改结束时间
+	Apply         bool     `json:"apply"`          // 是否应用到本地库存
+}
+
+type JushuitanInventorySkuSyncRequest struct {
+	MsgType string                      `json:"msg_type"`
+	Items   []JushuitanInventorySkuItem `json:"items"`
+}
+
+type JushuitanInventorySkuItem struct {
+	SkuID         string `json:"skuId"`
+	SkuIDSnake    string `json:"sku_id"`
+	IID           string `json:"iId"`
+	IIDSnake      string `json:"i_id"`
+	Name          string `json:"name"`
+	Qty           int    `json:"qty"`
+	VirtualQty    int    `json:"virtualQty"`
+	VirtualQtyRaw int    `json:"virtual_qty"`
+	OrderLock     int    `json:"orderLock"`
+	OrderLockRaw  int    `json:"order_lock"`
+	PickLock      int    `json:"pickLock"`
+	PickLockRaw   int    `json:"pick_lock"`
+	Modified      string `json:"modified"`
+	CoID          int    `json:"coid"`
+	WmsCoID       int    `json:"wms_co_id"`
 }
 
 type InventoryTransferRequest struct {
