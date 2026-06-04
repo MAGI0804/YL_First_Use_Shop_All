@@ -29,6 +29,7 @@ type AfterSaleItem struct {
 	Name      string  `json:"name,omitempty"`
 	Qty       int     `json:"qty"`
 	Amount    float64 `json:"amount,omitempty"`
+	Type      string  `json:"type,omitempty"`
 }
 
 // AfterSaleData 售后上传/修改数据。

@@ -81,7 +81,7 @@ type OrderRequestReturnRequest struct {
 	OrderID         string   `json:"order_id" binding:"required"`
 	UserID          int      `json:"user_id" binding:"required"`
 	OrderStatus     string   `json:"order_status" binding:"required"`
-	Type            string   `json:"type" binding:"omitempty,oneof=return exchange refund"`
+	Type            string   `json:"type" binding:"omitempty,oneof=return exchange refund replacement reissue"`
 	Reason          string   `json:"reason" binding:"required"`
 	SpecificReasons string   `json:"specific_reasons" binding:"required"`
 	BuyerProvince   string   `json:"buyer_province" `

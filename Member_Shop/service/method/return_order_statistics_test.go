@@ -70,6 +70,40 @@ func TestNormalizeJushuitanAfterSaleStatus(t *testing.T) {
 	}
 }
 
+func TestNormalizeReturnTypeSupportsReplacement(t *testing.T) {
+	tests := []struct {
+		name       string
+		returnType string
+		want       string
+	}{
+		{name: "replacement", returnType: "replacement", want: "replacement"},
+		{name: "reissue alias", returnType: "reissue", want: "replacement"},
+		{name: "chinese alias", returnType: "补发", want: "replacement"},
+		{name: "return refund alias", returnType: "return_refund", want: "return"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := normalizeReturnType(tt.returnType)
+			if got != tt.want {
+				t.Fatalf("type = %s, want %s", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestJushuitanAfterSaleTypeSupportsReplacement(t *testing.T) {
+	if got := jushuitanAfterSaleType("replacement"); got != "补发" {
+		t.Fatalf("main type = %s, want 补发", got)
+	}
+	if got := jushuitanAfterSaleItemType("replacement"); got != "补发" {
+		t.Fatalf("item type = %s, want 补发", got)
+	}
+	if got := jushuitanAfterSaleItemType("refund"); got != "其它" {
+		t.Fatalf("refund item type = %s, want 其它", got)
+	}
+}
+
 func TestParseAfterSaleProductItems(t *testing.T) {
 	t.Run("array", func(t *testing.T) {
 		items := parseAfterSaleProductItems(`[{"commodity_id":"SKU001","qty":2}]`)

@@ -682,7 +682,16 @@ func (oc *OrderController) OrderRequestReturn(c *gin.Context) {
 	c.Set("order_user_id", req.UserID)
 	c.Set("created_return_order_id", result.ReturnID)
 
-	typeLabel := map[string]string{"return": "退货", "exchange": "换货", "refund": "仅退款"}[req.Type]
+	typeLabel := map[string]string{
+		"return":      "退货",
+		"exchange":    "换货",
+		"refund":      "仅退款",
+		"replacement": "补发",
+		"reissue":     "补发",
+	}[req.Type]
+	if typeLabel == "" {
+		typeLabel = "售后"
+	}
 	data := map[string]any{
 		"status":  "success",
 		"message": typeLabel + "申请提交成功",

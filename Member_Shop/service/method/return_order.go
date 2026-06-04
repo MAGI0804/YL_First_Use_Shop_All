@@ -414,6 +414,8 @@ func normalizeReturnType(returnType string) string {
 		return "exchange"
 	case "refund", "仅退款":
 		return "refund"
+	case "replacement", "reissue", "补发":
+		return "replacement"
 	default:
 		return strings.TrimSpace(returnType)
 	}
@@ -586,6 +588,8 @@ func markOrderAfterSaleProcessingTx(tx *gorm.DB, returnOrder models.ReturnOrder)
 		status := "returning"
 		if returnOrder.Type == "exchange" {
 			status = "exchanging"
+		} else if returnOrder.Type == "replacement" {
+			status = "replacing"
 		}
 		if err := tx.Model(&models.SubOrder{}).
 			Where("sub_order_id = ?", returnOrder.SubOrderID).
@@ -833,6 +837,7 @@ func buildJushuitanAfterSaleItems(returnOrder models.ReturnOrder) []jushuitan.Af
 			OuterOiID: returnOrder.SubOrderID,
 			SkuID:     returnOrder.SubOrderID,
 			Qty:       1,
+			Type:      jushuitanAfterSaleItemType(returnOrder.Type),
 		}}
 	}
 
@@ -849,6 +854,7 @@ func buildJushuitanAfterSaleItems(returnOrder models.ReturnOrder) []jushuitan.Af
 			Name:      firstStringValue(raw, "name", "product_name", "commodity_name"),
 			Qty:       qty,
 			Amount:    firstFloatValue(raw, "amount", "sub_amount", "price"),
+			Type:      jushuitanAfterSaleItemType(returnOrder.Type),
 		})
 	}
 	if len(items) == 0 {
@@ -856,6 +862,7 @@ func buildJushuitanAfterSaleItems(returnOrder models.ReturnOrder) []jushuitan.Af
 			OuterOiID: returnOrder.SubOrderID,
 			SkuID:     returnOrder.SubOrderID,
 			Qty:       1,
+			Type:      jushuitanAfterSaleItemType(returnOrder.Type),
 		}}
 	}
 	return items
@@ -904,8 +911,23 @@ func jushuitanAfterSaleType(returnType string) string {
 		return "仅退款"
 	case "exchange":
 		return "换货"
+	case "replacement":
+		return "补发"
 	default:
 		return "退货退款"
+	}
+}
+
+func jushuitanAfterSaleItemType(returnType string) string {
+	switch normalizeReturnType(returnType) {
+	case "exchange":
+		return "换货"
+	case "replacement":
+		return "补发"
+	case "refund":
+		return "其它"
+	default:
+		return "退货"
 	}
 }
 

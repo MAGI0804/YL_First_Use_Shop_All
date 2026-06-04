@@ -16,13 +16,16 @@ import (
 
 const ValidShopName = "youlan_kids"
 
-var ValidOrderStatuses = []string{"pending", "unpaid", "paid", "partial_paid", "shipped", "delivered", "canceled", "processing", "returning", "exchanging"}
+var ValidOrderStatuses = []string{"pending", "unpaid", "paid", "partial_paid", "shipped", "delivered", "canceled", "processing", "returning", "exchanging", "replacing"}
 var validChangeStatusMap = map[string]bool{
 	"pending":      true,
 	"unpaid":       true,
 	"paid":         true,
 	"partial_paid": true,
 	"processing":   true,
+	"returning":    true,
+	"exchanging":   true,
+	"replacing":    true,
 	"shipped":      true,
 	"delivered":    true,
 	"canceled":     true,
