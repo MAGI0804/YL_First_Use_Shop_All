@@ -96,6 +96,17 @@ type SyncLogisticsInfoRequest struct {
 	OrderID string `json:"order_id" binding:"required"`
 }
 
+type JushuitanLogisticQueryRequest struct {
+	OrderID       string   `json:"order_id"`
+	ShopID        int      `json:"shop_id"`
+	PageIndex     int      `json:"page_index"`
+	PageSize      int      `json:"page_size"`
+	ModifiedBegin string   `json:"modified_begin"`
+	ModifiedEnd   string   `json:"modified_end"`
+	DateType      int      `json:"date_type"`
+	SoIDs         []string `json:"so_ids"`
+}
+
 type ChangeReceivingDataRequest struct {
 	OrderID         string `json:"order_id" binding:"required"`
 	ReceiverName    string `json:"receiver_name" binding:"required"`

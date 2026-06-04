@@ -696,32 +696,90 @@ func (oc *OrderController) OrderRequestReturn(c *gin.Context) {
 }
 
 func (oc *OrderController) SyncLogisticsInfo(c *gin.Context) {
-	var req requestbody.SyncLogisticsInfoRequest
+	var req requestbody.JushuitanLogisticQueryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, msg.ErrResponse("请求参数错误", err))
 		return
 	}
 
-	result, err := method.SyncLogisticsInfo(req.OrderID)
-	if err != nil {
-		c.JSON(http.StatusNotFound, msg.ErrResponseStr("订单不存在"))
+	oc.queryJushuitanLogistic(c, req)
+}
+
+func (oc *OrderController) QueryJushuitanLogistic(c *gin.Context) {
+	var req requestbody.JushuitanLogisticQueryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponse("请求参数错误", err))
 		return
 	}
 
-	if result.Order.ExpressCompany == "" || result.Order.ExpressNumber == "" {
-		c.JSON(http.StatusBadRequest, msg.ErrResponseStr("订单没有物流信息"))
+	oc.queryJushuitanLogistic(c, req)
+}
+
+func (oc *OrderController) queryJushuitanLogistic(c *gin.Context, req requestbody.JushuitanLogisticQueryRequest) {
+	soIDs := append([]string{}, req.SoIDs...)
+	if req.OrderID != "" && len(soIDs) == 0 {
+		soIDs = []string{req.OrderID}
+	}
+	if len(soIDs) == 0 && (req.ModifiedBegin == "" || req.ModifiedEnd == "") {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr("order_id/so_ids或modified_begin+modified_end不能为空"))
 		return
+	}
+
+	token, err := jushuitan.GetTokenTest()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, msg.ErrResponseStr("获取聚水潭token失败: "+err.Error()))
+		return
+	}
+
+	resp, rawResp, err := jushuitan.QueryLogistic(token, jushuitan.LogisticQueryRequest{
+		ShopID:        req.ShopID,
+		PageIndex:     req.PageIndex,
+		PageSize:      req.PageSize,
+		ModifiedBegin: req.ModifiedBegin,
+		ModifiedEnd:   req.ModifiedEnd,
+		DateType:      req.DateType,
+		SoIDs:         soIDs,
+	})
+	if err != nil {
+		c.JSON(http.StatusBadGateway, msg.ErrResponseStr(err.Error()))
+		return
+	}
+
+	applyResults := make([]*method.JushuitanLogisticApplyResult, 0, len(resp.Data.Orders))
+	for _, logisticOrder := range resp.Data.Orders {
+		items := make([]method.JushuitanLogisticItemInput, 0, len(logisticOrder.Items))
+		for _, item := range logisticOrder.Items {
+			items = append(items, method.JushuitanLogisticItemInput{
+				SubOrderID: item.OuterOiID,
+				Qty:        item.Qty,
+				SkuID:      item.SkuID,
+			})
+		}
+		result, applyErr := method.ApplyJushuitanLogisticOrder(method.JushuitanLogisticOrderInput{
+			OrderID:          logisticOrder.SoID,
+			ExpressCompany:   logisticOrder.LogisticsCompany,
+			ExpressNumber:    logisticOrder.LID,
+			SendDate:         logisticOrder.SendDate,
+			LogisticsProcess: logisticOrder,
+			Items:            items,
+		})
+		if applyErr != nil {
+			log.Printf("应用聚水潭发货信息失败, so_id=%s: %v", logisticOrder.SoID, applyErr)
+			continue
+		}
+		applyResults = append(applyResults, result)
 	}
 
 	data := map[string]any{
-		"code":    200,
-		"message": "物流信息同步成功",
-		"data": map[string]interface{}{
-			"order_id":          req.OrderID,
-			"express_company":   result.Order.ExpressCompany,
-			"express_number":    result.Order.ExpressNumber,
-			"logistics_process": result.LogisticsProcess,
-		},
+		"raw_response":      rawResp,
+		"page_index":        resp.Data.PageIndex,
+		"page_size":         resp.Data.PageSize,
+		"data_count":        resp.Data.DataCount,
+		"page_count":        resp.Data.PageCount,
+		"has_next":          resp.Data.HasNext,
+		"orders":            resp.Data.Orders,
+		"applied_orders":    applyResults,
+		"applied_order_num": len(applyResults),
 	}
 	c.JSON(http.StatusOK, msg.SuccessResponse("success", &data))
 }

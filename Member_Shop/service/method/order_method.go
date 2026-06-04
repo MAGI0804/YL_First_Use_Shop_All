@@ -843,6 +843,84 @@ type SyncLogisticsResult struct {
 	LogisticsProcess []map[string]interface{}
 }
 
+type JushuitanLogisticOrderInput struct {
+	OrderID          string
+	ExpressCompany   string
+	ExpressNumber    string
+	SendDate         string
+	LogisticsProcess interface{}
+	Items            []JushuitanLogisticItemInput
+}
+
+type JushuitanLogisticItemInput struct {
+	SubOrderID string
+	Qty        int
+	SkuID      string
+}
+
+type JushuitanLogisticApplyResult struct {
+	OrderID              string
+	ExpressCompany       string
+	ExpressNumber        string
+	UpdatedSubOrderCount int
+}
+
+func ApplyJushuitanLogisticOrder(input JushuitanLogisticOrderInput) (*JushuitanLogisticApplyResult, error) {
+	input.OrderID = strings.TrimSpace(input.OrderID)
+	if input.OrderID == "" {
+		return nil, fmt.Errorf("order_id不能为空")
+	}
+
+	var order models.Order
+	if err := db.DB.Where("order_id = ?", input.OrderID).First(&order).Error; err != nil {
+		return nil, err
+	}
+
+	updates := map[string]interface{}{}
+	if input.ExpressCompany != "" {
+		updates["express_company"] = input.ExpressCompany
+		order.ExpressCompany = input.ExpressCompany
+	}
+	if input.ExpressNumber != "" {
+		updates["express_number"] = input.ExpressNumber
+		order.ExpressNumber = input.ExpressNumber
+	}
+	if input.ExpressCompany != "" || input.ExpressNumber != "" {
+		updates["status"] = "shipped"
+		order.Status = "shipped"
+	}
+	if input.LogisticsProcess != nil {
+		logisticsJSON, err := json.Marshal(input.LogisticsProcess)
+		if err != nil {
+			return nil, err
+		}
+		updates["logistics_process"] = string(logisticsJSON)
+	}
+	if len(updates) > 0 {
+		if err := db.DB.Model(&order).Updates(updates).Error; err != nil {
+			return nil, err
+		}
+	}
+
+	updatedSubOrders := 0
+	for _, item := range input.Items {
+		if strings.TrimSpace(item.SubOrderID) == "" {
+			continue
+		}
+		if err := UpdateSubOrderShipInfo(item.SubOrderID, input.ExpressNumber, input.ExpressCompany, input.SendDate); err != nil {
+			return nil, err
+		}
+		updatedSubOrders++
+	}
+
+	return &JushuitanLogisticApplyResult{
+		OrderID:              input.OrderID,
+		ExpressCompany:       order.ExpressCompany,
+		ExpressNumber:        order.ExpressNumber,
+		UpdatedSubOrderCount: updatedSubOrders,
+	}, nil
+}
+
 // SyncLogisticsInfo 同步物流信息
 func SyncLogisticsInfo(orderID string) (*SyncLogisticsResult, error) {
 	var order models.Order
