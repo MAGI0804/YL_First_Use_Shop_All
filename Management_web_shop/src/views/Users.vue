@@ -2,36 +2,53 @@
   <div class="users-page">
     <div class="toolbar">
       <el-input v-model="filters.mobile" clearable placeholder="手机号" class="filter-input" />
+      <el-select v-model="filters.role" clearable placeholder="身份" class="filter-select">
+        <el-option v-for="item in roleOptions" :key="item.value" :label="item.label" :value="item.value" />
+      </el-select>
       <el-select v-model="filters.status" clearable placeholder="状态" class="filter-select">
         <el-option label="待激活" value="pending" />
         <el-option label="启用" value="active" />
         <el-option label="停用" value="disabled" />
       </el-select>
       <el-button :icon="Search" @click="loadUsers">查询</el-button>
-      <el-button type="primary" :icon="Plus" @click="openInviteDialog">新增账号</el-button>
+      <el-button type="primary" :icon="Plus" @click="openCreateDialog">新增账号</el-button>
     </div>
 
     <el-table :data="users" border v-loading="loading" empty-text="暂无账号">
-      <el-table-column prop="id" label="ID" width="80" />
       <el-table-column prop="operator_no" label="运营编号" min-width="170" />
       <el-table-column prop="nickname" label="账户名" min-width="120" />
       <el-table-column prop="mobile" label="手机号" width="140" />
-      <el-table-column prop="role" label="角色" width="110">
+      <el-table-column prop="role" label="身份" width="110">
         <template #default="{ row }">
-          <el-tag :type="row.role === 'admin' ? 'danger' : 'info'">{{ row.role === 'admin' ? '管理员' : '运营' }}</el-tag>
+          <el-tag :type="roleMeta[row.role]?.type || 'info'">{{ roleMeta[row.role]?.label || row.role }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="level" label="权限等级" width="100" />
       <el-table-column prop="status" label="状态" width="110">
         <template #default="{ row }">
           <el-tag :type="statusMeta[row.status]?.type || 'info'">{{ statusMeta[row.status]?.label || row.status }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="210" fixed="right">
+      <el-table-column label="可访问页面" min-width="260">
         <template #default="{ row }">
-          <el-button v-if="row.status !== 'active'" size="small" @click="changeStatus(row, 'active')">启用</el-button>
-          <el-button v-if="row.status !== 'disabled'" size="small" type="danger" @click="changeStatus(row, 'disabled')">停用</el-button>
-          <el-button v-if="row.status !== 'pending'" size="small" @click="changeStatus(row, 'pending')">待激活</el-button>
+          <div class="permission-tags">
+            <el-tag v-for="permission in row.permissions" :key="permission" size="small" effect="plain">
+              {{ permissionLabel(permission) }}
+            </el-tag>
+          </div>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="170" fixed="right">
+        <template #default="{ row }">
+          <el-button size="small" @click="openEditDialog(row)">编辑</el-button>
+          <el-button
+            v-if="row.status !== 'disabled'"
+            size="small"
+            type="danger"
+            @click="quickDisable(row)"
+          >
+            停用
+          </el-button>
+          <el-button v-else size="small" type="success" @click="quickEnable(row)">启用</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -48,64 +65,83 @@
       />
     </div>
 
-    <el-dialog v-model="inviteDialogVisible" title="新增后台账号" width="420px">
-      <el-form ref="inviteFormRef" :model="inviteForm" :rules="inviteRules" label-width="84px">
+    <el-dialog v-model="dialogVisible" :title="editingUser ? '编辑账号' : '新增账号'" width="560px">
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="84px">
         <el-form-item label="账户名" prop="nickname">
-          <el-input v-model="inviteForm.nickname" placeholder="员工或运营名称" />
+          <el-input v-model="form.nickname" placeholder="员工或运营名称" />
         </el-form-item>
         <el-form-item label="手机号" prop="mobile">
-          <el-input v-model="inviteForm.mobile" placeholder="登录手机号" />
+          <el-input v-model="form.mobile" :disabled="!!editingUser" placeholder="登录手机号" />
         </el-form-item>
-        <el-form-item label="角色" prop="role">
-          <el-select v-model="inviteForm.role" class="full-width">
-            <el-option label="运营" value="operation" />
-            <el-option label="管理员" value="admin" />
-          </el-select>
+        <el-form-item label="身份" prop="role">
+          <el-segmented v-model="form.role" :options="roleOptions" @change="applyRoleDefaultPermissions" />
         </el-form-item>
-        <el-form-item label="权限等级" prop="level">
-          <el-input-number v-model="inviteForm.level" :min="1" :max="9" class="full-width" />
+        <el-form-item v-if="editingUser" label="状态" prop="status">
+          <el-radio-group v-model="form.status">
+            <el-radio-button label="pending">待激活</el-radio-button>
+            <el-radio-button label="active">启用</el-radio-button>
+            <el-radio-button label="disabled">停用</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="页面权限" prop="permissions">
+          <el-checkbox-group v-model="form.permissions" class="permission-grid">
+            <el-checkbox
+              v-for="item in pagePermissions"
+              :key="item.value"
+              :label="item.value"
+              :disabled="item.value === 'users' && form.role !== 'admin'"
+            >
+              {{ item.label }}
+            </el-checkbox>
+          </el-checkbox-group>
         </el-form-item>
         <el-form-item label="备注">
-          <el-input v-model="inviteForm.remarks" type="textarea" :rows="3" />
+          <el-input v-model="form.remarks" type="textarea" :rows="3" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="inviteDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="submitInvite">保存</el-button>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="submitForm">保存</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
-import { ElMessage, FormInstance } from 'element-plus'
-import type { FormRules } from 'element-plus'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import type { FormInstance, FormRules } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
-import { inviteBackendUser, queryBackendUsers, updateBackendUserStatus } from '@/api'
+import { inviteBackendUser, queryBackendUsers, updateBackendUser, updateBackendUserStatus } from '@/api'
 import type { BackendUserSession } from '@/api'
 
-const loading = ref(false)
-const saving = ref(false)
-const users = ref<BackendUserSession[]>([])
-const total = ref(0)
-const inviteDialogVisible = ref(false)
-const inviteFormRef = ref<FormInstance>()
+type BackendRole = 'operation' | 'customer_service' | 'admin'
+type BackendStatus = 'pending' | 'active' | 'disabled'
 
-const filters = reactive({
-  mobile: '',
-  status: '',
-  page: 1,
-  page_size: 20
-})
+const pagePermissions = [
+  { label: '数据总览', value: 'dashboard' },
+  { label: '主页管理', value: 'home-manage' },
+  { label: '商品管理', value: 'product' },
+  { label: '库存管理', value: 'inventory' },
+  { label: '订单管理', value: 'order' },
+  { label: '售后中心', value: 'after-sales' },
+  { label: '评价管理', value: 'reviews' },
+  { label: '会员管理', value: 'member' },
+  { label: '报表管理', value: 'report' },
+  { label: '账号管理', value: 'users' }
+]
 
-const inviteForm = reactive({
-  nickname: '',
-  mobile: '',
-  role: 'operation',
-  level: 1,
-  remarks: ''
-})
+const roleOptions = [
+  { label: '运营', value: 'operation' },
+  { label: '客服', value: 'customer_service' },
+  { label: '管理员', value: 'admin' }
+]
+
+const roleMeta: Record<string, { label: string; type: 'success' | 'warning' | 'info' | 'danger' }> = {
+  operation: { label: '运营', type: 'info' },
+  customer_service: { label: '客服', type: 'warning' },
+  admin: { label: '管理员', type: 'danger' }
+}
 
 const statusMeta: Record<string, { label: string; type: 'success' | 'warning' | 'info' | 'danger' }> = {
   pending: { label: '待激活', type: 'warning' },
@@ -113,14 +149,61 @@ const statusMeta: Record<string, { label: string; type: 'success' | 'warning' | 
   disabled: { label: '停用', type: 'danger' }
 }
 
-const inviteRules: FormRules = {
+const defaultPermissions: Record<BackendRole, string[]> = {
+  operation: ['dashboard', 'home-manage', 'product', 'inventory', 'order', 'after-sales', 'reviews', 'member', 'report'],
+  customer_service: ['dashboard', 'order', 'after-sales', 'reviews', 'member'],
+  admin: pagePermissions.map((item) => item.value)
+}
+
+const loading = ref(false)
+const saving = ref(false)
+const users = ref<BackendUserSession[]>([])
+const total = ref(0)
+const dialogVisible = ref(false)
+const editingUser = ref<BackendUserSession | null>(null)
+const formRef = ref<FormInstance>()
+
+const filters = reactive({
+  mobile: '',
+  role: '',
+  status: '',
+  page: 1,
+  page_size: 20
+})
+
+const form = reactive({
+  nickname: '',
+  mobile: '',
+  role: 'operation' as BackendRole,
+  status: 'pending' as BackendStatus,
+  permissions: [...defaultPermissions.operation],
+  remarks: ''
+})
+
+const rules: FormRules = {
   nickname: [{ required: true, message: '请输入账户名', trigger: 'blur' }],
   mobile: [
     { required: true, message: '请输入手机号', trigger: 'blur' },
     { pattern: /^1[3-9]\d{9}$/, message: '手机号格式不正确', trigger: 'blur' }
   ],
-  role: [{ required: true, message: '请选择角色', trigger: 'change' }],
-  level: [{ required: true, message: '请输入权限等级', trigger: 'change' }]
+  role: [{ required: true, message: '请选择身份', trigger: 'change' }],
+  status: [{ required: true, message: '请选择状态', trigger: 'change' }],
+  permissions: [{ type: 'array', required: true, min: 1, message: '请至少选择一个页面', trigger: 'change' }]
+}
+
+const normalizedFormPermissions = computed(() => {
+  if (form.role !== 'admin') {
+    return form.permissions.filter((permission) => permission !== 'users')
+  }
+  return form.permissions
+})
+
+const permissionLabel = (value: string) => {
+  return pagePermissions.find((item) => item.value === value)?.label || value
+}
+
+const applyRoleDefaultPermissions = () => {
+  form.permissions = [...defaultPermissions[form.role]]
 }
 
 const loadUsers = async () => {
@@ -136,40 +219,78 @@ const loadUsers = async () => {
   }
 }
 
-const openInviteDialog = () => {
-  inviteForm.nickname = ''
-  inviteForm.mobile = ''
-  inviteForm.role = 'operation'
-  inviteForm.level = 1
-  inviteForm.remarks = ''
-  inviteDialogVisible.value = true
+const resetForm = () => {
+  form.nickname = ''
+  form.mobile = ''
+  form.role = 'operation'
+  form.status = 'pending'
+  form.permissions = [...defaultPermissions.operation]
+  form.remarks = ''
 }
 
-const submitInvite = async () => {
-  if (!inviteFormRef.value) return
-  const valid = await inviteFormRef.value.validate().catch(() => false)
+const openCreateDialog = () => {
+  editingUser.value = null
+  resetForm()
+  dialogVisible.value = true
+}
+
+const openEditDialog = (row: BackendUserSession) => {
+  editingUser.value = row
+  form.nickname = row.nickname
+  form.mobile = row.mobile
+  form.role = row.role
+  form.status = row.status
+  form.permissions = row.permissions?.length ? [...row.permissions] : [...defaultPermissions[row.role]]
+  form.remarks = row.remarks || ''
+  dialogVisible.value = true
+}
+
+const submitForm = async () => {
+  if (!formRef.value) return
+  const valid = await formRef.value.validate().catch(() => false)
   if (!valid) return
 
   saving.value = true
   try {
-    await inviteBackendUser(inviteForm)
-    ElMessage.success('账号已添加，等待首次注册激活')
-    inviteDialogVisible.value = false
+    const payload = {
+      nickname: form.nickname,
+      role: form.role,
+      permissions: normalizedFormPermissions.value,
+      remarks: form.remarks
+    }
+    if (editingUser.value) {
+      await updateBackendUser({ id: editingUser.value.id, status: form.status, ...payload })
+      ElMessage.success('账号已更新')
+    } else {
+      await inviteBackendUser({ mobile: form.mobile, ...payload })
+      ElMessage.success('账号已添加，等待首次注册激活')
+    }
+    dialogVisible.value = false
     loadUsers()
   } catch (error: any) {
-    ElMessage.error(error?.response?.data?.msg || '账号添加失败')
+    ElMessage.error(error?.response?.data?.msg || '保存失败')
   } finally {
     saving.value = false
   }
 }
 
-const changeStatus = async (row: BackendUserSession, status: 'pending' | 'active' | 'disabled') => {
+const quickDisable = async (row: BackendUserSession) => {
   try {
-    await updateBackendUserStatus({ id: row.id, status })
-    ElMessage.success('状态已更新')
+    await updateBackendUserStatus({ id: row.id, status: 'disabled' })
+    ElMessage.success('账号已停用')
     loadUsers()
   } catch (error: any) {
-    ElMessage.error(error?.response?.data?.msg || '状态更新失败')
+    ElMessage.error(error?.response?.data?.msg || '停用失败')
+  }
+}
+
+const quickEnable = async (row: BackendUserSession) => {
+  try {
+    await updateBackendUserStatus({ id: row.id, status: 'active' })
+    ElMessage.success('账号已启用')
+    loadUsers()
+  } catch (error: any) {
+    ElMessage.error(error?.response?.data?.msg || '启用失败')
   }
 }
 
@@ -202,13 +323,27 @@ onMounted(loadUsers)
   width: 130px;
 }
 
+.permission-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.permission-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(130px, 1fr));
+  gap: 4px 12px;
+}
+
 .pager {
   display: flex;
   justify-content: flex-end;
   padding: 12px 0;
 }
 
-.full-width {
-  width: 100%;
+@media (max-width: 640px) {
+  .permission-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

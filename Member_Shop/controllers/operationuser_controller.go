@@ -370,6 +370,26 @@ func (ouc *OperationUserController) UpdateBackendUserStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, msg.SuccessResponse("Backend user status updated", &data))
 }
 
+// UpdateBackendUser updates role, status, and page permissions for an account.
+func (ouc *OperationUserController) UpdateBackendUser(c *gin.Context) {
+	if !method.IsBackendAdmin(currentBackendUser(c)) {
+		c.JSON(http.StatusForbidden, msg.ErrResponseStr("admin permission required"))
+		return
+	}
+	var req requestbody.UpdateBackendUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr("Invalid request"))
+		return
+	}
+	user, err := method.UpdateBackendUser(req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr(err.Error()))
+		return
+	}
+	data := backendSessionData(method.BuildBackendUserSession(user, "", ""))
+	c.JSON(http.StatusOK, msg.SuccessResponse("Backend user updated", &data))
+}
+
 func backendSessionData(session method.BackendUserSession) map[string]any {
 	return map[string]any{"user": session}
 }

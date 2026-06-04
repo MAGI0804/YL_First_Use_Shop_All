@@ -54,11 +54,11 @@ type BackendLoginRequest struct {
 
 // AddBackendUserInviteRequest creates a pending backend account that can be activated by SMS.
 type AddBackendUserInviteRequest struct {
-	Mobile   string `json:"mobile" binding:"required"`
-	Nickname string `json:"nickname" binding:"required"`
-	Role     string `json:"role"`
-	Level    int    `json:"level"`
-	Remarks  string `json:"remarks"`
+	Mobile      string   `json:"mobile" binding:"required"`
+	Nickname    string   `json:"nickname" binding:"required"`
+	Role        string   `json:"role"`
+	Permissions []string `json:"permissions"`
+	Remarks     string   `json:"remarks"`
 }
 
 // QueryBackendUsersRequest filters backend staff accounts.
@@ -74,4 +74,14 @@ type QueryBackendUsersRequest struct {
 type UpdateBackendUserStatusRequest struct {
 	ID     uint   `json:"id" binding:"required"`
 	Status string `json:"status" binding:"required"`
+}
+
+// UpdateBackendUserRequest updates role, status, and page permissions.
+type UpdateBackendUserRequest struct {
+	ID          uint     `json:"id" binding:"required"`
+	Nickname    string   `json:"nickname"`
+	Role        string   `json:"role"`
+	Status      string   `json:"status"`
+	Permissions []string `json:"permissions"`
+	Remarks     string   `json:"remarks"`
 }

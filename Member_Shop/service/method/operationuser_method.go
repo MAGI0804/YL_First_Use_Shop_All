@@ -3,6 +3,7 @@ package method
 import (
 	"Member_shop/config"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -17,6 +18,42 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
+
+const (
+	BackendRoleOperation       = "operation"
+	BackendRoleCustomerService = "customer_service"
+	BackendRoleAdmin           = "admin"
+
+	BackendStatusPending  = "pending"
+	BackendStatusActive   = "active"
+	BackendStatusDisabled = "disabled"
+)
+
+var allBackendPagePermissions = []string{
+	"dashboard",
+	"home-manage",
+	"product",
+	"inventory",
+	"order",
+	"after-sales",
+	"reviews",
+	"member",
+	"report",
+	"users",
+}
+
+var backendPermissionLabels = map[string]string{
+	"dashboard":   "数据总览",
+	"home-manage": "主页管理",
+	"product":     "商品管理",
+	"inventory":   "库存管理",
+	"order":       "订单管理",
+	"after-sales": "售后中心",
+	"reviews":     "评价管理",
+	"member":      "会员管理",
+	"report":      "报表管理",
+	"users":       "账号管理",
+}
 
 // AddServiceUser 添加客服用户
 // 在Customer_service_user表中创建新的客服账号
@@ -258,10 +295,10 @@ func RegisterBackendUserByPhone(req requestbody.BackendRegisterByPhoneRequest) (
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
-	if backendUser.ID != 0 && backendUser.Status == "disabled" {
+	if backendUser.ID != 0 && backendUser.Status == BackendStatusDisabled {
 		return nil, fmt.Errorf("account is disabled")
 	}
-	if backendUser.ID != 0 && backendUser.Status == "active" && backendUser.Password != "" {
+	if backendUser.ID != 0 && backendUser.Status == BackendStatusActive && backendUser.Password != "" {
 		return nil, fmt.Errorf("account has already been activated")
 	}
 
@@ -272,19 +309,37 @@ func RegisterBackendUserByPhone(req requestbody.BackendRegisterByPhoneRequest) (
 
 	if backendUser.ID == 0 {
 		backendUser = models.BackendUser{
-			Nickname: "超级管理员",
-			Mobile:   req.Mobile,
-			Role:     "admin",
-			Level:    9,
-			Status:   "active",
+			Nickname:    "超级管理员",
+			Mobile:      req.Mobile,
+			Role:        BackendRoleAdmin,
+			Level:       9,
+			Status:      BackendStatusActive,
+			Permissions: encodePermissions(allBackendPagePermissions),
 		}
 	}
 	if strings.TrimSpace(req.Nickname) != "" {
 		backendUser.Nickname = strings.TrimSpace(req.Nickname)
 	}
-	backendUser.Password = string(hashedPassword)
-	backendUser.Status = "active"
-	if err := db.DB.Save(&backendUser).Error; err != nil {
+	if backendUser.ID == 0 {
+		backendUser.Password = string(hashedPassword)
+		if err := db.DB.Create(&backendUser).Error; err != nil {
+			return nil, err
+		}
+		return &backendUser, nil
+	}
+
+	updates := map[string]any{
+		"password": string(hashedPassword),
+		"status":   BackendStatusActive,
+		"nickname": backendUser.Nickname,
+	}
+	if backendUser.Permissions == "" {
+		updates["permissions"] = encodePermissions(defaultBackendPermissions(backendUser.Role))
+	}
+	if err := db.DB.Model(&models.BackendUser{}).Where("id = ?", backendUser.ID).Updates(updates).Error; err != nil {
+		return nil, err
+	}
+	if err := db.DB.Where("id = ?", backendUser.ID).First(&backendUser).Error; err != nil {
 		return nil, err
 	}
 	return &backendUser, nil
@@ -299,9 +354,9 @@ type BackendUserSession struct {
 	Mobile       string   `json:"mobile"`
 	Nickname     string   `json:"nickname"`
 	Role         string   `json:"role"`
-	Level        int      `json:"level"`
 	Status       string   `json:"status"`
 	Permissions  []string `json:"permissions"`
+	Remarks      string   `json:"remarks"`
 	Token        string   `json:"token,omitempty"`
 	RefreshToken string   `json:"refresh_token,omitempty"`
 }
@@ -314,27 +369,99 @@ func BuildBackendUserSession(user *models.BackendUser, token, refreshToken strin
 		Mobile:       user.Mobile,
 		Nickname:     user.Nickname,
 		Role:         user.Role,
-		Level:        user.Level,
 		Status:       user.Status,
 		Permissions:  BackendUserPermissions(user),
+		Remarks:      user.Remarks,
 		Token:        token,
 		RefreshToken: refreshToken,
 	}
 }
 
 func BackendUserPermissions(user *models.BackendUser) []string {
-	base := []string{"dashboard", "home-manage", "product", "inventory", "order", "after-sales", "reviews", "member", "report"}
-	if IsBackendAdmin(user) {
-		return append(base, "users")
+	if user == nil {
+		return []string{}
 	}
-	return base
+	if parsed := decodePermissions(user.Permissions, user.Role); len(parsed) > 0 {
+		return parsed
+	}
+	return defaultBackendPermissions(user.Role)
 }
 
 func IsBackendAdmin(user *models.BackendUser) bool {
 	if user == nil {
 		return false
 	}
-	return user.Role == "admin" || user.Level >= 9
+	return user.Role == BackendRoleAdmin
+}
+
+func IsValidBackendRole(role string) bool {
+	return role == BackendRoleOperation || role == BackendRoleCustomerService || role == BackendRoleAdmin
+}
+
+func normalizeBackendRole(role string) string {
+	role = strings.TrimSpace(role)
+	if role == "" {
+		return BackendRoleOperation
+	}
+	return role
+}
+
+func defaultBackendPermissions(role string) []string {
+	switch normalizeBackendRole(role) {
+	case BackendRoleAdmin:
+		return append([]string{}, allBackendPagePermissions...)
+	case BackendRoleCustomerService:
+		return []string{"dashboard", "order", "after-sales", "reviews", "member"}
+	default:
+		return []string{"dashboard", "home-manage", "product", "inventory", "order", "after-sales", "reviews", "member", "report"}
+	}
+}
+
+func normalizePermissions(permissions []string, role string) []string {
+	if len(permissions) == 0 {
+		return defaultBackendPermissions(role)
+	}
+	allowed := make(map[string]bool, len(allBackendPagePermissions))
+	for _, permission := range allBackendPagePermissions {
+		allowed[permission] = true
+	}
+	result := make([]string, 0, len(permissions))
+	seen := map[string]bool{}
+	for _, permission := range permissions {
+		permission = strings.TrimSpace(permission)
+		if permission == "" || !allowed[permission] || seen[permission] {
+			continue
+		}
+		if permission == "users" && role != BackendRoleAdmin {
+			continue
+		}
+		seen[permission] = true
+		result = append(result, permission)
+	}
+	if len(result) == 0 {
+		return defaultBackendPermissions(role)
+	}
+	return result
+}
+
+func encodePermissions(permissions []string) string {
+	payload, err := json.Marshal(permissions)
+	if err != nil {
+		return "[]"
+	}
+	return string(payload)
+}
+
+func decodePermissions(value string, role string) []string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	var permissions []string
+	if err := json.Unmarshal([]byte(value), &permissions); err == nil {
+		return normalizePermissions(permissions, role)
+	}
+	parts := strings.Split(value, ",")
+	return normalizePermissions(parts, role)
 }
 
 func AddBackendUserInvite(req requestbody.AddBackendUserInviteRequest) (*models.BackendUser, error) {
@@ -353,22 +480,19 @@ func AddBackendUserInvite(req requestbody.AddBackendUserInviteRequest) (*models.
 		return nil, err
 	}
 
-	role := strings.TrimSpace(req.Role)
-	if role == "" {
-		role = "operation"
-	}
-	level := req.Level
-	if level <= 0 {
-		level = 1
+	role := normalizeBackendRole(req.Role)
+	if !IsValidBackendRole(role) {
+		return nil, fmt.Errorf("invalid role")
 	}
 	user := models.BackendUser{
-		Nickname: strings.TrimSpace(req.Nickname),
-		Mobile:   req.Mobile,
-		Password: "",
-		Role:     role,
-		Level:    level,
-		Status:   "pending",
-		Remarks:  req.Remarks,
+		Nickname:    strings.TrimSpace(req.Nickname),
+		Mobile:      req.Mobile,
+		Password:    "",
+		Role:        role,
+		Level:       1,
+		Permissions: encodePermissions(normalizePermissions(req.Permissions, role)),
+		Status:      BackendStatusPending,
+		Remarks:     req.Remarks,
 	}
 	if err := db.DB.Create(&user).Error; err != nil {
 		return nil, err
@@ -394,10 +518,10 @@ func CanSendBackendRegisterCaptcha(mobile string) error {
 		}
 		return err
 	}
-	if user.Status == "disabled" {
+	if user.Status == BackendStatusDisabled {
 		return fmt.Errorf("account is disabled")
 	}
-	if user.Status == "active" && user.Password != "" {
+	if user.Status == BackendStatusActive && user.Password != "" {
 		return fmt.Errorf("account has already been activated")
 	}
 	return nil
@@ -422,7 +546,7 @@ func BackendLogin(req requestbody.BackendLoginRequest) (*models.BackendUser, str
 		}
 		return nil, "", "", err
 	}
-	if user.Status != "active" {
+	if user.Status != BackendStatusActive {
 		return nil, "", "", fmt.Errorf("account is not active")
 	}
 	if user.Password == "" {
@@ -470,29 +594,82 @@ func QueryBackendUsers(req requestbody.QueryBackendUsersRequest) ([]models.Backe
 }
 
 func UpdateBackendUserStatus(req requestbody.UpdateBackendUserStatusRequest) (*models.BackendUser, error) {
-	if req.Status != "pending" && req.Status != "active" && req.Status != "disabled" {
+	if req.Status != BackendStatusPending && req.Status != BackendStatusActive && req.Status != BackendStatusDisabled {
 		return nil, fmt.Errorf("invalid status")
 	}
 	var user models.BackendUser
 	if err := db.DB.Where("id = ?", req.ID).First(&user).Error; err != nil {
 		return nil, err
 	}
-	if req.Status == "disabled" && IsBackendAdmin(&user) {
-		var activeAdminCount int64
-		if err := db.DB.Model(&models.BackendUser{}).
-			Where("status = ? AND (role = ? OR level >= ?)", "active", "admin", 9).
-			Count(&activeAdminCount).Error; err != nil {
-			return nil, err
-		}
-		if activeAdminCount <= 1 {
-			return nil, fmt.Errorf("cannot disable the last active administrator")
-		}
+	if err := ensureCanRemoveActiveAdmin(&user, req.Status, user.Role); err != nil {
+		return nil, err
 	}
 	user.Status = req.Status
 	if err := db.DB.Save(&user).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil
+}
+
+func UpdateBackendUser(req requestbody.UpdateBackendUserRequest) (*models.BackendUser, error) {
+	var user models.BackendUser
+	if err := db.DB.Where("id = ?", req.ID).First(&user).Error; err != nil {
+		return nil, err
+	}
+
+	role := strings.TrimSpace(req.Role)
+	if role == "" {
+		role = user.Role
+	}
+	if !IsValidBackendRole(role) {
+		return nil, fmt.Errorf("invalid role")
+	}
+	status := strings.TrimSpace(req.Status)
+	if status == "" {
+		status = user.Status
+	}
+	if status != BackendStatusPending && status != BackendStatusActive && status != BackendStatusDisabled {
+		return nil, fmt.Errorf("invalid status")
+	}
+	if err := ensureCanRemoveActiveAdmin(&user, status, role); err != nil {
+		return nil, err
+	}
+
+	updates := map[string]any{
+		"role":        role,
+		"status":      status,
+		"permissions": encodePermissions(normalizePermissions(req.Permissions, role)),
+		"remarks":     req.Remarks,
+	}
+	if strings.TrimSpace(req.Nickname) != "" {
+		updates["nickname"] = strings.TrimSpace(req.Nickname)
+	}
+	if err := db.DB.Model(&models.BackendUser{}).Where("id = ?", user.ID).Updates(updates).Error; err != nil {
+		return nil, err
+	}
+	if err := db.DB.Where("id = ?", user.ID).First(&user).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func ensureCanRemoveActiveAdmin(user *models.BackendUser, nextStatus, nextRole string) error {
+	if user == nil || !IsBackendAdmin(user) {
+		return nil
+	}
+	if nextStatus == BackendStatusActive && nextRole == BackendRoleAdmin {
+		return nil
+	}
+	var activeAdminCount int64
+	if err := db.DB.Model(&models.BackendUser{}).
+		Where("status = ? AND role = ?", BackendStatusActive, BackendRoleAdmin).
+		Count(&activeAdminCount).Error; err != nil {
+		return err
+	}
+	if activeAdminCount <= 1 {
+		return fmt.Errorf("cannot remove the last active administrator")
+	}
+	return nil
 }
 
 type VerificationResult struct {

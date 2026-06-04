@@ -38,6 +38,7 @@ func InitOperationUserRoutes(router *gin.Engine) {
 			protectedBackendGroup.POST("/backend_invite_user", operationUserController.AddBackendUserInvite)
 			protectedBackendGroup.POST("/backend_users", operationUserController.QueryBackendUsers)
 			protectedBackendGroup.POST("/backend_update_status", operationUserController.UpdateBackendUserStatus)
+			protectedBackendGroup.POST("/backend_update_user", operationUserController.UpdateBackendUser)
 		}
 	}
 }

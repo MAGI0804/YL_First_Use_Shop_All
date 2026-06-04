@@ -13,10 +13,10 @@ export interface BackendUserSession {
   operator_no: string
   mobile: string
   nickname: string
-  role: string
-  level: number
+  role: 'operation' | 'customer_service' | 'admin'
   status: 'pending' | 'active' | 'disabled'
   permissions: string[]
+  remarks?: string
   token?: string
   refresh_token?: string
 }
@@ -69,12 +69,16 @@ export const queryBackendUsers = (params: BackendUserQueryParams) => {
   return http.post<BackendUserQueryResponse>('/OperationUser/backend_users', params)
 }
 
-export const inviteBackendUser = (params: { mobile: string; nickname: string; role?: string; level?: number; remarks?: string }) => {
+export const inviteBackendUser = (params: { mobile: string; nickname: string; role?: string; permissions?: string[]; remarks?: string }) => {
   return http.post<BackendAuthResponse>('/OperationUser/backend_invite_user', params)
 }
 
 export const updateBackendUserStatus = (params: { id: number; status: 'pending' | 'active' | 'disabled' }) => {
   return http.post<BackendAuthResponse>('/OperationUser/backend_update_status', params)
+}
+
+export const updateBackendUser = (params: { id: number; nickname?: string; role?: string; status?: string; permissions?: string[]; remarks?: string }) => {
+  return http.post<BackendAuthResponse>('/OperationUser/backend_update_user', params)
 }
 
 export const saveBackendSession = (session: BackendUserSession) => {
