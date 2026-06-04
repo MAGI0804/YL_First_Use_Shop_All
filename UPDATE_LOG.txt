@@ -38,3 +38,11 @@ Youlan Kids Shop update log
 - Web permissions: added backend token storage, route validation, permission-based side menu rendering, and an administrator account management page.
 - Verification: go test ./... passed; npm run build passed.
 - Push: commit e43f6b4 was pushed to origin/develop.
+
+2026-06-04
+- Backend users: fixed first-login activation by explicitly updating password/status and reloading the backend account before returning.
+- Backend permissions: replaced level-based web access with a direct page permissions list stored on backend_operation_user.
+- Backend identities: standardized backend roles as operation, customer_service, and admin; admin checks now use role only.
+- Web users: rebuilt account management around identity, status, and page permission checkboxes; new accounts remain pending until SMS activation.
+- Verification: go test ./... passed; npm run build passed.
+- Push: commit 65e21ea was pushed to origin/develop.
