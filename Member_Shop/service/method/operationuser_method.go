@@ -39,20 +39,22 @@ var allBackendPagePermissions = []string{
 	"reviews",
 	"member",
 	"report",
+	"download-center",
 	"users",
 }
 
 var backendPermissionLabels = map[string]string{
-	"dashboard":   "数据总览",
-	"home-manage": "主页管理",
-	"product":     "商品管理",
-	"inventory":   "库存管理",
-	"order":       "订单管理",
-	"after-sales": "售后中心",
-	"reviews":     "评价管理",
-	"member":      "会员管理",
-	"report":      "报表管理",
-	"users":       "账号管理",
+	"dashboard":       "数据总览",
+	"home-manage":     "主页管理",
+	"product":         "商品管理",
+	"inventory":       "库存管理",
+	"order":           "订单管理",
+	"after-sales":     "售后中心",
+	"reviews":         "评价管理",
+	"member":          "会员管理",
+	"report":          "报表管理",
+	"download-center": "下载中心",
+	"users":           "账号管理",
 }
 
 // AddServiceUser 添加客服用户
@@ -413,7 +415,7 @@ func defaultBackendPermissions(role string) []string {
 	case BackendRoleCustomerService:
 		return []string{"dashboard", "order", "after-sales", "reviews", "member"}
 	default:
-		return []string{"dashboard", "home-manage", "product", "inventory", "order", "after-sales", "reviews", "member", "report"}
+		return []string{"dashboard", "home-manage", "product", "inventory", "order", "after-sales", "reviews", "member", "report", "download-center"}
 	}
 }
 

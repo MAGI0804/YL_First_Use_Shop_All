@@ -309,6 +309,120 @@ export const exportAnalytics = (params: AnalyticsFilterParams) => {
   return http.post<AnalyticsExportResponse>('/analytics/export', params)
 }
 
+export type DownloadTaskStatus = 'pending' | 'running' | 'success' | 'failed' | 'expired'
+export type DownloadBusinessType = 'order' | 'product' | 'report' | 'inventory' | 'after_sale'
+
+export interface DownloadTemplateItem {
+  id: number
+  template_code: string
+  template_name: string
+  business_type: DownloadBusinessType
+  sql_content: string
+  model_fields: string
+  export_headers: string
+  allowed_filters: string
+  default_order_by: string
+  file_format: string
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface DownloadTaskItem {
+  task_id: string
+  template_code: string
+  business_type: DownloadBusinessType
+  task_name: string
+  filters: string
+  status: DownloadTaskStatus
+  progress: number
+  row_count: number
+  file_path: string
+  file_name: string
+  file_size: number
+  error_message: string
+  download_count: number
+  requested_by: number
+  started_at?: string
+  finished_at?: string
+  expires_at?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateDownloadTaskParams {
+  template_code: string
+  filters?: Record<string, any>
+  file_format?: 'xlsx'
+}
+
+export interface DownloadTaskQueryParams {
+  page: number
+  page_size: number
+  status?: string
+  business_type?: string
+  template_code?: string
+}
+
+export interface CreateDownloadTaskResponse {
+  code: number
+  data: {
+    task: DownloadTaskItem
+  }
+  msg: string
+}
+
+export interface DownloadTasksResponse {
+  code: number
+  data: {
+    list: DownloadTaskItem[]
+    total: number
+    page: number
+    page_size: number
+  }
+  msg: string
+}
+
+export interface DownloadTaskDetailResponse {
+  code: number
+  data: {
+    task: DownloadTaskItem
+  }
+  msg: string
+}
+
+export interface DownloadTemplatesResponse {
+  code: number
+  data: {
+    list: DownloadTemplateItem[]
+  }
+  msg: string
+}
+
+export const createDownloadTask = (params: CreateDownloadTaskParams) => {
+  return http.post<CreateDownloadTaskResponse>('/download_center/tasks', params)
+}
+
+export const queryDownloadTasks = (params: DownloadTaskQueryParams) => {
+  return http.get<DownloadTasksResponse>('/download_center/tasks', { params })
+}
+
+export const queryDownloadTaskDetail = (taskId: string) => {
+  return http.get<DownloadTaskDetailResponse>(`/download_center/tasks/${taskId}`)
+}
+
+export const retryDownloadTask = (taskId: string) => {
+  return http.post<DownloadTaskDetailResponse>(`/download_center/tasks/${taskId}/retry`)
+}
+
+export const queryDownloadTemplates = () => {
+  return http.get<DownloadTemplatesResponse>('/download_center/templates')
+}
+
+export const downloadTaskFile = (taskId: string) => {
+  return http.get<Blob>(`/download_center/tasks/${taskId}/file`, { responseType: 'blob' })
+}
+
 export interface ReviewReplyItem {
   id: number
   review_id: number

@@ -128,6 +128,7 @@ const pagePermissions = [
   { label: '评价管理', value: 'reviews' },
   { label: '会员管理', value: 'member' },
   { label: '报表管理', value: 'report' },
+  { label: '下载中心', value: 'download-center' },
   { label: '账号管理', value: 'users' }
 ]
 
@@ -150,7 +151,7 @@ const statusMeta: Record<string, { label: string; type: 'success' | 'warning' | 
 }
 
 const defaultPermissions: Record<BackendRole, string[]> = {
-  operation: ['dashboard', 'home-manage', 'product', 'inventory', 'order', 'after-sales', 'reviews', 'member', 'report'],
+  operation: ['dashboard', 'home-manage', 'product', 'inventory', 'order', 'after-sales', 'reviews', 'member', 'report', 'download-center'],
   customer_service: ['dashboard', 'order', 'after-sales', 'reviews', 'member'],
   admin: pagePermissions.map((item) => item.value)
 }

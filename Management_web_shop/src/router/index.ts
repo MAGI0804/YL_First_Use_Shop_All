@@ -75,6 +75,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '报表管理' }
       },
       {
+        path: 'download-center',
+        name: 'DownloadCenter',
+        component: () => import('@/views/DownloadCenter.vue'),
+        meta: { title: '下载中心', permission: 'download-center' }
+      },
+      {
         path: 'member',
         name: 'Member',
         component: () => import('@/views/Member.vue'),

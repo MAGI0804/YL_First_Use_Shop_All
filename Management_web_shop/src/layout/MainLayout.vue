@@ -51,7 +51,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Box, ChatDotRound, DataAnalysis, Document, Goods, PieChart, Service, User, UserFilled } from '@element-plus/icons-vue'
+import { Box, ChatDotRound, DataAnalysis, Document, Download, Goods, PieChart, Service, User, UserFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { clearBackendSession, getStoredBackendUser } from '@/api'
 
@@ -69,6 +69,7 @@ const menus = [
   { path: '/reviews', label: '评价管理', permission: 'reviews', icon: ChatDotRound },
   { path: '/member', label: '会员管理', permission: 'member', icon: UserFilled },
   { path: '/report', label: '报表管理', permission: 'report', icon: PieChart },
+  { path: '/download-center', label: '下载中心', permission: 'download-center', icon: Download },
   { path: '/users', label: '账号管理', permission: 'users', icon: UserFilled }
 ]
 
