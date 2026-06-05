@@ -680,6 +680,7 @@ func (oc *OrderController) OrderDeliver(c *gin.Context) {
 		return
 	}
 
+	before, _ := method.GetOrderByID(req.OrderID)
 	err := method.DeliverOrder(req.OrderID, req.ExpressCompany, req.ExpressNumber)
 	if err != nil {
 		if err.Error() == "订单状态不允许发货" {
@@ -693,6 +694,11 @@ func (oc *OrderController) OrderDeliver(c *gin.Context) {
 	// 将订单ID存储到上下文中，供中间件使用
 	c.Set("order_id", req.OrderID)
 	c.Set("order_user_id", req.UserID)
+	after, _ := method.GetOrderByID(req.OrderID)
+	recordOrderOperationIfBackend(c, method.ActionOrderDeliver, before, after, map[string]any{
+		"express_company": req.ExpressCompany,
+		"express_number":  req.ExpressNumber,
+	})
 
 	data := map[string]any{
 		"status":  "success",
@@ -709,6 +715,7 @@ func (oc *OrderController) OrderReceive(c *gin.Context) {
 		return
 	}
 
+	before, _ := method.GetOrderByID(req.OrderID)
 	err := method.ReceiveOrder(req.OrderID)
 	if err != nil {
 		if err.Error() == "订单状态不允许签收" {
@@ -722,6 +729,8 @@ func (oc *OrderController) OrderReceive(c *gin.Context) {
 	// 将订单ID存储到上下文中，供中间件使用
 	c.Set("order_id", req.OrderID)
 	c.Set("order_user_id", req.UserID)
+	after, _ := method.GetOrderByID(req.OrderID)
+	recordOrderOperationIfBackend(c, method.ActionOrderReceive, before, after, nil)
 
 	data := map[string]any{
 		"status":  "success",
@@ -729,6 +738,45 @@ func (oc *OrderController) OrderReceive(c *gin.Context) {
 		"data":    map[string]string{"order_id": req.OrderID},
 	}
 	c.JSON(http.StatusOK, msg.SuccessResponse("success", &data))
+}
+
+func recordOrderOperationIfBackend(c *gin.Context, action string, before *models.Order, after *models.Order, extraAfter map[string]any) {
+	backendUser, err := method.BackendOperatorFromContext(c)
+	if err != nil || after == nil {
+		return
+	}
+	beforeData := map[string]any{}
+	if before != nil {
+		beforeData = map[string]any{
+			"status":          before.Status,
+			"pay_status":      before.PayStatus,
+			"express_company": before.ExpressCompany,
+			"express_number":  before.ExpressNumber,
+		}
+	}
+	afterData := map[string]any{
+		"status":          after.Status,
+		"pay_status":      after.PayStatus,
+		"express_company": after.ExpressCompany,
+		"express_number":  after.ExpressNumber,
+	}
+	for key, value := range extraAfter {
+		afterData[key] = value
+	}
+	_ = method.RecordBackendOperation(method.BackendOperationLogInput{
+		Operator:   method.BuildBackendOperatorSnapshot(backendUser),
+		Action:     action,
+		Module:     method.OperationModuleOrder,
+		TargetType: "order",
+		TargetID:   after.OrderID,
+		UserID:     after.UserID,
+		OrderID:    after.OrderID,
+		BeforeData: beforeData,
+		AfterData:  afterData,
+		RequestID:  requestMeta(c).RequestID,
+		ClientIP:   requestMeta(c).ClientIP,
+		UserAgent:  requestMeta(c).UserAgent,
+	})
 }
 
 func (oc *OrderController) OrderRequestReturn(c *gin.Context) {

@@ -28,6 +28,8 @@ const (
 	ActionOrderBackendCreate        = "order.backend_create"
 	ActionOrderPaymentAmountUpdate  = "order.payment_amount.update"
 	ActionOrderPaymentConfirm       = "order.payment.confirm"
+	ActionOrderDeliver              = "order.deliver"
+	ActionOrderReceive              = "order.receive"
 )
 
 type BackendOperatorSnapshot struct {

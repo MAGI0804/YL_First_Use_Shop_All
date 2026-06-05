@@ -780,7 +780,7 @@ export interface DeliverOrderParams {
 }
 
 export const deliverOrder = (params: DeliverOrderParams) => {
-  return http.post('/order/deliver', params)
+  return http.post('/order/backend_deliver', params)
 }
 
 export interface ReceiveOrderParams {
@@ -789,7 +789,7 @@ export interface ReceiveOrderParams {
 }
 
 export const receiveOrder = (params: ReceiveOrderParams) => {
-  return http.post('/order/order_receive', params)
+  return http.post('/order/backend_receive', params)
 }
 
 export interface GetAllLabelsParams {
