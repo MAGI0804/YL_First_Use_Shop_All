@@ -76,3 +76,6 @@ Member_Shop/nginx.conf
 
 #证书文件
 Member_Shop/ssl
+
+#md文件
+md_file

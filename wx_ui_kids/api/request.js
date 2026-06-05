@@ -1,6 +1,6 @@
 const API_HOSTS = {
-  develop: 'https://shop-test.youlankids.com',
-  trial: 'https://shop-test.youlankids.com',
+  develop: 'https://snow-api.youlankids.com',
+  trial: 'https://snow-api.youlankids.com',
   release: 'https://snow-api.youlankids.com'
 }
 
