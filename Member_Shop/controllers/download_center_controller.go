@@ -94,7 +94,18 @@ func (dcc *DownloadCenterController) TaskDetail(c *gin.Context) {
 }
 
 func (dcc *DownloadCenterController) DownloadFile(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, msg.ErrResponseStr("download file not implemented"))
+	backendUser := downloadCenterBackendUser(c)
+	if backendUser == nil {
+		c.JSON(http.StatusUnauthorized, msg.ErrResponseStr("backend user missing"))
+		return
+	}
+
+	fullPath, fileName, err := method.ResolveDownloadTaskFile(c.Param("task_id"), int(backendUser.ID), method.IsBackendAdmin(backendUser))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr(err.Error()))
+		return
+	}
+	c.FileAttachment(fullPath, fileName)
 }
 
 func (dcc *DownloadCenterController) RetryTask(c *gin.Context) {

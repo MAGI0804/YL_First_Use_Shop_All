@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -43,7 +44,6 @@ var allowedDownloadBusinessTypes = map[string]bool{
 
 var allowedDownloadFileFormats = map[string]bool{
 	"xlsx": true,
-	"csv":  true,
 }
 
 var allowedDownloadTaskStatuses = map[string]bool{
@@ -106,6 +106,11 @@ func CreateDownloadTask(input CreateDownloadTaskInput) (*models.DownloadTask, er
 	if err := db.DB.Create(task).Error; err != nil {
 		return nil, err
 	}
+	go func(taskID string) {
+		if err := GenerateDownloadTask(taskID); err != nil {
+			log.Printf("generate download task %s failed: %v", taskID, err)
+		}
+	}(task.TaskID)
 	return task, nil
 }
 
@@ -198,6 +203,28 @@ func ListEnabledDownloadTemplates() ([]models.DownloadTemplate, error) {
 		return nil, err
 	}
 	return templates, nil
+}
+
+func ResolveDownloadTaskFile(taskID string, requestedBy int, isAdmin bool) (string, string, error) {
+	task, err := GetDownloadTask(taskID, requestedBy, isAdmin)
+	if err != nil {
+		return "", "", err
+	}
+	if task.Status != DownloadTaskStatusSuccess {
+		return "", "", fmt.Errorf("download task is not ready")
+	}
+	fullPath, err := safeDownloadFullPath(task.FilePath)
+	if err != nil {
+		return "", "", err
+	}
+	if err := db.DB.Model(task).UpdateColumn("download_count", gorm.Expr("download_count + ?", 1)).Error; err != nil {
+		return "", "", err
+	}
+	fileName := strings.TrimSpace(task.FileName)
+	if fileName == "" {
+		fileName = task.TaskID + ".xlsx"
+	}
+	return fullPath, fileName, nil
 }
 
 func FindEnabledDownloadTemplate(templateCode string) (*models.DownloadTemplate, error) {

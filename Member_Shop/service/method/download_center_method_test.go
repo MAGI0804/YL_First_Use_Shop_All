@@ -32,13 +32,10 @@ func TestValidateDownloadTaskRequestRejectsNonSelectSQL(t *testing.T) {
 	}
 }
 
-func TestNormalizeDownloadFileFormatUsesTemplateDefault(t *testing.T) {
-	format, err := NormalizeDownloadFileFormat("csv", "")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if format != "csv" {
-		t.Fatalf("format = %s, want csv", format)
+func TestNormalizeDownloadFileFormatRejectsCSVUntilImplemented(t *testing.T) {
+	_, err := NormalizeDownloadFileFormat("csv", "")
+	if err == nil || !strings.Contains(err.Error(), "unsupported file_format") {
+		t.Fatalf("expected unsupported csv error, got %v", err)
 	}
 }
 
