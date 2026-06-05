@@ -10,6 +10,9 @@ Page({
     loading: true,
     // 订单ID
     orderId: '',
+    expressCompany: '',
+    expressNumber: '',
+    type: '',
     // 物流信息
     logisticsInfo: null,
     // 错误信息
@@ -20,13 +23,25 @@ Page({
    * 生命周期函数--监听页面加载
    */
   onLoad(options) {
-    // 从URL参数中获取订单ID
     if (options.orderId) {
       this.setData({
-        orderId: options.orderId
+        orderId: options.orderId,
+        type: options.type || ''
       });
-      // 请求物流信息
       this.fetchLogisticsInfo();
+    } else if (options.company || options.trackingNumber) {
+      this.setData({
+        loading: false,
+        expressCompany: options.company || '',
+        expressNumber: options.trackingNumber || '',
+        type: options.type || '',
+        logisticsInfo: {
+          orderId: '',
+          expressCompany: options.company || '',
+          expressNumber: options.trackingNumber || '',
+          logisticsProcess: []
+        }
+      });
     } else {
       this.setData({
         loading: false,
@@ -60,16 +75,19 @@ Page({
       (res) => {
         console.log('物流信息响应:', res);
         // 处理成功响应
-        if (res && res.status === 'success' && res.data) {
-          const logisticsData = res.data;
+        if (res && (res.status === 'success' || res.code === 200) && res.data) {
+          const logisticsData = res.data.data || res.data;
           
           // 构造物流信息对象
           // 使用reverse()方法反转物流进程顺序，让最新的信息显示在顶部
+          const processList = Array.isArray(logisticsData.logistics_process)
+            ? logisticsData.logistics_process.slice().reverse()
+            : [];
           const logisticsInfo = {
             orderId: logisticsData.order_id,
             expressCompany: logisticsData.express_company || '',
             expressNumber: logisticsData.express_number || '',
-            logisticsProcess: (logisticsData.logistics_process || []).reverse()
+            logisticsProcess: processList
           };
           
           this.setData({
@@ -108,6 +126,18 @@ Page({
    * 重试请求
    */
   retryRequest() {
-    this.fetchLogisticsInfo();
+    if (this.data.orderId) {
+      this.fetchLogisticsInfo();
+      return;
+    }
+    this.setData({
+      errorMessage: '',
+      logisticsInfo: {
+        orderId: '',
+        expressCompany: this.data.expressCompany,
+        expressNumber: this.data.expressNumber,
+        logisticsProcess: []
+      }
+    });
   }
 });

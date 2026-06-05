@@ -56,3 +56,4 @@ Youlan Kids Shop update log
 - Mini program logout: logout now clears only user/session temporary state and uses switchTab with reLaunch fallback.
 - Mini program layout: reduced large blank areas on the My page, cart empty state, and order empty state.
 - Verification: go test ./... passed; npm run build passed; node syntax checks passed for modified mini program JS.
+- Mini program navigation: logistics detail now supports both orderId-based backend sync and company/trackingNumber direct entries from after-sales pages; unified code=200 backend responses are accepted.
