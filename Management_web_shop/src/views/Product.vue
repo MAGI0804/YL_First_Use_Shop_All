@@ -83,7 +83,7 @@
         <el-table-column label="商品图片" width="100">
           <template #default="{ row }">
             <div v-if="row.promo_image_url" class="product-image-wrapper">
-              <img :src="row.promo_image_url" class="product-image" />
+              <img :src="row.promo_image_url" class="product-image" loading="lazy" decoding="async" />
             </div>
             <div v-else class="product-image"></div>
           </template>

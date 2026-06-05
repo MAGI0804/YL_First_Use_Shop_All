@@ -26,7 +26,7 @@
         </template>
         <div class="basic-info">
           <div class="product-image-section">
-            <img :src="cleanUrl(isEditing && editForm.mainImagePreview ? editForm.mainImagePreview : productData.main_image?.url)" class="main-image" />
+            <img :src="cleanUrl(isEditing && editForm.mainImagePreview ? editForm.mainImagePreview : productData.main_image?.url)" class="main-image" loading="lazy" decoding="async" />
             <div v-if="isEditing" class="edit-image-input">
               <el-upload
                 v-model:file-list="mainImageFileList"
@@ -119,7 +119,7 @@
               :key="`display-${key}`"
               class="image-item"
             >
-              <img :src="cleanUrl(url)" />
+              <img :src="cleanUrl(url)" loading="lazy" decoding="async" />
             </div>
           </template>
           
@@ -132,7 +132,7 @@
               :class="{ 'cleared': slot.cleared, 'empty': !slot.previewUrl && !slot.cleared }"
             >
               <div v-if="slot.previewUrl" class="image-wrapper">
-                <img :src="slot.previewUrl" />
+                <img :src="slot.previewUrl" loading="lazy" decoding="async" />
               </div>
               <div v-else class="image-placeholder">
                 <span v-if="slot.cleared">已清空</span>
@@ -205,7 +205,7 @@
           >
             <template #title>
               <div class="color-title">
-                <img :src="cleanUrl(item.color_image)" class="color-preview" />
+                <img :src="cleanUrl(item.color_image)" class="color-preview" loading="lazy" decoding="async" />
                 <span>{{ item.color }}</span>
                 <el-tag type="info" size="small">{{ item.sizes.length }}个规格</el-tag>
               </div>

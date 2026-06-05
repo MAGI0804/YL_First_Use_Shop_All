@@ -1,6 +1,14 @@
 // pages/commodity/goods/index.js
 
 const app = getApp();
+const PLACEHOLDER_IMAGE = '/images/products.png';
+
+const buildSwiperImageItems = (images, activeIndex) => {
+  return (images || []).map((url, index) => ({
+    url,
+    loaded: Math.abs(index - activeIndex) <= 1
+  }));
+};
 
 Page({
 
@@ -15,6 +23,7 @@ Page({
     currentSwiper: 0,     // 当前轮播图索引
     goodsImages: [
     ],
+    goodsImageItems: [],
     displayPicturesList: [], // display_pictures列表，用于下方纵向展示
     selectedColorImage: '', // 选中颜色对应的图片
     goodsTitle: '[秋Vol.1] allblu幼岚【复古天鹅绒束口裤】',
@@ -143,7 +152,7 @@ Page({
       }
       // 如果没有足够的图片，确保至少有一个占位图
       if (goodsImages.length === 0) {
-        goodsImages.push('/images/products.png');
+        goodsImages.push(PLACEHOLDER_IMAGE);
       }
           
           // 只有当API返回了有效的items数据时才更新items
@@ -153,7 +162,7 @@ Page({
             // 初始化默认选中第一个颜色和对应的图片
             if (items.length > 0 && items[0].color) {
               // 获取主图作为默认颜色图片
-              let defaultImage = '/images/products.png';
+              let defaultImage = PLACEHOLDER_IMAGE;
               if (goodsData.images && Array.isArray(goodsData.images)) {
                 const mainImage = goodsData.images.find(img => img.is_main);
                 if (mainImage && mainImage.url) {
@@ -178,6 +187,7 @@ Page({
           
           that.setData({
             goodsImages: goodsImages,
+            goodsImageItems: buildSwiperImageItems(goodsImages, 0),
             goodsTitle: goodsData.name || '',
             goodsSubtitle: goodsData.subtitle || '',
             currentPrice: goodsData.price || 0,
@@ -227,8 +237,20 @@ Page({
    * 轮播图切换事件
    */
   swiperChange(e) {
+    const current = e.detail.current;
     this.setData({
-      currentSwiper: e.detail.current
+      currentSwiper: current
+    });
+    this.markSwiperImagesForLoad(current);
+  },
+
+  markSwiperImagesForLoad(activeIndex) {
+    const nextItems = this.data.goodsImageItems.map((item, index) => ({
+      ...item,
+      loaded: item.loaded || Math.abs(index - activeIndex) <= 1
+    }));
+    this.setData({
+      goodsImageItems: nextItems
     });
   },
 
@@ -286,14 +308,21 @@ Page({
       selectedImage = goodsImages[0];
     } else {
       // 如果都没有，使用默认占位图
-      selectedImage = '/images/products.png';
+      selectedImage = PLACEHOLDER_IMAGE;
     }
+
+    const nextGoodsImages = [...goodsImages];
+    nextGoodsImages[0] = selectedImage;
+    const nextGoodsImageItems = this.data.goodsImageItems.length > 0
+      ? this.data.goodsImageItems.map((item, index) => index === 0 ? { url: selectedImage, loaded: true } : item)
+      : buildSwiperImageItems(nextGoodsImages, 0);
     
     // 更新选中颜色和图片
     this.setData({
       selectedColor: color,
       selectedSize: '', // 选择新颜色后重置尺码选择
-      'goodsImages[0]': selectedImage, // 更新轮播图第一张图片为选中颜色的图片
+      goodsImages: nextGoodsImages, // 更新轮播图第一张图片为选中颜色的图片
+      goodsImageItems: nextGoodsImageItems,
       selectedColorImage: selectedImage // 更新选择界面显示的图片
     });
   },
@@ -522,7 +551,7 @@ Page({
         specification: `${selectedColor};${selectedSize}`,
         price: currentPrice,
         quantity: quantity,
-        image: this.data.goodsImages[0] || '/images/products.png'
+        image: this.data.goodsImages[0] || PLACEHOLDER_IMAGE
       }],
       totalPrice: currentPrice * quantity
     };

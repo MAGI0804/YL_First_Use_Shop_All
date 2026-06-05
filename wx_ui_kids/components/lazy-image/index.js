@@ -15,7 +15,8 @@ Component({
   },
   data: {
     loaded: false,
-    currentSrc: ''
+    currentSrc: '',
+    imageVisible: false
   },
   lifetimes: {
     attached() {
@@ -31,6 +32,14 @@ Component({
     }
   },
   methods: {
+    loadImage() {
+      if (!this.data.src) {
+        return;
+      }
+      this.setData({
+        currentSrc: this.data.src
+      });
+    },
     initObserver() {
       const that = this;
       this.observer = wx.createIntersectionObserver({
@@ -43,29 +52,17 @@ Component({
         bottom: 100,
         top: 100
       }).observe('.lazy-image-container', (res) => {
-        if (res.isIntersecting && !that.data.loaded) {
+        if (res.isIntersecting && !that.data.imageVisible) {
+          that.setData({
+            imageVisible: true
+          });
           that.loadImage();
+          if (that.observer) {
+            that.observer.disconnect();
+            that.observer = null;
+          }
         }
       });
-    },
-    loadImage() {
-      const that = this;
-      if (this.data.src) {
-        wx.getImageInfo({
-          src: this.data.src,
-          success() {
-            that.setData({
-              loaded: true,
-              currentSrc: that.data.src
-            });
-          },
-          fail() {
-            that.setData({
-              currentSrc: that.data.placeholder
-            });
-          }
-        });
-      }
     },
     onImageLoad() {
       this.setData({
