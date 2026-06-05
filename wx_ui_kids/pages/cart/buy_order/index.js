@@ -263,9 +263,9 @@ Page({
    * 选择优惠券
    */
   selectCoupon() {
-    // 跳转到优惠券选择页面
-    wx.navigateTo({
-      url: '/pages/my/coupon/index?from=order'
+    wx.showToast({
+      title: '暂无可用优惠券',
+      icon: 'none'
     })
   },
 

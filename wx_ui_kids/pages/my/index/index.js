@@ -154,8 +154,6 @@ Page({
    * 跳转到登录页面
    */
   navigateToLogin() {
-    // 清空所有缓存，确保登录前状态干净
-    console.log('登录前清空所有缓存');
     this.clearUserInfo();
     
     wx.navigateTo({
@@ -227,9 +225,15 @@ Page({
    * 清除用户信息
    */
   clearUserInfo() {
-    wx.clearStorageSync();
+    wx.removeStorageSync('token');
+    wx.removeStorageSync('refresh_token');
+    wx.removeStorageSync('user_id');
+    wx.removeStorageSync('userInfo');
+    wx.removeStorageSync('selectedAddress');
+    wx.removeStorageSync('selectedCoupon');
     app.globalData.userInfo = null;
     app.globalData.user_id = null;
+    app.globalData.token = undefined;
     this.setData({
       isLogin: false,
       userInfo: {
@@ -254,8 +258,13 @@ Page({
             icon: 'success'
           });
           setTimeout(() => {
-            wx.reLaunch({
-              url: '/pages/index/index'
+            wx.switchTab({
+              url: '/pages/index/index',
+              fail: () => {
+                wx.reLaunch({
+                  url: '/pages/index/index'
+                });
+              }
             });
           }, 1500);
         }

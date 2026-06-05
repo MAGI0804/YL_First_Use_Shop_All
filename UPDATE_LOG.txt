@@ -46,3 +46,13 @@ Youlan Kids Shop update log
 - Web users: rebuilt account management around identity, status, and page permission checkboxes; new accounts remain pending until SMS activation.
 - Verification: go test ./... passed; npm run build passed.
 - Push: commit 65e21ea was pushed to origin/develop.
+
+2026-06-05
+- Web interface audit: confirmed currently used management-web API calls target existing backend routes; unused legacy placeholder exports were left untouched to avoid changing dormant behavior.
+- Mini program API alignment: changed address detail loading to /address/get_address_by_id and address editing to /address/update_address.
+- Mini program API alignment: profile JSON updates now use the shared app.req wrapper against /ordinary_user/Modify_data; upload requests use the current request host.
+- Mini program environment alignment: develop/trial use the test API host and release uses the production API host.
+- Mini program navigation: disabled the missing coupon-page jump with a user-facing "暂无可用优惠券" toast.
+- Mini program logout: logout now clears only user/session temporary state and uses switchTab with reLaunch fallback.
+- Mini program layout: reduced large blank areas on the My page, cart empty state, and order empty state.
+- Verification: go test ./... passed; npm run build passed; node syntax checks passed for modified mini program JS.

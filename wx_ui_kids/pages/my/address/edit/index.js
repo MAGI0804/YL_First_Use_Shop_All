@@ -242,8 +242,7 @@ Page({
       title: '更新中...',
     });
     
-    // 使用与添加地址相同的接口，通过是否有address_id来区分操作类型
-    const url = '/address/add_address';
+    const url = '/address/update_address';
     const method = 'post';
     
     app.req[method](url, requestData, 

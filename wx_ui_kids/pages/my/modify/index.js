@@ -1,7 +1,6 @@
 // pages/my/modify/index.js
 const app = getApp()
 const request = require('../../../api/request').default
-const host = request.host
 
 Page({
   /**
@@ -114,7 +113,7 @@ Page({
         
         // 使用wx.uploadFile上传图片，自动使用multipart/form-data格式
         wx.uploadFile({
-          url: `${host}/ordinary_user/Modify_data?access_token=${accessToken}`,
+          url: `${request.getHost()}/ordinary_user/Modify_data?access_token=${accessToken}`,
           filePath: tempFilePath,
           name: 'user_img', // 根据后端要求，文件参数名必须是user_img
           formData: {
@@ -228,7 +227,7 @@ Page({
     if (isTempFilePath) {
       // 当用户选择了新头像时，使用wx.uploadFile
       wx.uploadFile({
-        url: `${host}/ordinary_user/Modify_data?access_token=${accessToken}`,
+        url: `${request.getHost()}/ordinary_user/Modify_data?access_token=${accessToken}`,
         filePath: avatarUrl,
         name: 'user_img',
         formData: {
@@ -247,27 +246,17 @@ Page({
         }
       })
     } else {
-      // 当用户没有选择新头像时，使用普通的wx.request
-      wx.request({
-        url: `${host}/ordinary_user/Modify_data?access_token=${accessToken}`,
-        method: 'POST',
-        data: {
-          user_id: user_id,
-          nickname: nickName
-        },
-        header: {
-          'content-type': 'application/json'
-        },
-        success: (res) => {
-          this.handleSaveResult({ data: JSON.stringify(res.data) })
-        },
-        fail: (err) => {
-          console.error('保存用户信息失败:', err)
-          wx.showToast({
-            title: '保存失败',
-            icon: 'none'
-          })
-        }
+      app.req.post('/ordinary_user/Modify_data', {
+        user_id: user_id,
+        nickname: nickName
+      }, (res) => {
+        this.handleSaveResult(res)
+      }, (err) => {
+        console.error('保存用户信息失败:', err)
+        wx.showToast({
+          title: '保存失败',
+          icon: 'none'
+        })
       })
     }
   },
@@ -277,8 +266,8 @@ Page({
    */
   handleSaveResult(res) {
     try {
-      const data = JSON.parse(res.data)
-      if (data.message === '用户信息更新成功') {
+      const data = typeof res.data === 'string' ? JSON.parse(res.data) : res
+      if (data.code === 200 || data.message === '用户信息更新成功' || data.msg === '信息修改成功') {
         // 更新成功，更新全局和本地存储的用户信息
         const updatedUserInfo = {
           ...app.globalData.userInfo,

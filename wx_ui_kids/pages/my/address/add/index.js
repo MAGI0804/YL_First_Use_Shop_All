@@ -41,8 +41,18 @@ Page({
    * 获取地址详情
    */
   getAddressDetail() {
-    // 使用POST请求，并将参数放在请求体内
-    app.req.post('/address/get_address', { address_id: this.data.addressId }, 
+    const globalUserInfo = app.globalData.userInfo || {};
+    const userId = parseInt(globalUserInfo.user_id || app.globalData.user_id || wx.getStorageSync('user_id') || 0);
+
+    if (!userId) {
+      console.warn('请先登录');
+      return;
+    }
+
+    app.req.post('/address/get_address_by_id', {
+      user_id: userId,
+      address_id: this.data.addressId
+    },
       (res) => {
         if (res.code === 200 && res.data && res.data.address) {
           const address = res.data.address;
@@ -60,7 +70,7 @@ Page({
         regionArray: [
           address.province || '',
           address.city || '',
-          address.district || ''
+          address.county || ''
         ].filter(Boolean) // 过滤空值
       });
         } else {
@@ -224,8 +234,7 @@ Page({
       title: isEdit ? '更新中...' : '保存中...',
     });
     
-    // 固定使用 /address/add_address URL，不添加任何参数
-    const url = '/address/add_address';
+    const url = isEdit ? '/address/update_address' : '/address/add_address';
     const method = 'post';
     
     app.req[method](url, requestData, 
