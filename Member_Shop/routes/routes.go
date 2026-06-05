@@ -39,11 +39,13 @@ func InitRoutes(router *gin.Engine) {
 
 	// 初始化用户相关路由
 	InitUserRoutes(router)
+	InitMemberRoutes(router)
 
 	// 初始化订单相关路由
 	InitOrderRoutes(router)
 	// 初始化运营用户相关路由
 	InitOperationUserRoutes(router)
+	InitOperationLogRoutes(router)
 
 	// 初始化活动相关路由
 	InitActivityRoutes(router)

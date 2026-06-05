@@ -72,7 +72,7 @@ func (oc *OrderController) OrderList(c *gin.Context) {
 		req.PageSize = 50
 	}
 
-	orders, total, err := method.GetOrderList(req.UserID, req.Status, req.BeginTime, req.EndTime, req.Tid, req.Page, req.PageSize)
+	orders, total, err := method.GetOrderListFiltered(req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, msg.ErrResponseStr("查询订单列表失败: "+err.Error()))
 		return
@@ -327,6 +327,25 @@ func (oc *OrderController) OrderCreate(c *gin.Context) {
 	c.JSON(http.StatusOK, msg.SuccessResponse("success", &data))
 }
 
+func (oc *OrderController) BackendCreateOrder(c *gin.Context) {
+	operator, ok := requireBackendOperator(c)
+	if !ok {
+		return
+	}
+	var req requestbody.BackendCreateOrderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponse("请求参数错误", err))
+		return
+	}
+	order, err := method.CreateBackendOrder(req, operator, requestMeta(c))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr(err.Error()))
+		return
+	}
+	data := method.ConvertOrderToMap(*order)
+	c.JSON(http.StatusOK, msg.SuccessResponse("success", &data))
+}
+
 func getStringValue(m map[string]interface{}, key string) string {
 	if v, ok := m[key].(string); ok {
 		return v
@@ -509,15 +528,49 @@ func (oc *OrderController) OrderCancel(c *gin.Context) {
 }
 
 func (oc *OrderController) UpdatePaymentAmount(c *gin.Context) {
+	operator, ok := requireBackendOperator(c)
+	if !ok {
+		return
+	}
 	var req requestbody.UpdatePaymentAmountRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, msg.ErrResponse("invalid request", err))
 		return
 	}
 
-	order, err := method.UpdatePaymentAmount(req.OrderID, req.FinalPayAmount, req.DiscountReason, req.OperatorID)
+	before, _ := method.GetOrderByID(req.OrderID)
+	order, err := method.UpdatePaymentAmount(req.OrderID, req.FinalPayAmount, req.DiscountReason, int(operator.ID))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, msg.ErrResponseStr(err.Error()))
+		return
+	}
+	beforeData := map[string]any{}
+	if before != nil {
+		beforeData = map[string]any{
+			"final_pay_amount": before.FinalPayAmount,
+			"discount_amount":  before.DiscountAmount,
+			"discount_reason":  before.DiscountReason,
+		}
+	}
+	if err := method.RecordBackendOperation(method.BackendOperationLogInput{
+		Operator:   operator,
+		Action:     method.ActionOrderPaymentAmountUpdate,
+		Module:     method.OperationModuleOrder,
+		TargetType: "order",
+		TargetID:   order.OrderID,
+		UserID:     order.UserID,
+		OrderID:    order.OrderID,
+		BeforeData: beforeData,
+		AfterData: map[string]any{
+			"final_pay_amount": order.FinalPayAmount,
+			"discount_amount":  order.DiscountAmount,
+			"discount_reason":  order.DiscountReason,
+		},
+		RequestID: requestMeta(c).RequestID,
+		ClientIP:  requestMeta(c).ClientIP,
+		UserAgent: requestMeta(c).UserAgent,
+	}); err != nil {
+		c.JSON(http.StatusInternalServerError, msg.ErrResponseStr(err.Error()))
 		return
 	}
 
@@ -533,21 +586,60 @@ func (oc *OrderController) UpdatePaymentAmount(c *gin.Context) {
 }
 
 func (oc *OrderController) ConfirmPayment(c *gin.Context) {
+	operator, ok := requireBackendOperator(c)
+	if !ok {
+		return
+	}
 	var req requestbody.ConfirmPaymentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, msg.ErrResponse("invalid request", err))
 		return
 	}
 
-	if err := method.ConfirmOrderPayment(req.OrderID, req.OperatorID, req.PaymentRemark); err != nil {
+	before, _ := method.GetOrderByID(req.OrderID)
+	if err := method.ConfirmOrderPayment(req.OrderID, int(operator.ID), req.PaymentRemark); err != nil {
 		c.JSON(http.StatusBadRequest, msg.ErrResponseStr(err.Error()))
 		return
+	}
+	after, _ := method.GetOrderByID(req.OrderID)
+	if after != nil {
+		beforeData := map[string]any{}
+		if before != nil {
+			beforeData = map[string]any{
+				"pay_status":       before.PayStatus,
+				"payment_time":     before.PaymentTime,
+				"total_paid_delta": 0,
+			}
+		}
+		if err := method.RecordBackendOperation(method.BackendOperationLogInput{
+			Operator:   operator,
+			Action:     method.ActionOrderPaymentConfirm,
+			Module:     method.OperationModuleOrder,
+			TargetType: "order",
+			TargetID:   after.OrderID,
+			UserID:     after.UserID,
+			OrderID:    after.OrderID,
+			BeforeData: beforeData,
+			AfterData: map[string]any{
+				"pay_status":          after.PayStatus,
+				"payment_time":        after.PaymentTime,
+				"payment_operator_id": after.PaymentOperatorID,
+				"payment_remark":      after.PaymentRemark,
+				"total_paid_delta":    after.FinalPayAmount,
+			},
+			RequestID: requestMeta(c).RequestID,
+			ClientIP:  requestMeta(c).ClientIP,
+			UserAgent: requestMeta(c).UserAgent,
+		}); err != nil {
+			c.JSON(http.StatusInternalServerError, msg.ErrResponseStr(err.Error()))
+			return
+		}
 	}
 
 	data := map[string]any{
 		"order_id":    req.OrderID,
 		"pay_status":  "paid",
-		"operator_id": req.OperatorID,
+		"operator_id": operator.ID,
 	}
 	c.JSON(http.StatusOK, msg.SuccessResponse("success", &data))
 }

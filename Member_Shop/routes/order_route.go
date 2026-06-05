@@ -2,6 +2,7 @@ package routes
 
 import (
 	"Member_shop/controllers"
+	"Member_shop/middleware"
 
 	"github.com/gin-gonic/gin"
 )
@@ -15,7 +16,8 @@ func InitOrderRoutes(router *gin.Engine) {
 	orderGroup := router.Group("/order/")
 	{
 		// 订单相关路由 - 与Django版本order.urls完全匹配
-		orderGroup.POST("add_order", orderController.OrderCreate)                           // 创建订单
+		orderGroup.POST("add_order", orderController.OrderCreate) // 创建订单
+		orderGroup.POST("backend_create_order", middleware.BackendAuthMiddleware(), orderController.BackendCreateOrder)
 		orderGroup.POST("query_order_data", orderController.OrderDetail)                    // 查询订单信息
 		orderGroup.POST("change_receiving_data", orderController.ChangeReceivingData)       // 修改收货信息
 		orderGroup.POST("change_status", orderController.ChangeStatus)                      // 修改订单状态
@@ -41,8 +43,8 @@ func InitOrderRoutes(router *gin.Engine) {
 		orderGroup.POST("change_sub_order_status", orderController.ChangeSubOrderStatus)
 		orderGroup.POST("cancel_sub_order", orderController.SubOrderCancel)
 		orderGroup.POST("return_sub_order", orderController.SubOrderReturn)
-		orderGroup.POST("update_payment_amount", orderController.UpdatePaymentAmount)
-		orderGroup.POST("confirm_payment", orderController.ConfirmPayment)
+		orderGroup.POST("update_payment_amount", middleware.BackendAuthMiddleware(), orderController.UpdatePaymentAmount)
+		orderGroup.POST("confirm_payment", middleware.BackendAuthMiddleware(), orderController.ConfirmPayment)
 		orderGroup.POST("jushuitan_ship_info", orderController.JushuitanShipInfo)
 	}
 }

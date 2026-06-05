@@ -9,14 +9,19 @@ type QueryOrdersRequest struct {
 }
 
 type OrderListRequest struct {
-	Shopname  string `json:"shopname" binding:"required"`
-	UserID    int    `json:"user_id"`
-	Status    string `json:"status"`
-	Page      int    `json:"page" binding:"required,min=1"`
-	PageSize  int    `json:"page_size" binding:"required,min=1,max=50"`
-	BeginTime string `json:"begin_time"`
-	EndTime   string `json:"end_time"`
-	Tid       string `json:"tid"`
+	Shopname   string `json:"shopname" binding:"required"`
+	UserID     int    `json:"user_id"`
+	Status     string `json:"status"`
+	Page       int    `json:"page" binding:"required,min=1"`
+	PageSize   int    `json:"page_size" binding:"required,min=1,max=50"`
+	BeginTime  string `json:"begin_time"`
+	EndTime    string `json:"end_time"`
+	Tid        string `json:"tid"`
+	Mobile     string `json:"mobile"`
+	MemberID   uint   `json:"member_id"`
+	MemberNo   string `json:"member_no"`
+	SubOrderID string `json:"sub_order_id"`
+	PayStatus  string `json:"pay_status"`
 }
 
 type OrderDetailRequest struct {
@@ -51,12 +56,12 @@ type UpdatePaymentAmountRequest struct {
 	OrderID        string  `json:"order_id" binding:"required"`
 	FinalPayAmount float64 `json:"final_pay_amount" binding:"required,min=0"`
 	DiscountReason string  `json:"discount_reason"`
-	OperatorID     int     `json:"operator_id" binding:"required"`
+	OperatorID     int     `json:"operator_id"`
 }
 
 type ConfirmPaymentRequest struct {
 	OrderID       string `json:"order_id" binding:"required"`
-	OperatorID    int    `json:"operator_id" binding:"required"`
+	OperatorID    int    `json:"operator_id"`
 	PaymentRemark string `json:"payment_remark"`
 }
 

@@ -3,6 +3,7 @@ package method
 import (
 	"Member_shop/db"
 	"Member_shop/models"
+	"Member_shop/requestbody"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -78,6 +79,9 @@ func convertOrderToMap(order models.Order, afterSaleStatus *string) map[string]i
 	result["payment_operator_id"] = order.PaymentOperatorID
 	result["payment_remark"] = order.PaymentRemark
 	result["price_adjusted_by"] = order.PriceAdjustedBy
+	result["created_by_backend"] = order.CreatedByBackend
+	result["backend_operator_id"] = order.BackendOperatorID
+	result["backend_order_remark"] = order.BackendOrderRemark
 
 	if order.ProductList != "" {
 		var productList []string
@@ -329,61 +333,98 @@ func QueryOrdersByUserID(userID int, status string, page, pageSize int) (*QueryO
 
 // GetOrderList 获取订单列表
 func GetOrderList(userID int, status, beginTime, endTime, tid string, page, pageSize int) ([]map[string]interface{}, int64, error) {
+	return GetOrderListFiltered(requestbody.OrderListRequest{
+		UserID:    userID,
+		Status:    status,
+		BeginTime: beginTime,
+		EndTime:   endTime,
+		Tid:       tid,
+		Page:      page,
+		PageSize:  pageSize,
+	})
+}
+
+func GetOrderListFiltered(req requestbody.OrderListRequest) ([]map[string]interface{}, int64, error) {
 	var orders []models.Order
 	query := db.DB.Model(&models.Order{})
 
-	if userID > 0 {
-		query = query.Where("user_id = ?", userID)
+	if req.UserID > 0 {
+		query = query.Where("order_data.user_id = ?", req.UserID)
 	}
 
-	if status != "" {
-		query = query.Where("status = ?", status)
+	if req.Status != "" {
+		query = query.Where("order_data.status = ?", req.Status)
 	}
 
-	if tid != "" {
-		query = query.Where("order_id LIKE ?", "%"+tid+"%")
+	if req.PayStatus != "" {
+		query = query.Where("order_data.pay_status = ?", req.PayStatus)
 	}
 
-	if beginTime != "" {
-		t, err := time.ParseInLocation("2006-01-02 15:04:05", beginTime, time.Local)
+	if req.Tid != "" {
+		query = query.Where("order_data.order_id LIKE ?", "%"+req.Tid+"%")
+	}
+
+	if req.Mobile != "" {
+		like := "%" + strings.TrimSpace(req.Mobile) + "%"
+		query = query.Joins("LEFT JOIN member_info AS member_mobile_filter ON member_mobile_filter.user_id = order_data.user_id").
+			Where("(order_data.receiver_phone LIKE ? OR member_mobile_filter.mobile LIKE ?)", like, like)
+	}
+
+	if req.MemberID > 0 {
+		query = query.Joins("LEFT JOIN member_info AS member_id_filter ON member_id_filter.user_id = order_data.user_id").
+			Where("member_id_filter.id = ?", req.MemberID)
+	}
+
+	if req.MemberNo != "" {
+		query = query.Joins("LEFT JOIN member_info AS member_no_filter ON member_no_filter.user_id = order_data.user_id").
+			Where("member_no_filter.member_no LIKE ?", "%"+strings.TrimSpace(req.MemberNo)+"%")
+	}
+
+	if req.SubOrderID != "" {
+		query = query.Joins("JOIN sub_order_data AS sub_order_filter ON sub_order_filter.order_id = order_data.order_id").
+			Where("sub_order_filter.sub_order_id LIKE ?", "%"+strings.TrimSpace(req.SubOrderID)+"%")
+	}
+
+	if req.BeginTime != "" {
+		t, err := time.ParseInLocation("2006-01-02 15:04:05", req.BeginTime, time.Local)
 		if err != nil {
-			t, err = time.ParseInLocation("2006-01-02", beginTime, time.Local)
+			t, err = time.ParseInLocation("2006-01-02", req.BeginTime, time.Local)
 			if err == nil {
 				t = t.Add(-8 * time.Hour)
 				beginTimeUTC := t.In(time.UTC)
-				query = query.Where("order_time >= ?", beginTimeUTC)
+				query = query.Where("order_data.order_time >= ?", beginTimeUTC)
 			}
 		} else {
 			t = t.Add(-8 * time.Hour)
 			beginTimeUTC := t.In(time.UTC)
-			query = query.Where("order_time >= ?", beginTimeUTC)
+			query = query.Where("order_data.order_time >= ?", beginTimeUTC)
 		}
 	}
 
-	if endTime != "" {
-		t, err := time.ParseInLocation("2006-01-02 15:04:05", endTime, time.Local)
+	if req.EndTime != "" {
+		t, err := time.ParseInLocation("2006-01-02 15:04:05", req.EndTime, time.Local)
 		if err != nil {
-			t, err = time.ParseInLocation("2006-01-02", endTime, time.Local)
+			t, err = time.ParseInLocation("2006-01-02", req.EndTime, time.Local)
 			if err == nil {
 				t = t.Add(-8 * time.Hour).Add(24 * time.Hour)
 				endTimeUTC := t.In(time.UTC)
-				query = query.Where("order_time < ?", endTimeUTC)
+				query = query.Where("order_data.order_time < ?", endTimeUTC)
 			}
 		} else {
 			t = t.Add(-8 * time.Hour)
 			endTimeUTC := t.In(time.UTC)
-			query = query.Where("order_time < ?", endTimeUTC)
+			query = query.Where("order_data.order_time < ?", endTimeUTC)
 		}
 	}
 
-	offset := (page - 1) * pageSize
+	offset := (req.Page - 1) * req.PageSize
 
 	var total int64
-	if err := query.Count(&total).Error; err != nil {
+	if err := query.Distinct("order_data.order_id").Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
-	if err := query.Offset(offset).Limit(pageSize).Order("order_time DESC").Find(&orders).Error; err != nil {
+	if err := query.Distinct("order_data.*").Offset(offset).Limit(req.PageSize).Order("order_data.order_time DESC").Find(&orders).Error; err != nil {
 		return nil, 0, err
 	}
 

@@ -19,7 +19,10 @@ type Member struct {
 	UserID           int       `gorm:"column:user_id;index;default:0;comment:关联的微信用户ID" json:"user_id"`
 	OpenID           string    `gorm:"column:openid;size:100;index;null;comment:关联的微信OpenID" json:"openid"`
 	Mobile           string    `gorm:"column:mobile;size:11;uniqueIndex;not null;comment:会员手机号" json:"mobile"`
+	ManualUniqueCode string    `gorm:"column:manual_unique_code;size:64;index;null;comment:后台手动录入唯一字段" json:"manual_unique_code"`
 	Nickname         string    `gorm:"column:nickname;size:100;null;comment:会员昵称" json:"nickname"`
+	Status           string    `gorm:"column:status;size:20;default:active;comment:会员状态 active/disabled" json:"status"`
+	Source           string    `gorm:"column:source;size:50;default:backend;comment:会员来源" json:"source"`
 	TotalOrderAmount float64   `gorm:"column:total_order_amount;type:decimal(10,2);default:0;comment:订单总金额" json:"total_order_amount"`
 	TotalPaidAmount  float64   `gorm:"column:total_paid_amount;type:decimal(10,2);default:0;comment:实付总金额" json:"total_paid_amount"`
 	TmallID          string    `gorm:"column:tmall_id;size:100;null;comment:天猫ID" json:"tmall_id"`
@@ -39,6 +42,12 @@ func (Member) TableName() string {
 func (m *Member) BeforeCreate(tx *gorm.DB) error {
 	if m.MemberNo == "" {
 		m.MemberNo = GenerateMemberNo()
+	}
+	if m.Status == "" {
+		m.Status = "active"
+	}
+	if m.Source == "" {
+		m.Source = "backend"
 	}
 	return nil
 }

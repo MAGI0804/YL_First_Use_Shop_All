@@ -15,6 +15,8 @@ func RunMigrations() {
 	modelsToMigrate := []interface{}{
 		&models.User{},
 		&models.Member{},
+		&models.MemberTag{},
+		&models.MemberTagRelation{},
 		&models.BackendUser{},
 		//&models.UserData{},
 		&models.Address{},
@@ -41,6 +43,7 @@ func RunMigrations() {
 		&models.DownloadTask{},
 		&models.BackendUser{},
 		&models.Member{},
+		&models.BackendOperationLog{},
 	}
 
 	for _, model := range modelsToMigrate {
