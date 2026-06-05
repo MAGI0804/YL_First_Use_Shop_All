@@ -144,6 +144,7 @@ func AccessTokenValidationMiddleware() gin.HandlerFunc {
 		"/OperationUser/send_register_captcha",
 		"/OperationUser/backend_register_by_phone",
 		"/OperationUser/backend_login",
+		"/download_center/",
 	}
 
 	return func(c *gin.Context) {

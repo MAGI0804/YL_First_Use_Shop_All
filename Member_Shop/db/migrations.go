@@ -37,6 +37,8 @@ func RunMigrations() {
 		&models.ProductReview{},
 		&models.ReviewReply{},
 		&models.JushuitanPushRawData{},
+		&models.DownloadTemplate{},
+		&models.DownloadTask{},
 		&models.BackendUser{},
 		&models.Member{},
 	}

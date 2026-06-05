@@ -35,6 +35,7 @@ func InitRoutes(router *gin.Engine) {
 	InitInventoryRoutes(router)
 	InitReviewRoutes(router)
 	InitAnalyticsRoutes(router)
+	InitDownloadCenterRoutes(router)
 
 	// 初始化用户相关路由
 	InitUserRoutes(router)
