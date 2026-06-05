@@ -42,6 +42,18 @@ func TestNormalizeDownloadFileFormatUsesTemplateDefault(t *testing.T) {
 	}
 }
 
+func TestNormalizeDownloadTaskPagination(t *testing.T) {
+	page, pageSize := NormalizeDownloadTaskPagination(0, 0)
+	if page != 1 || pageSize != defaultDownloadTaskPageSize {
+		t.Fatalf("page/pageSize = %d/%d, want 1/%d", page, pageSize, defaultDownloadTaskPageSize)
+	}
+
+	page, pageSize = NormalizeDownloadTaskPagination(3, 1000)
+	if page != 3 || pageSize != maxDownloadTaskPageSize {
+		t.Fatalf("page/pageSize = %d/%d, want 3/%d", page, pageSize, maxDownloadTaskPageSize)
+	}
+}
+
 func TestParseDownloadFilterRulesRejectsDuplicateField(t *testing.T) {
 	_, err := ParseDownloadFilterRules(`[
 		{"field":"status","operator":"=","db_column":"status"},

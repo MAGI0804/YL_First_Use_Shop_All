@@ -53,4 +53,5 @@ func RunMigrations() {
 	}
 
 	log.Println("database migrations completed")
+	seedDefaultDownloadTemplates()
 }

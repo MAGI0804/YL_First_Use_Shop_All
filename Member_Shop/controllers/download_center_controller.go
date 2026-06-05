@@ -41,11 +41,56 @@ func (dcc *DownloadCenterController) CreateTask(c *gin.Context) {
 }
 
 func (dcc *DownloadCenterController) ListTasks(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, msg.ErrResponseStr("download task list not implemented"))
+	backendUser := downloadCenterBackendUser(c)
+	if backendUser == nil {
+		c.JSON(http.StatusUnauthorized, msg.ErrResponseStr("backend user missing"))
+		return
+	}
+
+	var req requestbody.QueryDownloadTasksRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponse("请求参数错误", err))
+		return
+	}
+
+	tasks, total, page, pageSize, err := method.QueryDownloadTasks(method.QueryDownloadTasksInput{
+		Page:         req.Page,
+		PageSize:     req.PageSize,
+		Status:       req.Status,
+		BusinessType: req.BusinessType,
+		TemplateCode: req.TemplateCode,
+		RequestedBy:  int(backendUser.ID),
+		IsAdmin:      method.IsBackendAdmin(backendUser),
+	})
+	if err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr(err.Error()))
+		return
+	}
+
+	data := map[string]any{
+		"list":      tasks,
+		"total":     total,
+		"page":      page,
+		"page_size": pageSize,
+	}
+	c.JSON(http.StatusOK, msg.SuccessResponse("success", &data))
 }
 
 func (dcc *DownloadCenterController) TaskDetail(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, msg.ErrResponseStr("download task detail not implemented"))
+	backendUser := downloadCenterBackendUser(c)
+	if backendUser == nil {
+		c.JSON(http.StatusUnauthorized, msg.ErrResponseStr("backend user missing"))
+		return
+	}
+
+	task, err := method.GetDownloadTask(c.Param("task_id"), int(backendUser.ID), method.IsBackendAdmin(backendUser))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr(err.Error()))
+		return
+	}
+
+	data := map[string]any{"task": task}
+	c.JSON(http.StatusOK, msg.SuccessResponse("success", &data))
 }
 
 func (dcc *DownloadCenterController) DownloadFile(c *gin.Context) {
@@ -53,11 +98,31 @@ func (dcc *DownloadCenterController) DownloadFile(c *gin.Context) {
 }
 
 func (dcc *DownloadCenterController) RetryTask(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, msg.ErrResponseStr("download task retry not implemented"))
+	backendUser := downloadCenterBackendUser(c)
+	if backendUser == nil {
+		c.JSON(http.StatusUnauthorized, msg.ErrResponseStr("backend user missing"))
+		return
+	}
+
+	task, err := method.RetryDownloadTask(c.Param("task_id"), int(backendUser.ID), method.IsBackendAdmin(backendUser))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr(err.Error()))
+		return
+	}
+
+	data := map[string]any{"task": task}
+	c.JSON(http.StatusOK, msg.SuccessResponse("success", &data))
 }
 
 func (dcc *DownloadCenterController) ListTemplates(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, msg.ErrResponseStr("download template list not implemented"))
+	templates, err := method.ListEnabledDownloadTemplates()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, msg.ErrResponseStr(err.Error()))
+		return
+	}
+
+	data := map[string]any{"list": templates}
+	c.JSON(http.StatusOK, msg.SuccessResponse("success", &data))
 }
 
 func downloadCenterBackendUser(c *gin.Context) *models.BackendUser {

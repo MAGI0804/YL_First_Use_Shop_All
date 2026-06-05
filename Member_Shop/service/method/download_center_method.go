@@ -14,6 +14,9 @@ import (
 )
 
 const (
+	defaultDownloadTaskPageSize = 20
+	maxDownloadTaskPageSize     = 100
+
 	DownloadTemplateStatusEnabled  = "enabled"
 	DownloadTemplateStatusDisabled = "disabled"
 
@@ -43,6 +46,14 @@ var allowedDownloadFileFormats = map[string]bool{
 	"csv":  true,
 }
 
+var allowedDownloadTaskStatuses = map[string]bool{
+	DownloadTaskStatusPending: true,
+	DownloadTaskStatusRunning: true,
+	DownloadTaskStatusSuccess: true,
+	DownloadTaskStatusFailed:  true,
+	DownloadTaskStatusExpired: true,
+}
+
 type DownloadFilterRule struct {
 	Field    string `json:"field"`
 	Operator string `json:"operator"`
@@ -55,6 +66,16 @@ type CreateDownloadTaskInput struct {
 	Filters      map[string]any
 	FileFormat   string
 	RequestedBy  int
+}
+
+type QueryDownloadTasksInput struct {
+	Page         int
+	PageSize     int
+	Status       string
+	BusinessType string
+	TemplateCode string
+	RequestedBy  int
+	IsAdmin      bool
 }
 
 func CreateDownloadTask(input CreateDownloadTaskInput) (*models.DownloadTask, error) {
@@ -86,6 +107,97 @@ func CreateDownloadTask(input CreateDownloadTaskInput) (*models.DownloadTask, er
 		return nil, err
 	}
 	return task, nil
+}
+
+func QueryDownloadTasks(input QueryDownloadTasksInput) ([]models.DownloadTask, int64, int, int, error) {
+	page, pageSize := NormalizeDownloadTaskPagination(input.Page, input.PageSize)
+	query := db.DB.Model(&models.DownloadTask{})
+
+	status := strings.TrimSpace(input.Status)
+	if status != "" {
+		if !allowedDownloadTaskStatuses[status] {
+			return nil, 0, page, pageSize, fmt.Errorf("unsupported task status %q", status)
+		}
+		query = query.Where("status = ?", status)
+	}
+	businessType := strings.TrimSpace(input.BusinessType)
+	if businessType != "" {
+		if !allowedDownloadBusinessTypes[businessType] {
+			return nil, 0, page, pageSize, fmt.Errorf("unsupported business_type %q", businessType)
+		}
+		query = query.Where("business_type = ?", businessType)
+	}
+	if strings.TrimSpace(input.TemplateCode) != "" {
+		query = query.Where("template_code = ?", strings.TrimSpace(input.TemplateCode))
+	}
+	if !input.IsAdmin {
+		query = query.Where("requested_by = ?", input.RequestedBy)
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, page, pageSize, err
+	}
+
+	tasks := []models.DownloadTask{}
+	if err := query.Order("created_at DESC").
+		Offset((page - 1) * pageSize).
+		Limit(pageSize).
+		Find(&tasks).Error; err != nil {
+		return nil, 0, page, pageSize, err
+	}
+	return tasks, total, page, pageSize, nil
+}
+
+func GetDownloadTask(taskID string, requestedBy int, isAdmin bool) (*models.DownloadTask, error) {
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" {
+		return nil, fmt.Errorf("task_id is required")
+	}
+	query := db.DB.Where("task_id = ?", taskID)
+	if !isAdmin {
+		query = query.Where("requested_by = ?", requestedBy)
+	}
+
+	var task models.DownloadTask
+	if err := query.First(&task).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, fmt.Errorf("download task not found")
+		}
+		return nil, err
+	}
+	return &task, nil
+}
+
+func RetryDownloadTask(taskID string, requestedBy int, isAdmin bool) (*models.DownloadTask, error) {
+	task, err := GetDownloadTask(taskID, requestedBy, isAdmin)
+	if err != nil {
+		return nil, err
+	}
+	if task.Status != DownloadTaskStatusFailed {
+		return nil, fmt.Errorf("only failed download tasks can be retried")
+	}
+	updates := map[string]any{
+		"status":        DownloadTaskStatusPending,
+		"progress":      0,
+		"error_message": "",
+		"started_at":    nil,
+		"finished_at":   nil,
+	}
+	if err := db.DB.Model(task).Updates(updates).Error; err != nil {
+		return nil, err
+	}
+	return GetDownloadTask(taskID, requestedBy, isAdmin)
+}
+
+func ListEnabledDownloadTemplates() ([]models.DownloadTemplate, error) {
+	templates := []models.DownloadTemplate{}
+	if err := db.DB.Where("status = ?", DownloadTemplateStatusEnabled).
+		Order("business_type ASC, template_code ASC").
+		Find(&templates).Error; err != nil {
+		return nil, err
+	}
+	return templates, nil
 }
 
 func FindEnabledDownloadTemplate(templateCode string) (*models.DownloadTemplate, error) {
@@ -162,6 +274,19 @@ func ParseDownloadFilterRules(raw string) (map[string]DownloadFilterRule, error)
 		result[field] = rule
 	}
 	return result, nil
+}
+
+func NormalizeDownloadTaskPagination(page, pageSize int) (int, int) {
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = defaultDownloadTaskPageSize
+	}
+	if pageSize > maxDownloadTaskPageSize {
+		pageSize = maxDownloadTaskPageSize
+	}
+	return page, pageSize
 }
 
 func NormalizeDownloadFileFormat(templateDefault, requested string) (string, error) {
