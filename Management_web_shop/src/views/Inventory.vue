@@ -20,6 +20,7 @@
             />
             <el-button type="primary" :icon="Search" :loading="queryLoading" @click="handleInventoryQuery">查询</el-button>
             <el-button :icon="Refresh" @click="resetInventoryQuery">重置</el-button>
+            <el-button :icon="Download" @click="handleInventoryExport('query')">生成下载任务</el-button>
             <span v-if="queryTotalInventory !== null" class="summary">总库存 {{ queryTotalInventory }}</span>
           </div>
 
@@ -44,6 +45,7 @@
             <el-input-number v-model="warningParams.threshold" :min="1" :max="9999" controls-position="right" />
             <el-button type="primary" :icon="Search" :loading="warningLoading" @click="loadWarnings">查询</el-button>
             <el-button :icon="Refresh" @click="resetWarnings">重置</el-button>
+            <el-button :icon="Download" @click="handleInventoryExport('warnings')">生成下载任务</el-button>
             <span class="summary">阈值 {{ warningThreshold }}</span>
           </div>
 
@@ -91,6 +93,7 @@
             </el-select>
             <el-button type="primary" :icon="Search" :loading="logLoading" @click="loadLogs">查询</el-button>
             <el-button :icon="Refresh" @click="resetLogs">重置</el-button>
+            <el-button :icon="Download" @click="handleInventoryExport('logs')">生成下载任务</el-button>
           </div>
 
           <el-table :data="logRows" border height="520" empty-text="暂无库存日志">
@@ -217,7 +220,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { EditPen, Refresh, Search, Switch, Tickets } from '@element-plus/icons-vue'
+import { Download, EditPen, Refresh, Search, Switch, Tickets } from '@element-plus/icons-vue'
 import {
   adjustInventory,
   queryInventory,
@@ -225,6 +228,7 @@ import {
   queryInventoryWarnings,
   stockCheckInventory,
   transferInventory,
+  createDownloadTask,
   type InventoryCommodity,
   type InventoryLogItem
 } from '@/api'
@@ -382,6 +386,32 @@ const resetLogs = () => {
   logParams.page = 1
   logParams.page_size = 10
   loadLogs()
+}
+
+const handleInventoryExport = async (scope: 'query' | 'warnings' | 'logs') => {
+  const filters: Record<string, any> = {}
+  if (scope === 'query') {
+    filters.commodity_id = queryForm.commodity_id || undefined
+    filters.style_code = queryForm.style_code || undefined
+  }
+  if (scope === 'warnings') {
+    filters.low_inventory_threshold = warningParams.threshold
+  }
+  if (scope === 'logs') {
+    filters.commodity_id = logParams.commodity_id || undefined
+    filters.style_code = logParams.style_code || undefined
+  }
+  try {
+    await createDownloadTask({
+      template_code: 'inventory_export',
+      file_format: 'xlsx',
+      filters
+    })
+    ElMessage.success('库存下载任务已创建，请到下载中心查看')
+  } catch (error) {
+    console.error('create inventory download task failed:', error)
+    ElMessage.error('库存下载任务创建失败')
+  }
 }
 
 const ensureCommodity = (commodityID: string) => {

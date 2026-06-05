@@ -26,7 +26,7 @@ func seedDefaultDownloadTemplates() {
 			SQLContent:     "SELECT commodity_id, name, style_code, category, category_detail, price, size, color, height, spec_code, inventory, created_at, notes FROM Commodity_data",
 			ModelFields:    `[{"field":"commodity_id","model":"Commodity","model_field":"CommodityID","db_column":"commodity_id","type":"string"},{"field":"name","model":"Commodity","model_field":"Name","db_column":"name","type":"string"},{"field":"style_code","model":"Commodity","model_field":"StyleCode","db_column":"style_code","type":"string"},{"field":"category","model":"Commodity","model_field":"Category","db_column":"category","type":"string"},{"field":"inventory","model":"Commodity","model_field":"Inventory","db_column":"inventory","type":"int"}]`,
 			ExportHeaders:  `[{"field":"commodity_id","header":"商品ID","width":24},{"field":"name","header":"商品名称","width":28},{"field":"style_code","header":"款号","width":16},{"field":"category","header":"分类","width":16},{"field":"category_detail","header":"详细分类","width":16},{"field":"price","header":"价格","width":12,"format":"money"},{"field":"size","header":"尺码","width":12},{"field":"color","header":"颜色","width":12},{"field":"height","header":"身高","width":12},{"field":"spec_code","header":"规格码","width":18},{"field":"inventory","header":"库存","width":12},{"field":"created_at","header":"创建时间","width":20,"format":"datetime"},{"field":"notes","header":"备注","width":24}]`,
-			AllowedFilters: `[{"field":"category","operator":"=","db_column":"category","type":"string"},{"field":"category_detail","operator":"=","db_column":"category_detail","type":"string"},{"field":"style_code","operator":"=","db_column":"style_code","type":"string"},{"field":"commodity_id","operator":"=","db_column":"commodity_id","type":"string"},{"field":"name","operator":"LIKE","db_column":"name","type":"string"},{"field":"low_inventory","operator":"<=","db_column":"inventory","type":"int"}]`,
+			AllowedFilters: `[{"field":"category","operator":"=","db_column":"category","type":"string"},{"field":"category_detail","operator":"=","db_column":"category_detail","type":"string"},{"field":"style_code","operator":"=","db_column":"style_code","type":"string"},{"field":"commodity_id","operator":"=","db_column":"commodity_id","type":"string"},{"field":"name","operator":"LIKE","db_column":"name","type":"string"},{"field":"low_inventory","operator":"<=","db_column":"inventory","type":"int"},{"field":"begin_time","operator":">=","db_column":"created_at","type":"datetime"},{"field":"end_time","operator":"<=","db_column":"created_at","type":"datetime"}]`,
 			DefaultOrderBy: "created_at DESC",
 			FileFormat:     "xlsx",
 			Status:         "enabled",
@@ -73,6 +73,18 @@ func seedDefaultDownloadTemplates() {
 		var existing models.DownloadTemplate
 		err := DB.Where("template_code = ?", template.TemplateCode).First(&existing).Error
 		if err == nil {
+			if err := DB.Model(&existing).Updates(map[string]any{
+				"template_name":    template.TemplateName,
+				"business_type":    template.BusinessType,
+				"sql_content":      template.SQLContent,
+				"model_fields":     template.ModelFields,
+				"export_headers":   template.ExportHeaders,
+				"allowed_filters":  template.AllowedFilters,
+				"default_order_by": template.DefaultOrderBy,
+				"file_format":      template.FileFormat,
+			}).Error; err != nil {
+				log.Printf("update download template %s failed: %v", template.TemplateCode, err)
+			}
 			continue
 		}
 		if err := DB.Create(&template).Error; err != nil {

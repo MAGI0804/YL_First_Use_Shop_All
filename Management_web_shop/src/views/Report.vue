@@ -15,7 +15,7 @@
         <el-input v-model="filters.style_code" placeholder="款号" clearable class="field" @keyup.enter="handleSearch" />
         <el-input-number v-model="filters.low_inventory_threshold" :min="0" :max="9999" controls-position="right" class="number-field" />
         <el-button type="primary" :icon="Search" :loading="loading" @click="handleSearch">查询</el-button>
-        <el-button :icon="Download" @click="handleExport">导出 JSON</el-button>
+        <el-button :icon="Download" @click="handleExport">生成下载任务</el-button>
       </div>
     </section>
 
@@ -134,7 +134,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Download, Search } from '@element-plus/icons-vue'
 import {
-  exportAnalytics,
+  createDownloadTask,
   queryProductSummary,
   querySalesSummary,
   queryUserSummary,
@@ -228,18 +228,15 @@ const handleSearch = () => {
 
 const handleExport = async () => {
   try {
-    const res = await exportAnalytics(queryParams())
-    const blob = new Blob([JSON.stringify(res.data?.export || {}, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `youlan-report-${new Date().toISOString().slice(0, 10)}.json`
-    link.click()
-    URL.revokeObjectURL(url)
-    ElMessage.success('报表已导出')
+    await createDownloadTask({
+      template_code: 'analytics_sales_export',
+      filters: queryParams(),
+      file_format: 'xlsx'
+    })
+    ElMessage.success('下载任务已创建，请到下载中心查看')
   } catch (error) {
-    console.error('export report failed:', error)
-    ElMessage.error('报表导出失败')
+    console.error('create report download task failed:', error)
+    ElMessage.error('下载任务创建失败')
   }
 }
 

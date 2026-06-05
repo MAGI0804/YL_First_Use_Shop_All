@@ -69,6 +69,7 @@
 
         <el-button type="primary" style="margin-left: 12px;" @click="handleSearch">搜索</el-button>
         <el-button @click="handleReset">重置</el-button>
+        <el-button :icon="Download" @click="handleExportTask">生成下载任务</el-button>
       </div>
     </div>
 
@@ -129,7 +130,8 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getToken, getAllLabels, getAllCategories, goodsQuery } from '@/api'
+import { Download } from '@element-plus/icons-vue'
+import { getToken, getAllLabels, getAllCategories, goodsQuery, createDownloadTask } from '@/api'
 
 const router = useRouter()
 const initialLoading = ref(true)
@@ -316,6 +318,25 @@ const handleReset = () => {
     selectedLabels[key] = []
   })
   fetchGoodsList()
+}
+
+const handleExportTask = async () => {
+  try {
+    await createDownloadTask({
+      template_code: 'product_export',
+      file_format: 'xlsx',
+      filters: {
+        category: queryParams.category && queryParams.category !== '全部' ? queryParams.category : undefined,
+        style_code: searchCode.value || undefined,
+        begin_time: dateRange.value?.[0] || undefined,
+        end_time: dateRange.value?.[1] || undefined
+      }
+    })
+    ElMessage.success('商品下载任务已创建，请到下载中心查看')
+  } catch (error) {
+    console.error('create product download task failed:', error)
+    ElMessage.error('商品下载任务创建失败')
+  }
 }
 
 const handleSizeChange = (size: number) => {

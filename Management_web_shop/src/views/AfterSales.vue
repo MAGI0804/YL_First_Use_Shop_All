@@ -51,6 +51,7 @@
         />
         <el-button type="primary" :icon="Search" :loading="loading" @click="handleSearch">查询</el-button>
         <el-button :icon="Refresh" @click="handleReset">重置</el-button>
+        <el-button :icon="Download" @click="handleExportTask">生成下载任务</el-button>
       </div>
 
       <el-table :data="displayRows" border height="560" row-key="return_id" empty-text="暂无售后记录">
@@ -128,9 +129,10 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Refresh, Search } from '@element-plus/icons-vue'
+import { Download, Refresh, Search } from '@element-plus/icons-vue'
 import {
   approveReturnOrder,
+  createDownloadTask,
   queryReturnOrders,
   queryReturnOrderStatistics,
   receiveReturnOrder,
@@ -278,6 +280,27 @@ const handleReset = () => {
   pagination.page = 1
   pagination.page_size = 10
   reload()
+}
+
+const handleExportTask = async () => {
+  try {
+    await createDownloadTask({
+      template_code: 'after_sale_export',
+      file_format: 'xlsx',
+      filters: {
+        begin_time: dateRange.value?.[0] || undefined,
+        end_time: dateRange.value?.[1] || undefined,
+        status: filters.status || undefined,
+        type: filters.type || undefined,
+        order_id: filters.order_id || undefined,
+        return_id: filters.return_order_id || undefined
+      }
+    })
+    ElMessage.success('售后下载任务已创建，请到下载中心查看')
+  } catch (error) {
+    console.error('create after-sale download task failed:', error)
+    ElMessage.error('售后下载任务创建失败')
+  }
 }
 
 const approve = async (row: ReturnOrderItem) => {

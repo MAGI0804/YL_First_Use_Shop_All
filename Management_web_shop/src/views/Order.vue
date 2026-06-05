@@ -37,6 +37,7 @@
       </el-select>
       <el-button type="primary" style="margin-left: 8px;" @click="handleSearch">搜索</el-button>
       <el-button @click="handleReset">重置</el-button>
+      <el-button :icon="Download" @click="handleExportTask">生成下载任务</el-button>
     </div>
 
     <el-table :data="orderList" style="width: 100%; margin-top: 20px;" row-key="id">
@@ -167,8 +168,8 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search } from '@element-plus/icons-vue'
-import { queryOrders, getToken, batchGetProducts, updatePaymentAmount, confirmOrderPayment, deliverOrder, receiveOrder } from '@/api'
+import { Download, Search } from '@element-plus/icons-vue'
+import { queryOrders, getToken, batchGetProducts, updatePaymentAmount, confirmOrderPayment, deliverOrder, receiveOrder, createDownloadTask } from '@/api'
 
 const router = useRouter()
 const searchOrderNo = ref('')
@@ -407,6 +408,25 @@ const handleReset = () => {
   currentPage.value = 1
   fetchOrders()
   ElMessage.success('已重置')
+}
+
+const handleExportTask = async () => {
+  try {
+    await createDownloadTask({
+      template_code: 'order_export',
+      file_format: 'xlsx',
+      filters: {
+        begin_time: dateRange.value?.[0] || undefined,
+        end_time: dateRange.value?.[1] || undefined,
+        status: statusFilter.value || undefined,
+        order_id: searchOrderNo.value || undefined
+      }
+    })
+    ElMessage.success('订单下载任务已创建，请到下载中心查看')
+  } catch (error) {
+    console.error('create order download task failed:', error)
+    ElMessage.error('订单下载任务创建失败')
+  }
 }
 
 const getStatusType = (status: string) => {
