@@ -4,10 +4,6 @@ export const getToken = () => {
   return http.getToken()
 }
 
-export const login = (username: string, password: string) => {
-  return http.post('/login', { username, password })
-}
-
 export interface BackendUserSession {
   id: number
   operator_no: string
@@ -194,22 +190,6 @@ export const queryOrders = (params: OrderQueryParams) => {
 
 export const batchGetProducts = (params: BatchProductParams) => {
   return http.post<BatchProductResponse>('/commodity/batch_get_products_by_ids', params)
-}
-
-export const getProductList = (params: any) => {
-  return http.get('/product/list', { params })
-}
-
-export const getMemberList = (params: any) => {
-  return http.get('/member/list', { params })
-}
-
-export const getDashboardData = (params: any) => {
-  return http.get('/dashboard/data', { params })
-}
-
-export const getReportData = (params: any) => {
-  return http.get('/report/data', { params })
 }
 
 export interface AnalyticsFilterParams {
