@@ -1,81 +1,64 @@
 <template>
   <div class="member-page">
-    <div class="top-bar">
-      <div class="search-bar">
-        <el-input
-          v-model="phoneSearch"
-          placeholder="请输入手机号"
-          style="width: 150px;"
-          clearable
-        />
-        <el-select v-model="levelFilter" placeholder="会员等级" style="width: 100px; margin-left: 12px;">
-          <el-option label="全部" value="" />
-          <el-option label="lv1" value="normal" />
-          <el-option label="lv2" value="silver" />
-          <el-option label="lv3" value="gold" />
-          <el-option label="lv4" value="black" />
+    <div class="toolbar">
+      <div class="filters">
+        <el-input v-model="filters.mobile" placeholder="手机号" clearable class="filter-item" @keyup.enter="fetchMembers" />
+        <el-input v-model="filters.member_no" placeholder="会员号" clearable class="filter-item" @keyup.enter="fetchMembers" />
+        <el-input v-model="filters.manual_unique_code" placeholder="唯一字段" clearable class="filter-item" @keyup.enter="fetchMembers" />
+        <el-select v-model="filters.status" placeholder="状态" clearable class="filter-item">
+          <el-option label="正常" value="active" />
+          <el-option label="停用" value="disabled" />
         </el-select>
-        <div class="points-range" style="margin-left: 12px; display: flex; align-items: center;">
-          <el-input-number v-model="pointsMin" :min="0" placeholder="最小" style="width: 120px;" />
-          <span style="margin: 0 8px; font-size: 12px;">至</span>
-          <el-input-number v-model="pointsMax" :min="0" placeholder="最大" style="width: 120px;" />
-          <span style="margin-left: 4px; font-size: 12px; color: #999;">积分</span>
-        </div>
-        <el-select v-model="tagFilter" placeholder="用户标签" multiple collapse-tags collapse-tags-tooltip style="width: 140px; margin-left: 12px;">
-          <el-option label="活跃用户" value="active" />
-          <el-option label="高消费" value="high消费" />
-          <el-option label="新用户" value="new" />
-          <el-option label="沉睡用户" value="sleep" />
-          <el-option label="VIP" value="vip" />
+        <el-select v-model="filters.tag_id" placeholder="标签" clearable class="filter-item">
+          <el-option v-for="tag in tags" :key="tag.id" :label="tag.name" :value="tag.id" />
         </el-select>
-        <el-button type="primary" style="margin-left: 12px;" @click="handleSearch">搜索</el-button>
+        <el-button type="primary" @click="handleSearch">搜索</el-button>
         <el-button @click="handleReset">重置</el-button>
       </div>
-      <div class="action-buttons">
-        <el-button type="primary" @click="openAddDialog">新增会员</el-button>
-        <el-button @click="handleBatchImport">批量新增</el-button>
-      </div>
+      <el-button type="primary" @click="openAddDialog">新增会员</el-button>
     </div>
 
-    <el-table :data="filteredList" style="width: 100%; margin-top: 20px;" row-key="id">
-      <el-table-column label="会员信息" min-width="160">
+    <el-table v-loading="loading" :data="members" row-key="id" class="member-table">
+      <el-table-column label="会员" min-width="190">
         <template #default="{ row }">
-          <div class="member-info">
-            <div class="member-name">{{ row.username }}</div>
-            <div class="member-phone">{{ row.phone }}</div>
+          <div class="member-main">
+            <span class="member-name">{{ row.nickname || '-' }}</span>
+            <span class="member-sub">{{ row.mobile }}</span>
+            <span class="member-sub">{{ row.member_no }}</span>
           </div>
         </template>
       </el-table-column>
-      <el-table-column prop="level" label="会员等级" width="120">
+      <el-table-column prop="manual_unique_code" label="唯一字段" min-width="130" show-overflow-tooltip />
+      <el-table-column label="金额" min-width="150">
         <template #default="{ row }">
-          <el-tag :type="getLevelType(row.level)" size="small">
-            {{ getLevelText(row.level) }}
-          </el-tag>
-          <el-button type="primary" link style="margin-left: 4px;" @click="openLevelDialog(row)">调整</el-button>
+          <div class="amount-lines">
+            <span>下单 ¥{{ formatMoney(row.total_order_amount) }}</span>
+            <span>已付 ¥{{ formatMoney(row.total_paid_amount) }}</span>
+          </div>
         </template>
       </el-table-column>
-      <el-table-column prop="points" label="积分" width="100" />
-      <el-table-column label="标签" min-width="180">
+      <el-table-column label="平台信息" min-width="190">
         <template #default="{ row }">
-          <el-tag v-for="tag in row.tags" :key="tag" size="small" style="margin-right: 4px;">
-            {{ getTagText(tag) }}
-          </el-tag>
+          <div class="amount-lines">
+            <span>天猫 {{ row.tmall_id || '-' }} / ¥{{ formatMoney(row.tmall_amount) }}</span>
+            <span>有赞 {{ row.youzan_id || '-' }} / ¥{{ formatMoney(row.youzan_amount) }}</span>
+          </div>
         </template>
       </el-table-column>
-      <el-table-column prop="createTime" label="注册时间" width="160" />
-      <el-table-column label="状态" width="80">
+      <el-table-column label="状态" width="90">
         <template #default="{ row }">
           <el-tag :type="row.status === 'active' ? 'success' : 'info'" size="small">
-            {{ row.status === 'active' ? '正常' : '已暂停' }}
+            {{ row.status === 'active' ? '正常' : '停用' }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column prop="created_at" label="创建时间" min-width="160" />
+      <el-table-column label="操作" width="220" fixed="right">
         <template #default="{ row }">
           <el-button type="primary" link @click="viewDetail(row.id)">详情</el-button>
-          <el-button type="warning" link @click="addTag(row)">加标签</el-button>
-          <el-button :type="row.status === 'active' ? 'info' : 'success'" link @click="toggleStatus(row)">
-            {{ row.status === 'active' ? '暂停' : '启用' }}
+          <el-button type="warning" link @click="openTagDialog(row)">标签</el-button>
+          <el-button link @click="toggleStatus(row)">
+            {{ row.status === 'active' ? '停用' : '启用' }}
           </el-button>
         </template>
       </el-table-column>
@@ -83,300 +66,255 @@
 
     <div class="pagination">
       <el-pagination
-        v-model:current-page="currentPage"
-        :page-size="10"
-        :total="filteredList.length"
+        v-model:current-page="page"
+        :page-size="pageSize"
+        :total="total"
         layout="total, prev, pager, next"
+        @current-change="fetchMembers"
       />
     </div>
 
-    <el-dialog v-model="addDialogVisible" title="新增会员" width="500px">
-      <el-form :model="newMember" label-width="80px">
-        <el-form-item label="用户名">
-          <el-input v-model="newMember.username" placeholder="请输入用户名" />
+    <el-dialog v-model="addDialogVisible" title="新增会员" width="560px" destroy-on-close>
+      <el-form :model="memberForm" label-width="96px">
+        <el-form-item label="手机号" required>
+          <el-input v-model="memberForm.mobile" placeholder="请输入手机号" />
         </el-form-item>
-        <el-form-item label="手机号">
-          <el-input v-model="newMember.phone" placeholder="请输入手机号" />
+        <el-form-item label="唯一字段">
+          <el-input v-model="memberForm.manual_unique_code" placeholder="手动录入，系统校验唯一" />
         </el-form-item>
-        <el-form-item label="会员等级">
-          <el-select v-model="newMember.level" placeholder="请选择会员等级" style="width: 100%;">
-            <el-option label="lv1" value="normal" />
-            <el-option label="lv2" value="silver" />
-            <el-option label="lv3" value="gold" />
-            <el-option label="lv4" value="black" />
-          </el-select>
+        <el-form-item label="昵称">
+          <el-input v-model="memberForm.nickname" placeholder="会员昵称" />
+        </el-form-item>
+        <el-form-item label="天猫ID">
+          <el-input v-model="memberForm.tmall_id" />
+        </el-form-item>
+        <el-form-item label="天猫金额">
+          <el-input-number v-model="memberForm.tmall_amount" :min="0" :precision="2" class="full-input" />
+        </el-form-item>
+        <el-form-item label="有赞ID">
+          <el-input v-model="memberForm.youzan_id" />
+        </el-form-item>
+        <el-form-item label="有赞金额">
+          <el-input-number v-model="memberForm.youzan_amount" :min="0" :precision="2" class="full-input" />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="memberForm.remarks" type="textarea" :rows="3" />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="addDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirmAddMember">确定</el-button>
+        <el-button type="primary" :loading="submitting" @click="submitMember">保存</el-button>
       </template>
     </el-dialog>
 
-    <el-dialog v-model="tagDialogVisible" title="添加标签" width="450px">
-      <div style="margin-bottom: 16px;">
-        <div style="margin-bottom: 8px; color: #666; font-size: 14px;">选择已有标签</div>
-        <el-select v-model="selectedTags" multiple placeholder="请选择标签" style="width: 100%;">
-          <el-option label="活跃用户" value="active" />
-          <el-option label="高消费" value="high消费" />
-          <el-option label="新用户" value="new" />
-          <el-option label="沉睡用户" value="sleep" />
-          <el-option label="VIP" value="vip" />
-        </el-select>
-      </div>
-      <div>
-        <div style="margin-bottom: 8px; color: #666; font-size: 14px;">自定义新标签</div>
-        <div style="display: flex; gap: 8px;">
-          <el-input v-model="customTag" placeholder="请输入新标签" />
-          <el-button @click="addCustomTag">添加</el-button>
-        </div>
-        <div v-if="customTags.length > 0" style="margin-top: 12px;">
-          <el-tag
-            v-for="(tag, index) in customTags"
-            :key="index"
-            closable
-            @close="removeCustomTag(index)"
-            style="margin-right: 8px; margin-bottom: 8px;"
-          >
-            {{ tag }}
-          </el-tag>
-        </div>
+    <el-dialog v-model="tagDialogVisible" title="会员标签" width="480px" destroy-on-close>
+      <el-select v-model="selectedTagIds" multiple placeholder="选择标签" class="full-input">
+        <el-option v-for="tag in tags" :key="tag.id" :label="tag.name" :value="tag.id" />
+      </el-select>
+      <div class="new-tag-line">
+        <el-input v-model="newTagName" placeholder="新增标签名" />
+        <el-button @click="createTag">新增</el-button>
       </div>
       <template #footer>
         <el-button @click="tagDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirmAddTag">确定</el-button>
-      </template>
-    </el-dialog>
-
-    <el-dialog v-model="levelDialogVisible" title="调整会员等级" width="400px">
-      <el-form label-width="80px">
-        <el-form-item label="会员昵称">
-          <span>{{ levelRow?.username }}</span>
-        </el-form-item>
-        <el-form-item label="当前等级">
-          <el-tag :type="getLevelType(levelRow?.level || '')" size="small">
-            {{ getLevelText(levelRow?.level || '') }}
-          </el-tag>
-        </el-form-item>
-        <el-form-item label="调整等级">
-          <el-select v-model="selectedLevel" placeholder="请选择等级" style="width: 100%;">
-            <el-option label="lv1" value="normal" />
-            <el-option label="lv2" value="silver" />
-            <el-option label="lv3" value="gold" />
-            <el-option label="lv4" value="black" />
-          </el-select>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="levelDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirmLevelChange">确定</el-button>
+        <el-button type="primary" :loading="submitting" @click="saveTags">保存</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  createMember,
+  createMemberTag,
+  queryMemberDetail,
+  queryMembers,
+  queryMemberTags,
+  setMemberTags,
+  updateMember,
+  type MemberItem,
+  type MemberTagItem
+} from '@/api'
 
 const router = useRouter()
-const phoneSearch = ref('')
-const levelFilter = ref('')
-const pointsMin = ref<number | undefined>(undefined)
-const pointsMax = ref<number | undefined>(undefined)
-const tagFilter = ref<string[]>([])
-const currentPage = ref(1)
-const tagDialogVisible = ref(false)
+const loading = ref(false)
+const submitting = ref(false)
+const members = ref<MemberItem[]>([])
+const tags = ref<MemberTagItem[]>([])
+const total = ref(0)
+const page = ref(1)
+const pageSize = 10
 const addDialogVisible = ref(false)
-const levelDialogVisible = ref(false)
-const selectedTags = ref<string[]>([])
-const selectedLevel = ref('')
-const customTag = ref('')
-const customTags = ref<string[]>([])
-const levelRow = ref<any>(null)
-const currentRow = ref<any>(null)
+const tagDialogVisible = ref(false)
+const currentMember = ref<MemberItem | null>(null)
+const selectedTagIds = ref<number[]>([])
+const newTagName = ref('')
 
-const newMember = reactive({
-  username: '',
-  phone: '',
-  level: 'normal',
-  points: 0
+const filters = reactive({
+  mobile: '',
+  member_no: '',
+  manual_unique_code: '',
+  status: '',
+  tag_id: undefined as number | undefined
 })
 
-const allMembers = ref([
-  { id: 1, username: '张三', phone: '13888888888', level: 'gold', points: 5000, tags: ['active', 'vip'], createTime: '2024-03-15 10:30:00', status: 'active' },
-  { id: 2, username: '李四', phone: '13999999999', level: 'silver', points: 2000, tags: ['new'], createTime: '2024-04-01 11:20:00', status: 'active' },
-  { id: 3, username: '王五', phone: '13666666666', level: 'normal', points: 500, tags: [], createTime: '2024-04-10 14:15:00', status: 'active' },
-  { id: 4, username: '赵六', phone: '13777777777', level: 'black', points: 10000, tags: ['high消费', 'vip'], createTime: '2024-02-20 09:20:00', status: 'paused' },
-  { id: 5, username: '钱七', phone: '13555555555', level: 'normal', points: 800, tags: ['sleep'], createTime: '2024-01-05 16:30:00', status: 'active' },
-])
-
-const filteredList = computed(() => {
-  let list = [...allMembers.value]
-  
-  if (phoneSearch.value) {
-    list = list.filter(item => item.phone.includes(phoneSearch.value))
-  }
-  
-  if (levelFilter.value) {
-    list = list.filter(item => item.level === levelFilter.value)
-  }
-  
-  if (pointsMin.value !== undefined) {
-    list = list.filter(item => item.points >= pointsMin.value!)
-  }
-  
-  if (pointsMax.value !== undefined) {
-    list = list.filter(item => item.points <= pointsMax.value!)
-  }
-  
-  if (tagFilter.value.length > 0) {
-    list = list.filter(item => 
-      tagFilter.value.some(tag => item.tags.includes(tag))
-    )
-  }
-  
-  return list
+const memberForm = reactive({
+  mobile: '',
+  manual_unique_code: '',
+  nickname: '',
+  tmall_id: '',
+  tmall_amount: 0,
+  youzan_id: '',
+  youzan_amount: 0,
+  remarks: ''
 })
 
-const getLevelType = (level: string) => {
-  const map: Record<string, string> = {
-    normal: 'info',
-    silver: '',
-    gold: 'warning',
-    black: 'danger'
+const fetchTags = async () => {
+  const res = await queryMemberTags({ page: 1, page_size: 100 })
+  if (res.code === 200) {
+    tags.value = res.data.items || []
   }
-  return map[level] || 'info'
 }
 
-const getLevelText = (level: string) => {
-  const map: Record<string, string> = {
-    normal: 'lv1',
-    silver: 'lv2',
-    gold: 'lv3',
-    black: 'lv4'
+const fetchMembers = async () => {
+  loading.value = true
+  try {
+    const res = await queryMembers({
+      page: page.value,
+      page_size: pageSize,
+      mobile: filters.mobile || undefined,
+      member_no: filters.member_no || undefined,
+      manual_unique_code: filters.manual_unique_code || undefined,
+      status: filters.status || undefined,
+      tag_id: filters.tag_id
+    })
+    if (res.code === 200) {
+      members.value = res.data.items || []
+      total.value = res.data.total || 0
+    }
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.msg || '会员列表加载失败')
+  } finally {
+    loading.value = false
   }
-  return map[level] || level
-}
-
-const getTagText = (tag: string) => {
-  const map: Record<string, string> = {
-    active: '活跃用户',
-    high消费: '高消费',
-    new: '新用户',
-    sleep: '沉睡用户',
-    vip: 'VIP'
-  }
-  return map[tag] || tag
 }
 
 const handleSearch = () => {
-  ElMessage.success(`找到 ${filteredList.value.length} 位会员`)
+  page.value = 1
+  fetchMembers()
 }
 
 const handleReset = () => {
-  phoneSearch.value = ''
-  levelFilter.value = ''
-  pointsMin.value = undefined
-  pointsMax.value = undefined
-  tagFilter.value = []
-  ElMessage.success('已重置')
+  filters.mobile = ''
+  filters.member_no = ''
+  filters.manual_unique_code = ''
+  filters.status = ''
+  filters.tag_id = undefined
+  page.value = 1
+  fetchMembers()
 }
 
 const openAddDialog = () => {
-  newMember.username = ''
-  newMember.phone = ''
-  newMember.level = 'normal'
-  newMember.points = 0
+  Object.assign(memberForm, {
+    mobile: '',
+    manual_unique_code: '',
+    nickname: '',
+    tmall_id: '',
+    tmall_amount: 0,
+    youzan_id: '',
+    youzan_amount: 0,
+    remarks: ''
+  })
   addDialogVisible.value = true
 }
 
-const confirmAddMember = () => {
-  if (!newMember.username || !newMember.phone) {
-    ElMessage.warning('请填写完整信息')
+const submitMember = async () => {
+  if (!memberForm.mobile.trim()) {
+    ElMessage.warning('手机号不能为空')
     return
   }
-  allMembers.value.unshift({
-    id: Date.now(),
-    ...newMember,
-    tags: [],
-    createTime: new Date().toLocaleString(),
-    status: 'active'
-  })
-  ElMessage.success('会员添加成功')
-  addDialogVisible.value = false
+  submitting.value = true
+  try {
+    await createMember({ ...memberForm })
+    ElMessage.success('会员已新增')
+    addDialogVisible.value = false
+    fetchMembers()
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.msg || '新增会员失败')
+  } finally {
+    submitting.value = false
+  }
 }
 
-const handleBatchImport = () => {
-  ElMessage.info('批量导入功能开发中，请使用Excel文件导入')
+const openTagDialog = async (row: MemberItem) => {
+  currentMember.value = row
+  selectedTagIds.value = []
+  tagDialogVisible.value = true
+  try {
+    const res = await queryMemberDetail({ id: row.id })
+    if (res.code === 200) {
+      selectedTagIds.value = (res.data.detail.tags || []).map(tag => tag.id)
+    }
+  } catch {
+    selectedTagIds.value = []
+  }
+}
+
+const createTag = async () => {
+  const name = newTagName.value.trim()
+  if (!name) return
+  try {
+    await createMemberTag({ name })
+    newTagName.value = ''
+    await fetchTags()
+    ElMessage.success('标签已新增')
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.msg || '新增标签失败')
+  }
+}
+
+const saveTags = async () => {
+  if (!currentMember.value) return
+  submitting.value = true
+  try {
+    await setMemberTags({ member_id: currentMember.value.id, tag_ids: selectedTagIds.value })
+    ElMessage.success('标签已保存')
+    tagDialogVisible.value = false
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.msg || '保存标签失败')
+  } finally {
+    submitting.value = false
+  }
+}
+
+const toggleStatus = async (row: MemberItem) => {
+  const nextStatus = row.status === 'active' ? 'disabled' : 'active'
+  const action = nextStatus === 'active' ? '启用' : '停用'
+  try {
+    await ElMessageBox.confirm(`确认${action}会员 ${row.mobile}？`, '提示', { type: 'warning' })
+    await updateMember({ ...row, status: nextStatus })
+    ElMessage.success(`会员已${action}`)
+    fetchMembers()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.msg || `${action}失败`)
+    }
+  }
 }
 
 const viewDetail = (id: number) => {
   router.push(`/member/${id}`)
 }
 
-const addTag = (row: any) => {
-  currentRow.value = row
-  selectedTags.value = [...row.tags]
-  tagDialogVisible.value = true
-}
+const formatMoney = (value: number | string | undefined | null) => Number(value || 0).toFixed(2)
 
-const confirmAddTag = () => {
-  if (currentRow.value) {
-    currentRow.value.tags = [...selectedTags.value, ...customTags.value]
-    ElMessage.success('标签添加成功')
-  }
-  tagDialogVisible.value = false
-  customTag.value = ''
-  customTags.value = []
-}
-
-const addCustomTag = () => {
-  if (customTag.value && !customTags.value.includes(customTag.value)) {
-    customTags.value.push(customTag.value)
-    customTag.value = ''
-  }
-}
-
-const removeCustomTag = (index: number) => {
-  customTags.value.splice(index, 1)
-}
-
-const openLevelDialog = (row: any) => {
-  levelRow.value = row
-  selectedLevel.value = row.level
-  levelDialogVisible.value = true
-}
-
-const confirmLevelChange = () => {
-  if (levelRow.value && selectedLevel.value) {
-    levelRow.value.level = selectedLevel.value
-    ElMessage.success('等级调整成功')
-  }
-  levelDialogVisible.value = false
-}
-
-const toggleStatus = (row: any) => {
-  const action = row.status === 'active' ? '暂停' : '启用'
-  ElMessageBox.confirm(
-    `是否确认要将 ${row.phone} 的会员${action}会员服务？`,
-    '提示',
-    {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    }
-  ).then(() => {
-    if (row.status === 'active') {
-      row.status = 'paused'
-      ElMessage.success('会员已暂停')
-    } else {
-      row.status = 'active'
-      ElMessage.success('会员已启用')
-    }
-  }).catch(() => {})
-}
+onMounted(async () => {
+  await fetchTags()
+  fetchMembers()
+})
 </script>
 
 <style scoped>
@@ -384,47 +322,59 @@ const toggleStatus = (row: any) => {
   padding: 20px;
 }
 
-.top-bar {
+.toolbar {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  gap: 16px;
 }
 
-.search-bar {
+.filters {
   display: flex;
-  align-items: center;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
 }
 
-.action-buttons {
-  display: flex;
-  gap: 12px;
+.filter-item {
+  width: 150px;
 }
 
-.points-range {
-  display: flex;
-  align-items: center;
+.member-table {
+  width: 100%;
+  margin-top: 18px;
 }
 
-.member-info {
+.member-main,
+.amount-lines {
   display: flex;
   flex-direction: column;
+  gap: 3px;
 }
 
 .member-name {
-  font-weight: 500;
-  color: #1a1a1a;
+  font-weight: 600;
+  color: #1f2937;
 }
 
-.member-phone {
+.member-sub,
+.amount-lines span {
   font-size: 12px;
-  color: #999;
+  color: #6b7280;
 }
 
 .pagination {
-  margin-top: 20px;
+  margin-top: 18px;
   display: flex;
   justify-content: flex-end;
+}
+
+.full-input {
+  width: 100%;
+}
+
+.new-tag-line {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
 }
 </style>

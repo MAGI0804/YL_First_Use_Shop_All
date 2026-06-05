@@ -113,6 +113,11 @@ export interface OrderQueryParams {
   begin_time?: string
   end_time?: string
   tid?: string
+  mobile?: string
+  member_id?: number
+  member_no?: string
+  sub_order_id?: string
+  pay_status?: string
 }
 
 export interface OrderItem {
@@ -186,6 +191,180 @@ export interface BatchProductResponse {
 
 export const queryOrders = (params: OrderQueryParams) => {
   return http.post<OrderQueryResponse>('/order/orders_query', params)
+}
+
+export interface MemberItem {
+  id: number
+  member_no: string
+  user_id: number
+  openid: string
+  mobile: string
+  manual_unique_code: string
+  nickname: string
+  status: string
+  source: string
+  total_order_amount: number
+  total_paid_amount: number
+  tmall_id: string
+  tmall_amount: number
+  youzan_id: string
+  youzan_amount: number
+  remarks: string
+  created_at: string
+  updated_at: string
+}
+
+export interface MemberTagItem {
+  id: number
+  name: string
+  color: string
+  remarks: string
+  created_by: number
+  created_at: string
+  updated_at: string
+}
+
+export interface MemberQueryParams {
+  page: number
+  page_size: number
+  mobile?: string
+  member_no?: string
+  manual_unique_code?: string
+  nickname?: string
+  status?: string
+  tag_id?: number
+  tag_name?: string
+}
+
+export interface MemberQueryResponse {
+  code: number
+  data: {
+    items: MemberItem[]
+    total: number
+    page: number
+    page_size: number
+  }
+  msg: string
+}
+
+export interface MemberDetailResponse {
+  code: number
+  data: {
+    detail: {
+      member: MemberItem
+      tags: MemberTagItem[]
+    }
+  }
+  msg: string
+}
+
+export interface MemberTagQueryResponse {
+  code: number
+  data: {
+    items: MemberTagItem[]
+    total: number
+    page: number
+    page_size: number
+  }
+  msg: string
+}
+
+export interface OperationLogItem {
+  id: number
+  operator_id: number
+  operator_no: string
+  operator_mobile: string
+  operator_role: string
+  action: string
+  module: string
+  target_type: string
+  target_id: string
+  member_id: number
+  user_id: number
+  order_id: string
+  before_data: string
+  after_data: string
+  client_ip: string
+  remark: string
+  created_at: string
+}
+
+export interface OperationLogQueryParams {
+  page: number
+  page_size: number
+  operator_id?: number
+  action?: string
+  module?: string
+  target_type?: string
+  target_id?: string
+  member_id?: number
+  user_id?: number
+  order_id?: string
+  begin_time?: string
+  end_time?: string
+}
+
+export interface OperationLogQueryResponse {
+  code: number
+  data: {
+    items: OperationLogItem[]
+    total: number
+    page: number
+    page_size: number
+  }
+  msg: string
+}
+
+export const queryMembers = (params: MemberQueryParams) => {
+  return http.post<MemberQueryResponse>('/member/list', params)
+}
+
+export const createMember = (params: Partial<MemberItem>) => {
+  return http.post('/member/create', params)
+}
+
+export const updateMember = (params: Partial<MemberItem> & { id: number }) => {
+  return http.post('/member/update', params)
+}
+
+export const queryMemberDetail = (params: { id?: number; member_no?: string; mobile?: string; user_id?: number }) => {
+  return http.post<MemberDetailResponse>('/member/detail', params)
+}
+
+export const queryMemberTags = (params: { name?: string; page: number; page_size: number }) => {
+  return http.post<MemberTagQueryResponse>('/member/tag/list', params)
+}
+
+export const createMemberTag = (params: { name: string; color?: string; remarks?: string }) => {
+  return http.post('/member/tag/create', params)
+}
+
+export const setMemberTags = (params: { member_id: number; tag_ids: number[] }) => {
+  return http.post('/member/tag/set_member_tags', params)
+}
+
+export const queryMemberCart = (params: { member_id?: number; member_no?: string; mobile?: string; user_id?: number }) => {
+  return http.post('/member/cart/query', params)
+}
+
+export const addMemberCartItem = (params: { member_id?: number; user_id?: number; commodity_code: string; quantity: number }) => {
+  return http.post('/member/cart/add', params)
+}
+
+export const updateMemberCartQuantity = (params: { member_id?: number; user_id?: number; commodity_code: string; quantity: number }) => {
+  return http.post('/member/cart/update_quantity', params)
+}
+
+export const deleteMemberCartItems = (params: { member_id?: number; user_id?: number; commodity_codes?: string[] }) => {
+  return http.post('/member/cart/delete', params)
+}
+
+export const backendCreateOrder = (params: any) => {
+  return http.post('/order/backend_create_order', params)
+}
+
+export const queryOperationLogs = (params: OperationLogQueryParams) => {
+  return http.post<OperationLogQueryResponse>('/operation_log/query', params)
 }
 
 export const batchGetProducts = (params: BatchProductParams) => {
@@ -576,7 +755,7 @@ export interface UpdatePaymentAmountParams {
   order_id: string
   final_pay_amount: number
   discount_reason?: string
-  operator_id: number
+  operator_id?: number
 }
 
 export const updatePaymentAmount = (params: UpdatePaymentAmountParams) => {
@@ -585,7 +764,7 @@ export const updatePaymentAmount = (params: UpdatePaymentAmountParams) => {
 
 export interface ConfirmPaymentParams {
   order_id: string
-  operator_id: number
+  operator_id?: number
   payment_remark?: string
 }
 

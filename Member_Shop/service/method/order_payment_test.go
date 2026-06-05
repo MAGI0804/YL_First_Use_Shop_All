@@ -97,3 +97,16 @@ func TestValidateOrderReadyToPay(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeOrderProductListSupportsBackendItems(t *testing.T) {
+	got := normalizeOrderProductList(`[{"commodity_id":"SKU001","qty":2},"SKU002",{"sku_id":"SKU003"}]`)
+	want := []string{"SKU001", "SKU002", "SKU003"}
+	if len(got) != len(want) {
+		t.Fatalf("len = %d, want %d, got %v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("item %d = %q, want %q", i, got[i], want[i])
+		}
+	}
+}

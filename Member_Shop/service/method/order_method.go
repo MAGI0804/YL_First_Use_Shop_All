@@ -84,12 +84,7 @@ func convertOrderToMap(order models.Order, afterSaleStatus *string) map[string]i
 	result["backend_order_remark"] = order.BackendOrderRemark
 
 	if order.ProductList != "" {
-		var productList []string
-		if err := json.Unmarshal([]byte(order.ProductList), &productList); err == nil {
-			result["product_list"] = productList
-		} else {
-			result["product_list"] = []string{}
-		}
+		result["product_list"] = normalizeOrderProductList(order.ProductList)
 	} else {
 		result["product_list"] = []string{}
 	}
@@ -167,6 +162,30 @@ func convertOrderToMap(order models.Order, afterSaleStatus *string) map[string]i
 		decorateOrderAfterSaleFields(result, order.OrderID)
 	}
 
+	return result
+}
+
+func normalizeOrderProductList(productListJSON string) []string {
+	var rawItems []interface{}
+	if err := json.Unmarshal([]byte(productListJSON), &rawItems); err != nil {
+		return []string{}
+	}
+	result := make([]string, 0, len(rawItems))
+	for _, item := range rawItems {
+		switch value := item.(type) {
+		case string:
+			if strings.TrimSpace(value) != "" {
+				result = append(result, value)
+			}
+		case map[string]interface{}:
+			for _, key := range []string{"commodity_id", "commodity_code", "sku_id"} {
+				if code, ok := value[key].(string); ok && strings.TrimSpace(code) != "" {
+					result = append(result, strings.TrimSpace(code))
+					break
+				}
+			}
+		}
+	}
 	return result
 }
 

@@ -142,6 +142,16 @@
           </div>
         </div>
       </el-card>
+
+      <section class="operation-section">
+        <div class="section-title">操作记录</div>
+        <el-table :data="operationLogs" size="small">
+          <el-table-column prop="created_at" label="时间" min-width="160" />
+          <el-table-column prop="operator_mobile" label="操作人" width="130" />
+          <el-table-column prop="action" label="动作" min-width="190" />
+          <el-table-column prop="remark" label="备注" min-width="180" show-overflow-tooltip />
+        </el-table>
+      </section>
     </div>
   </div>
 
@@ -156,9 +166,6 @@
       <el-form-item label="优惠原因">
         <el-input v-model="paymentForm.discountReason" type="textarea" :rows="3" placeholder="实付金额小于订单金额时必填" />
       </el-form-item>
-      <el-form-item label="操作人ID">
-        <el-input-number v-model="paymentForm.operatorId" :min="1" :precision="0" style="width: 100%;" />
-      </el-form-item>
     </el-form>
     <template #footer>
       <el-button @click="paymentDialogVisible = false">取消</el-button>
@@ -172,7 +179,7 @@ import { computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, DocumentCopy } from '@element-plus/icons-vue'
-import { queryOrderDetail, getToken, batchGetProducts, updatePaymentAmount, confirmOrderPayment, deliverOrder, receiveOrder } from '@/api'
+import { queryOrderDetail, getToken, batchGetProducts, updatePaymentAmount, confirmOrderPayment, deliverOrder, receiveOrder, queryOperationLogs, type OperationLogItem } from '@/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -180,13 +187,13 @@ const loading = ref(true)
 const orderData = ref<any>({})
 const productList = ref<string[]>([])
 const productMap = ref<Record<string, any>>({})
+const operationLogs = ref<OperationLogItem[]>([])
 const paymentDialogVisible = ref(false)
 const paymentSubmitting = ref(false)
 const paymentForm = ref({
   orderAmount: 0,
   finalPayAmount: 0,
-  discountReason: '',
-  operatorId: 1
+  discountReason: ''
 })
 const canAdjustPayment = computed(() => Boolean(orderData.value.order_id) && orderData.value.status !== 'canceled' && orderData.value.pay_status !== 'paid')
 const canShipOrder = computed(() => orderData.value.status === 'pending')
@@ -238,6 +245,7 @@ const fetchOrderDetail = async () => {
           })
         }
       }
+      fetchOperationLogs()
     } else {
       console.error('业务错误:', res)
       ElMessage.error('获取订单详情失败: ' + (res.msg || res.data?.message || '未知错误'))
@@ -273,6 +281,14 @@ const getStatusText = (status: string) => {
   return map[status] || status
 }
 
+const fetchOperationLogs = async () => {
+  if (!orderData.value.order_id) return
+  const res = await queryOperationLogs({ page: 1, page_size: 20, order_id: orderData.value.order_id })
+  if (res.code === 200) {
+    operationLogs.value = res.data.items || []
+  }
+}
+
 const getPayStatusType = (status: string) => {
   const map: Record<string, string> = {
     unpaid: 'warning',
@@ -299,8 +315,7 @@ const openPaymentDialog = () => {
   paymentForm.value = {
     orderAmount: Number(orderData.value.order_amount || 0),
     finalPayAmount: Number(orderData.value.final_pay_amount || orderData.value.order_amount || 0),
-    discountReason: orderData.value.discount_reason || '',
-    operatorId: 1
+    discountReason: orderData.value.discount_reason || ''
   }
   paymentDialogVisible.value = true
 }
@@ -315,8 +330,7 @@ const submitPaymentAmount = async () => {
     await updatePaymentAmount({
       order_id: orderData.value.order_id,
       final_pay_amount: paymentForm.value.finalPayAmount,
-      discount_reason: paymentForm.value.discountReason,
-      operator_id: paymentForm.value.operatorId
+      discount_reason: paymentForm.value.discountReason
     })
     paymentDialogVisible.value = false
     ElMessage.success('实付金额已更新')
@@ -380,7 +394,6 @@ const confirmPayment = async () => {
     })
     await confirmOrderPayment({
       order_id: orderData.value.order_id,
-      operator_id: 1,
       payment_remark: '运营后台订单详情确认支付'
     })
     ElMessage.success('支付状态已确认')
@@ -537,5 +550,12 @@ onMounted(() => {
   margin-top: 4px;
   padding-top: 8px;
   border-top: 1px solid #f0f0f0;
+}
+
+.operation-section {
+  margin-top: 16px;
+  padding: 12px 16px;
+  border: 1px solid #ebeef5;
+  background: #fff;
 }
 </style>

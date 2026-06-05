@@ -9,6 +9,9 @@
         clearable
         @keyup.enter="handleSearch"
       />
+      <el-input v-model="searchMobile" placeholder="手机号" style="width: 150px;" clearable @keyup.enter="handleSearch" />
+      <el-input v-model="searchMemberNo" placeholder="会员号" style="width: 160px;" clearable @keyup.enter="handleSearch" />
+      <el-input v-model="searchSubOrderId" placeholder="子订单号" style="width: 170px;" clearable @keyup.enter="handleSearch" />
       <span class="time-label">下单时间</span>
       <el-date-picker
         v-model="dateRange"
@@ -34,6 +37,11 @@
         <el-option label="已送达" value="delivered" />
         <el-option label="已取消" value="canceled" />
         <el-option label="售后中" value="processing" />
+      </el-select>
+      <el-select v-model="payStatusFilter" placeholder="支付" style="width: 110px;">
+        <el-option label="全部" value="" />
+        <el-option label="未支付" value="unpaid" />
+        <el-option label="已支付" value="paid" />
       </el-select>
       <el-button type="primary" style="margin-left: 8px;" @click="handleSearch">搜索</el-button>
       <el-button @click="handleReset">重置</el-button>
@@ -154,9 +162,6 @@
       <el-form-item label="优惠原因">
         <el-input v-model="paymentForm.discountReason" type="textarea" :rows="3" placeholder="实付金额小于订单金额时必填" />
       </el-form-item>
-      <el-form-item label="操作人ID">
-        <el-input-number v-model="paymentForm.operatorId" :min="1" :precision="0" style="width: 100%;" />
-      </el-form-item>
     </el-form>
     <template #footer>
       <el-button @click="paymentDialogVisible = false">取消</el-button>
@@ -173,8 +178,12 @@ import { queryOrders, getToken, batchGetProducts, updatePaymentAmount, confirmOr
 
 const router = useRouter()
 const searchOrderNo = ref('')
+const searchMobile = ref('')
+const searchMemberNo = ref('')
+const searchSubOrderId = ref('')
 const dateRange = ref<[string, string] | null>(null)
 const statusFilter = ref('')
+const payStatusFilter = ref('')
 const currentPage = ref(1)
 const loading = ref(false)
 const orderList = ref<any[]>([])
@@ -188,8 +197,7 @@ const paymentForm = ref({
   orderNo: '',
   orderAmount: 0,
   finalPayAmount: 0,
-  discountReason: '',
-  operatorId: 1
+  discountReason: ''
 })
 
 const CACHE_KEY = 'order_first_page_cache'
@@ -230,7 +238,7 @@ const saveToCache = (orders: any[], products: any, totalCount: number) => {
 }
 
 const fetchOrders = async () => {
-  const isFirstPage = currentPage.value === 1 && !searchOrderNo.value && !dateRange.value && !statusFilter.value
+  const isFirstPage = currentPage.value === 1 && !searchOrderNo.value && !searchMobile.value && !searchMemberNo.value && !searchSubOrderId.value && !dateRange.value && !statusFilter.value && !payStatusFilter.value
   
   if (isFirstPage && loadFromCache()) {
     return
@@ -245,9 +253,13 @@ const fetchOrders = async () => {
       shopname: 'youlan_kids'
     }
     if (statusFilter.value) params.status = statusFilter.value
+    if (payStatusFilter.value) params.pay_status = payStatusFilter.value
     if (dateRange.value?.[0]) params.begin_time = dateRange.value[0]
     if (dateRange.value?.[1]) params.end_time = dateRange.value[1]
     if (searchOrderNo.value) params.tid = searchOrderNo.value
+    if (searchMobile.value) params.mobile = searchMobile.value
+    if (searchMemberNo.value) params.member_no = searchMemberNo.value
+    if (searchSubOrderId.value) params.sub_order_id = searchSubOrderId.value
     const res = await queryOrders(params)
     if (res.code === 200 && res.data?.code === 200) {
       const orders = res.data.data
@@ -403,8 +415,12 @@ const formatDate = (date: Date): string => {
 
 const handleReset = () => {
   searchOrderNo.value = ''
+  searchMobile.value = ''
+  searchMemberNo.value = ''
+  searchSubOrderId.value = ''
   dateRange.value = null
   statusFilter.value = ''
+  payStatusFilter.value = ''
   currentPage.value = 1
   fetchOrders()
   ElMessage.success('已重置')
@@ -419,7 +435,11 @@ const handleExportTask = async () => {
         begin_time: dateRange.value?.[0] || undefined,
         end_time: dateRange.value?.[1] || undefined,
         status: statusFilter.value || undefined,
-        order_id: searchOrderNo.value || undefined
+        order_id: searchOrderNo.value || undefined,
+        mobile: searchMobile.value || undefined,
+        member_no: searchMemberNo.value || undefined,
+        sub_order_id: searchSubOrderId.value || undefined,
+        pay_status: payStatusFilter.value || undefined
       }
     })
     ElMessage.success('订单下载任务已创建，请到下载中心查看')
@@ -479,8 +499,7 @@ const openPaymentDialog = (row: any) => {
     orderNo: row.orderNo,
     orderAmount: Number(row.amount || 0),
     finalPayAmount: Number(row.finalPayAmount || row.amount || 0),
-    discountReason: row.discountReason || '',
-    operatorId: 1
+    discountReason: row.discountReason || ''
   }
   paymentDialogVisible.value = true
 }
@@ -495,8 +514,7 @@ const submitPaymentAmount = async () => {
     await updatePaymentAmount({
       order_id: paymentForm.value.orderNo,
       final_pay_amount: paymentForm.value.finalPayAmount,
-      discount_reason: paymentForm.value.discountReason,
-      operator_id: paymentForm.value.operatorId
+      discount_reason: paymentForm.value.discountReason
     })
     localStorage.removeItem(CACHE_KEY)
     paymentDialogVisible.value = false
@@ -519,7 +537,6 @@ const confirmPayment = async (row: any) => {
     })
     await confirmOrderPayment({
       order_id: row.orderNo,
-      operator_id: 1,
       payment_remark: '运营后台签收后确认支付'
     })
     localStorage.removeItem(CACHE_KEY)
@@ -598,6 +615,8 @@ const receiveOrderAction = async (row: any) => {
 .search-bar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .time-label {

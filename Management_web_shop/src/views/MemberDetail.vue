@@ -8,180 +8,282 @@
       <span class="page-title">会员详情</span>
     </div>
 
-    <div class="detail-content">
-      <el-row :gutter="20">
+    <el-skeleton v-if="loading" :rows="8" animated />
+
+    <div v-else class="detail-content">
+      <el-row :gutter="16">
         <el-col :span="8">
-          <el-card class="info-card">
-            <template #header>
-              <span>基本信息</span>
-            </template>
+          <section class="section-block">
+            <div class="section-title">基础信息</div>
+            <div class="info-row"><span>会员号</span><strong>{{ member.member_no }}</strong></div>
+            <div class="info-row"><span>唯一字段</span><strong>{{ member.manual_unique_code || '-' }}</strong></div>
+            <div class="info-row"><span>昵称</span><strong>{{ member.nickname || '-' }}</strong></div>
+            <div class="info-row"><span>手机号</span><strong>{{ member.mobile }}</strong></div>
+            <div class="info-row"><span>关联用户ID</span><strong>{{ member.user_id || '-' }}</strong></div>
             <div class="info-row">
-              <span class="label">会员昵称：</span>
-              <span class="value">{{ member.username }}</span>
-            </div>
-            <div class="info-row">
-              <span class="label">手机号：</span>
-              <span class="value">{{ member.phone }}</span>
-            </div>
-            <div class="info-row">
-              <span class="label">会员等级：</span>
-              <el-tag :type="getLevelType(member.level)" size="small">
-                {{ getLevelText(member.level) }}
+              <span>状态</span>
+              <el-tag :type="member.status === 'active' ? 'success' : 'info'" size="small">
+                {{ member.status === 'active' ? '正常' : '停用' }}
               </el-tag>
             </div>
-            <div class="info-row">
-              <span class="label">积分：</span>
-              <span class="value">{{ member.points }}</span>
-            </div>
-            <div class="info-row">
-              <span class="label">注册时间：</span>
-              <span class="value">{{ member.createTime }}</span>
-            </div>
-          </el-card>
+          </section>
         </el-col>
         <el-col :span="8">
-          <el-card class="info-card">
-            <template #header>
+          <section class="section-block">
+            <div class="section-title">金额统计</div>
+            <div class="info-row"><span>总下单金额</span><strong>¥{{ formatMoney(member.total_order_amount) }}</strong></div>
+            <div class="info-row"><span>已支付金额</span><strong>¥{{ formatMoney(member.total_paid_amount) }}</strong></div>
+            <div class="info-row"><span>天猫</span><strong>{{ member.tmall_id || '-' }} / ¥{{ formatMoney(member.tmall_amount) }}</strong></div>
+            <div class="info-row"><span>有赞</span><strong>{{ member.youzan_id || '-' }} / ¥{{ formatMoney(member.youzan_amount) }}</strong></div>
+          </section>
+        </el-col>
+        <el-col :span="8">
+          <section class="section-block">
+            <div class="section-title with-action">
               <span>标签</span>
-            </template>
-            <div class="tags-container">
-              <el-tag v-for="tag in member.tags" :key="tag" style="margin-right: 8px; margin-bottom: 8px;">
-                {{ getTagText(tag) }}
-              </el-tag>
-              <el-button size="small" @click="tagDialogVisible = true">编辑标签</el-button>
+              <el-button size="small" @click="tagDialogVisible = true">编辑</el-button>
             </div>
-          </el-card>
-        </el-col>
-        <el-col :span="8">
-          <el-card class="info-card">
-            <template #header>
-              <span>账户统计</span>
-            </template>
-            <div class="info-row">
-              <span class="label">订单总数：</span>
-              <span class="value">{{ member.orderCount }}</span>
+            <div class="tag-list">
+              <el-tag v-for="tag in memberTags" :key="tag.id" size="small">{{ tag.name }}</el-tag>
+              <span v-if="memberTags.length === 0" class="empty-text">暂无标签</span>
             </div>
-            <div class="info-row">
-              <span class="label">消费总额：</span>
-              <span class="value">¥{{ member.totalSpent }}</span>
-            </div>
-            <div class="info-row">
-              <span class="label">平均客单价：</span>
-              <span class="value">¥{{ member.avgOrder }}</span>
-            </div>
-          </el-card>
+          </section>
         </el-col>
       </el-row>
 
-      <el-card class="order-card" style="margin-top: 20px;">
-        <template #header>
-          <span>最近订单</span>
-        </template>
-        <el-table :data="member.orders">
-          <el-table-column prop="orderNo" label="订单号" width="180" />
-          <el-table-column prop="amount" label="金额" width="100">
+      <section class="section-block wide">
+        <div class="section-title with-action">
+          <span>购物车</span>
+          <div>
+            <el-button size="small" @click="cartDialogVisible = true">新增商品</el-button>
+            <el-button size="small" type="primary" :disabled="cartItems.length === 0" @click="openOrderDialog">从购物车下单</el-button>
+          </div>
+        </div>
+        <el-table :data="cartItems" size="small">
+          <el-table-column prop="commodity_code" label="商品编码" min-width="180" />
+          <el-table-column prop="quantity" label="数量" width="120">
             <template #default="{ row }">
-              ¥{{ row.amount }}
+              <el-input-number v-model="row.quantity" :min="0" :precision="0" size="small" @change="updateCart(row)" />
             </template>
           </el-table-column>
-          <el-table-column prop="status" label="状态" width="100">
+          <el-table-column prop="added_time" label="加入时间" min-width="160" />
+          <el-table-column label="操作" width="90">
             <template #default="{ row }">
-              <el-tag :type="row.status === 'completed' ? 'success' : 'info'" size="small">
-                {{ row.status === 'completed' ? '已完成' : '进行中' }}
-              </el-tag>
+              <el-button type="danger" link @click="deleteCart(row)">删除</el-button>
             </template>
           </el-table-column>
-          <el-table-column prop="createTime" label="下单时间" width="180" />
         </el-table>
-      </el-card>
+      </section>
+
+      <section class="section-block wide">
+        <div class="section-title">操作记录</div>
+        <el-table :data="operationLogs" size="small">
+          <el-table-column prop="created_at" label="时间" min-width="160" />
+          <el-table-column prop="operator_mobile" label="操作人" width="130" />
+          <el-table-column prop="action" label="动作" min-width="190" />
+          <el-table-column prop="target_id" label="对象" min-width="120" />
+          <el-table-column prop="remark" label="备注" min-width="160" show-overflow-tooltip />
+        </el-table>
+      </section>
     </div>
 
-    <el-dialog v-model="tagDialogVisible" title="编辑标签" width="400px">
-      <el-select v-model="selectedTags" multiple placeholder="请选择标签" style="width: 100%;">
-        <el-option label="活跃用户" value="active" />
-        <el-option label="高消费" value="high消费" />
-        <el-option label="新用户" value="new" />
-        <el-option label="沉睡用户" value="sleep" />
-        <el-option label="VIP" value="vip" />
+    <el-dialog v-model="tagDialogVisible" title="编辑标签" width="480px">
+      <el-select v-model="selectedTagIds" multiple class="full-input" placeholder="选择标签">
+        <el-option v-for="tag in allTags" :key="tag.id" :label="tag.name" :value="tag.id" />
       </el-select>
       <template #footer>
         <el-button @click="tagDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirmSaveTag">保存</el-button>
+        <el-button type="primary" @click="saveTags">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="cartDialogVisible" title="新增购物车商品" width="420px">
+      <el-form label-width="90px">
+        <el-form-item label="商品编码">
+          <el-input v-model="cartForm.commodity_code" />
+        </el-form-item>
+        <el-form-item label="数量">
+          <el-input-number v-model="cartForm.quantity" :min="1" :precision="0" class="full-input" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="cartDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="addCart">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="orderDialogVisible" title="后台代会员下单" width="560px">
+      <el-form :model="orderForm" label-width="96px">
+        <el-form-item label="收货人" required><el-input v-model="orderForm.receiver_name" /></el-form-item>
+        <el-form-item label="手机号" required><el-input v-model="orderForm.receiver_phone" /></el-form-item>
+        <el-form-item label="省份" required><el-input v-model="orderForm.province" /></el-form-item>
+        <el-form-item label="城市" required><el-input v-model="orderForm.city" /></el-form-item>
+        <el-form-item label="区县" required><el-input v-model="orderForm.county" /></el-form-item>
+        <el-form-item label="详细地址" required><el-input v-model="orderForm.detailed_address" /></el-form-item>
+        <el-form-item label="后台备注"><el-input v-model="orderForm.backend_remark" type="textarea" :rows="3" /></el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="orderDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="submitting" @click="createOrder">下单</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { onMounted, reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft } from '@element-plus/icons-vue'
+import {
+  addMemberCartItem,
+  backendCreateOrder,
+  deleteMemberCartItems,
+  queryMemberCart,
+  queryMemberDetail,
+  queryMemberTags,
+  queryOperationLogs,
+  setMemberTags,
+  updateMemberCartQuantity,
+  type MemberItem,
+  type MemberTagItem,
+  type OperationLogItem
+} from '@/api'
 
+const route = useRoute()
 const router = useRouter()
+const loading = ref(true)
+const submitting = ref(false)
 const tagDialogVisible = ref(false)
-const selectedTags = ref<string[]>([])
+const cartDialogVisible = ref(false)
+const orderDialogVisible = ref(false)
+const member = ref<MemberItem>({} as MemberItem)
+const memberTags = ref<MemberTagItem[]>([])
+const allTags = ref<MemberTagItem[]>([])
+const selectedTagIds = ref<number[]>([])
+const cartItems = ref<any[]>([])
+const operationLogs = ref<OperationLogItem[]>([])
 
-const member = reactive({
-  id: 1,
-  username: '张三',
-  phone: '138****8888',
-  level: 'gold',
-  points: 5000,
-  tags: ['active', 'vip'],
-  createTime: '2024-03-15 10:30:00',
-  orderCount: 25,
-  totalSpent: '8,680',
-  avgOrder: '347',
-  orders: [
-    { orderNo: 'ORDER20240427001', amount: '299', status: 'completed', createTime: '2024-04-27 10:30:00' },
-    { orderNo: 'ORDER20240426002', amount: '159', status: 'completed', createTime: '2024-04-26 14:20:00' },
-    { orderNo: 'ORDER20240425003', amount: '499', status: 'completed', createTime: '2024-04-25 09:15:00' },
-  ]
+const cartForm = reactive({ commodity_code: '', quantity: 1 })
+const orderForm = reactive({
+  receiver_name: '',
+  receiver_phone: '',
+  province: '',
+  city: '',
+  county: '',
+  detailed_address: '',
+  backend_remark: ''
 })
 
-selectedTags.value = [...member.tags]
+const memberId = Number(route.params.id)
 
-const getLevelType = (level: string) => {
-  const map: Record<string, string> = {
-    normal: 'info',
-    silver: '',
-    gold: 'warning',
-    black: 'danger'
+const fetchDetail = async () => {
+  loading.value = true
+  try {
+    const res = await queryMemberDetail({ id: memberId })
+    if (res.code === 200) {
+      member.value = res.data.detail.member
+      memberTags.value = res.data.detail.tags || []
+      selectedTagIds.value = memberTags.value.map(tag => tag.id)
+      await Promise.all([fetchCart(), fetchLogs()])
+    }
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.msg || '会员详情加载失败')
+  } finally {
+    loading.value = false
   }
-  return map[level] || 'info'
 }
 
-const getLevelText = (level: string) => {
-  const map: Record<string, string> = {
-    normal: 'lv1',
-    silver: 'lv2',
-    gold: 'lv3',
-    black: 'lv4'
+const fetchTags = async () => {
+  const res = await queryMemberTags({ page: 1, page_size: 100 })
+  if (res.code === 200) allTags.value = res.data.items || []
+}
+
+const fetchCart = async () => {
+  if (!member.value.id) return
+  const res: any = await queryMemberCart({ member_id: member.value.id })
+  if (res.code === 200) {
+    cartItems.value = res.data.cart?.cart_items || []
   }
-  return map[level] || level
 }
 
-const getTagText = (tag: string) => {
-  const map: Record<string, string> = {
-    active: '活跃用户',
-    high消费: '高消费',
-    new: '新用户',
-    sleep: '沉睡用户',
-    vip: 'VIP'
-  }
-  return map[tag] || tag
+const fetchLogs = async () => {
+  const res = await queryOperationLogs({ page: 1, page_size: 20, member_id: memberId })
+  if (res.code === 200) operationLogs.value = res.data.items || []
 }
 
-const goBack = () => {
-  router.back()
-}
-
-const confirmSaveTag = () => {
-  member.tags = [...selectedTags.value]
-  ElMessage.success('标签保存成功')
+const saveTags = async () => {
+  await setMemberTags({ member_id: memberId, tag_ids: selectedTagIds.value })
   tagDialogVisible.value = false
+  ElMessage.success('标签已保存')
+  fetchDetail()
 }
+
+const addCart = async () => {
+  if (!cartForm.commodity_code.trim()) {
+    ElMessage.warning('商品编码不能为空')
+    return
+  }
+  await addMemberCartItem({ member_id: memberId, commodity_code: cartForm.commodity_code, quantity: cartForm.quantity })
+  cartDialogVisible.value = false
+  cartForm.commodity_code = ''
+  cartForm.quantity = 1
+  ElMessage.success('购物车已新增')
+  await Promise.all([fetchCart(), fetchLogs()])
+}
+
+const updateCart = async (row: any) => {
+  await updateMemberCartQuantity({ member_id: memberId, commodity_code: row.commodity_code, quantity: row.quantity })
+  ElMessage.success('购物车数量已更新')
+  await Promise.all([fetchCart(), fetchLogs()])
+}
+
+const deleteCart = async (row: any) => {
+  await ElMessageBox.confirm(`确认删除商品 ${row.commodity_code}？`, '提示', { type: 'warning' })
+  await deleteMemberCartItems({ member_id: memberId, commodity_codes: [row.commodity_code] })
+  ElMessage.success('购物车商品已删除')
+  await Promise.all([fetchCart(), fetchLogs()])
+}
+
+const openOrderDialog = () => {
+  orderForm.receiver_name = member.value.nickname || ''
+  orderForm.receiver_phone = member.value.mobile || ''
+  orderForm.province = ''
+  orderForm.city = ''
+  orderForm.county = ''
+  orderForm.detailed_address = ''
+  orderForm.backend_remark = ''
+  orderDialogVisible.value = true
+}
+
+const createOrder = async () => {
+  submitting.value = true
+  try {
+    await backendCreateOrder({
+      member_id: memberId,
+      ...orderForm,
+      items: cartItems.value.map(item => ({
+        commodity_code: item.commodity_code,
+        quantity: item.quantity
+      }))
+    })
+    orderDialogVisible.value = false
+    ElMessage.success('后台代下单成功')
+    await Promise.all([fetchDetail(), fetchCart(), fetchLogs()])
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.msg || '后台代下单失败')
+  } finally {
+    submitting.value = false
+  }
+}
+
+const formatMoney = (value: number | string | undefined | null) => Number(value || 0).toFixed(2)
+const goBack = () => router.back()
+
+onMounted(async () => {
+  await fetchTags()
+  fetchDetail()
+})
 </script>
 
 <style scoped>
@@ -192,44 +294,63 @@ const confirmSaveTag = () => {
 .page-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 10px;
+  margin-bottom: 18px;
 }
 
 .page-title {
   font-size: 18px;
-  font-weight: 500;
-  color: #1a1a1a;
+  font-weight: 600;
 }
 
-.info-card :deep(.el-card__header) {
-  font-weight: 500;
+.section-block {
+  border: 1px solid #ebeef5;
+  padding: 16px;
+  min-height: 180px;
+  background: #fff;
+}
+
+.section-block.wide {
+  margin-top: 16px;
+  min-height: auto;
+}
+
+.section-title {
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: #1f2937;
+}
+
+.section-title.with-action {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .info-row {
   display: flex;
-  align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid #f5f5f5;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f3f4f6;
 }
 
-.info-row:last-child {
-  border-bottom: none;
+.info-row span {
+  color: #6b7280;
 }
 
-.label {
-  width: 100px;
-  color: #999;
-}
-
-.value {
-  flex: 1;
-  color: #1a1a1a;
-}
-
-.tags-container {
+.tag-list {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  gap: 8px;
+}
+
+.empty-text {
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.full-input {
+  width: 100%;
 }
 </style>
