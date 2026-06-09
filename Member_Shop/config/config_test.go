@@ -46,6 +46,8 @@ func TestLoadConfigReadsEnvironmentOverrides(t *testing.T) {
 	t.Setenv("JWT_SECRET", "jwt-from-env")
 	t.Setenv("WECHAT_APP_ID", "wx-from-env")
 	t.Setenv("WECHAT_LOGIN_URL", "https://wechat.example.com/login")
+	t.Setenv("WECHAT_ACCESS_TOKEN_URL", "https://wechat.example.com/stable-token")
+	t.Setenv("WECHAT_PHONE_NUMBER_URL", "https://wechat.example.com/phone-number")
 	t.Setenv("ALIYUN_SMS_TEMPLATE_CODE", "sms-template")
 	t.Setenv("JST_ENV_STAGE", "test")
 	t.Setenv("JST_APP_KEY_PROD", "jst-key")
@@ -76,6 +78,12 @@ func TestLoadConfigReadsEnvironmentOverrides(t *testing.T) {
 	}
 	if cfg.WechatConfig.LoginURL != "https://wechat.example.com/login" {
 		t.Fatalf("expected WeChat login URL env override")
+	}
+	if cfg.WechatConfig.AccessTokenURL != "https://wechat.example.com/stable-token" {
+		t.Fatalf("expected WeChat access token URL env override")
+	}
+	if cfg.WechatConfig.PhoneNumberURL != "https://wechat.example.com/phone-number" {
+		t.Fatalf("expected WeChat phone number URL env override")
 	}
 	if cfg.SMSConfig.TemplateCode != "sms-template" {
 		t.Fatalf("expected SMS env override")

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -101,92 +102,41 @@ func BindWechatPhone(req requestbody.BindWechatPhoneRequest) (*models.Member, er
 		return nil, tx.Error
 	}
 
-	var user models.User
-	openIDErr := tx.Where("openid = ?", req.OpenID).First(&user).Error
-	if errors.Is(openIDErr, gorm.ErrRecordNotFound) {
-		user = models.User{
-			OpenID:   req.OpenID,
-			Mobile:   req.Mobile,
-			IsActive: true,
-		}
-		if err := tx.Create(&user).Error; err != nil {
-			tx.Rollback()
-			return nil, err
-		}
-	} else if openIDErr != nil {
-		tx.Rollback()
-		return nil, openIDErr
-	} else if user.Mobile != "" && user.Mobile != req.Mobile {
-		tx.Rollback()
-		return nil, fmt.Errorf("openid already bound to another mobile")
-	} else if user.Mobile == "" {
-		// Keep the existing users_user mobile field as the WeChat authorized mobile.
-		if err := tx.Model(&user).Update("mobile", req.Mobile).Error; err != nil {
-			tx.Rollback()
-			return nil, err
-		}
-		user.Mobile = req.Mobile
-	}
-
-	var otherUser models.User
-	otherUserErr := tx.Where("mobile = ? AND openid <> ?", req.Mobile, req.OpenID).First(&otherUser).Error
-	if otherUserErr == nil {
-		tx.Rollback()
-		return nil, fmt.Errorf("mobile already bound to another openid")
-	}
-	if otherUserErr != nil && !errors.Is(otherUserErr, gorm.ErrRecordNotFound) {
-		tx.Rollback()
-		return nil, otherUserErr
-	}
-
 	var member models.Member
-	openIDMemberErr := tx.Where("openid = ?", req.OpenID).First(&member).Error
-	if openIDMemberErr == nil && member.Mobile != req.Mobile {
+	if err := tx.Where("mobile = ?", req.Mobile).First(&member).Error; err != nil {
 		tx.Rollback()
-		return nil, fmt.Errorf("openid already linked to another member mobile")
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("mobile is not a member")
+		}
+		return nil, err
 	}
-	if openIDMemberErr != nil && !errors.Is(openIDMemberErr, gorm.ErrRecordNotFound) {
+	if err := validateMemberStatus(member); err != nil {
 		tx.Rollback()
-		return nil, openIDMemberErr
+		return nil, err
+	}
+	if member.OpenID != "" && member.OpenID != req.OpenID {
+		tx.Rollback()
+		return nil, fmt.Errorf("mobile already linked to another wechat user")
 	}
 
-	if errors.Is(openIDMemberErr, gorm.ErrRecordNotFound) {
-		memberErr := tx.Where("mobile = ?", req.Mobile).First(&member).Error
-		if memberErr == nil {
-			if member.OpenID != "" && member.OpenID != req.OpenID {
-				tx.Rollback()
-				return nil, fmt.Errorf("mobile already linked to another member")
-			}
-			if member.UserID != 0 && member.UserID != user.UserID {
-				tx.Rollback()
-				return nil, fmt.Errorf("member already linked to another user")
-			}
-			if err := tx.Model(&member).Updates(map[string]interface{}{
-				"user_id": user.UserID,
-				"openid":  req.OpenID,
-			}).Error; err != nil {
-				tx.Rollback()
-				return nil, err
-			}
-		} else if errors.Is(memberErr, gorm.ErrRecordNotFound) {
-			member = models.Member{
-				UserID:   user.UserID,
-				OpenID:   req.OpenID,
-				Mobile:   req.Mobile,
-				Nickname: user.Nickname,
-			}
-			if err := tx.Create(&member).Error; err != nil {
-				tx.Rollback()
-				return nil, err
-			}
-		} else {
-			tx.Rollback()
-			return nil, memberErr
-		}
-	} else if err := tx.Model(&member).Updates(map[string]interface{}{
+	user, err := findOrCreateWechatMemberUser(tx, member, req)
+	if err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+	if err := validateMemberWechatLink(member, user, req.OpenID, req.Mobile); err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	memberUpdates := map[string]interface{}{
 		"user_id": user.UserID,
 		"openid":  req.OpenID,
-	}).Error; err != nil {
+	}
+	if strings.TrimSpace(member.Nickname) == "" && strings.TrimSpace(req.Nickname) != "" {
+		memberUpdates["nickname"] = strings.TrimSpace(req.Nickname)
+	}
+	if err := tx.Model(&member).Updates(memberUpdates).Error; err != nil {
 		tx.Rollback()
 		return nil, err
 	}
@@ -199,6 +149,154 @@ func BindWechatPhone(req requestbody.BindWechatPhoneRequest) (*models.Member, er
 		return nil, err
 	}
 	return &member, nil
+}
+
+func findOrCreateWechatMemberUser(tx *gorm.DB, member models.Member, req requestbody.BindWechatPhoneRequest) (models.User, error) {
+	var user models.User
+	openIDErr := tx.Where("openid = ?", req.OpenID).First(&user).Error
+	if openIDErr == nil {
+		return updateWechatMemberUser(tx, user, req)
+	}
+	if openIDErr != nil && !errors.Is(openIDErr, gorm.ErrRecordNotFound) {
+		return models.User{}, openIDErr
+	}
+
+	mobileErr := tx.Where("mobile = ?", req.Mobile).First(&user).Error
+	if mobileErr == nil {
+		if user.OpenID != "" && user.OpenID != req.OpenID {
+			return models.User{}, fmt.Errorf("mobile already bound to another openid")
+		}
+		if member.UserID != 0 && member.UserID != user.UserID {
+			return models.User{}, fmt.Errorf("member already linked to another user")
+		}
+		return updateWechatMemberUser(tx, user, req)
+	}
+	if mobileErr != nil && !errors.Is(mobileErr, gorm.ErrRecordNotFound) {
+		return models.User{}, mobileErr
+	}
+
+	if member.UserID != 0 {
+		idErr := tx.Where("user_id = ?", member.UserID).First(&user).Error
+		if idErr == nil {
+			return updateWechatMemberUser(tx, user, req)
+		}
+		if idErr != nil && !errors.Is(idErr, gorm.ErrRecordNotFound) {
+			return models.User{}, idErr
+		}
+	}
+
+	user = models.User{
+		OpenID:           req.OpenID,
+		Mobile:           req.Mobile,
+		Nickname:         normalizedWechatNickname(req.Nickname, req.OpenID),
+		UserImg:          normalizedWechatAvatar(req.AvatarURL),
+		RegistrationDate: time.Now(),
+		LastLogin:        time.Now(),
+		IsActive:         true,
+		IsStaff:          false,
+	}
+	if err := tx.Create(&user).Error; err != nil {
+		return models.User{}, err
+	}
+	return user, nil
+}
+
+func updateWechatMemberUser(tx *gorm.DB, user models.User, req requestbody.BindWechatPhoneRequest) (models.User, error) {
+	if user.Mobile != "" && user.Mobile != req.Mobile {
+		return models.User{}, fmt.Errorf("openid already bound to another mobile")
+	}
+	if user.OpenID != "" && user.OpenID != req.OpenID {
+		return models.User{}, fmt.Errorf("mobile already bound to another openid")
+	}
+
+	updates := map[string]interface{}{
+		"openid":     req.OpenID,
+		"mobile":     req.Mobile,
+		"last_login": time.Now(),
+		"is_active":  true,
+	}
+	nickname := strings.TrimSpace(req.Nickname)
+	if shouldUpdateWechatNickname(user.Nickname, nickname) {
+		updates["nickname"] = nickname
+	}
+	avatarURL := normalizedWechatAvatar(req.AvatarURL)
+	if user.UserImg == "" && avatarURL != "" {
+		updates["user_img"] = avatarURL
+	}
+	if err := tx.Model(&user).Updates(updates).Error; err != nil {
+		return models.User{}, err
+	}
+	if err := tx.First(&user, user.UserID).Error; err != nil {
+		return models.User{}, err
+	}
+	return user, nil
+}
+
+func validateMemberStatus(member models.Member) error {
+	if strings.EqualFold(strings.TrimSpace(member.Status), "disabled") {
+		return fmt.Errorf("member disabled")
+	}
+	return nil
+}
+
+func validateMemberWechatLink(member models.Member, user models.User, openID, mobile string) error {
+	if member.Mobile != mobile {
+		return fmt.Errorf("member mobile mismatch")
+	}
+	if err := validateMemberStatus(member); err != nil {
+		return err
+	}
+	if member.OpenID != "" && member.OpenID != openID {
+		return fmt.Errorf("mobile already linked to another wechat user")
+	}
+	if member.UserID != 0 && user.UserID != 0 && member.UserID != user.UserID {
+		return fmt.Errorf("member already linked to another user")
+	}
+	if user.OpenID != "" && user.OpenID != openID {
+		return fmt.Errorf("mobile already bound to another openid")
+	}
+	if user.Mobile != "" && user.Mobile != mobile {
+		return fmt.Errorf("openid already bound to another mobile")
+	}
+	return nil
+}
+
+func shouldUpdateWechatNickname(current, next string) bool {
+	current = strings.TrimSpace(current)
+	next = strings.TrimSpace(next)
+	return next != "" && (current == "" || strings.HasPrefix(current, "微信用户_") || strings.HasPrefix(current, "wechat_user_") || strings.HasPrefix(current, "mobile_user_"))
+}
+
+func normalizedWechatNickname(nickname, openID string) string {
+	if strings.TrimSpace(nickname) != "" {
+		return strings.TrimSpace(nickname)
+	}
+	if len(openID) > 8 {
+		return "微信用户_" + openID[:8]
+	}
+	return "微信用户_" + openID
+}
+
+func normalizedWechatAvatar(avatarURL string) string {
+	avatarURL = strings.TrimSpace(avatarURL)
+	if strings.HasPrefix(avatarURL, "wxfile://") || strings.HasPrefix(avatarURL, "http://tmp/") {
+		return ""
+	}
+	return avatarURL
+}
+
+func EnsureActiveMemberUser(userID int) error {
+	if userID <= 0 {
+		return fmt.Errorf("user is not a member")
+	}
+	var member models.Member
+	if err := db.DB.Where("user_id = ?", userID).First(&member).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("user is not a member")
+		}
+		return err
+	}
+	return validateMemberStatus(member)
 }
 
 // UpdatePlatformInfo updates member platform IDs and amounts.

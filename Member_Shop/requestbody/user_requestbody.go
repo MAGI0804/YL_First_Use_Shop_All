@@ -10,9 +10,11 @@ type QueryUserIdByMobileRequest struct {
 	Mobile string `json:"mobile" required:"true"`
 }
 
-// WechatLoginRequest 微信登录/注册入参
+// WechatLoginRequest 微信会员登录入参
 type WechatLoginRequest struct {
-	Code string `json:"code" required:"true"`
+	Code      string         `json:"code" binding:"required"`
+	PhoneCode string         `json:"phone_code" binding:"required"`
+	UserInfo  map[string]any `json:"userInfo"`
 }
 
 // AddUserData 添加用户数据入参
@@ -34,9 +36,11 @@ type SendRegisterCaptchaRequest struct {
 
 // BindWechatPhoneRequest 绑定微信手机号请求
 type BindWechatPhoneRequest struct {
-	OpenID  string `json:"openid" binding:"required"`
-	Mobile  string `json:"mobile" binding:"required"`
-	Captcha string `json:"captcha"`
+	OpenID    string `json:"openid" binding:"required"`
+	Mobile    string `json:"mobile" binding:"required"`
+	Captcha   string `json:"captcha"`
+	Nickname  string `json:"nickname"`
+	AvatarURL string `json:"avatar_url"`
 }
 
 // UpdatePlatformInfoRequest 更新平台信息请求

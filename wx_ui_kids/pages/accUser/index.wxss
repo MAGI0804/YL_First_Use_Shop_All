@@ -7,7 +7,7 @@ page {
 .login-page {
   min-height: 100vh;
   background: #ffffff;
-  padding: 150rpx 56rpx 48rpx;
+  padding: 120rpx 56rpx 48rpx;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -17,7 +17,51 @@ page {
 .title-image {
   width: 420rpx;
   display: block;
-  margin-bottom: 120rpx;
+  margin-bottom: 72rpx;
+}
+
+.profile-panel {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  margin-bottom: 56rpx;
+}
+
+.avatar-button {
+  width: 112rpx;
+  height: 112rpx;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 8rpx;
+  background: #f4f8fb;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.avatar-button::after {
+  border: none;
+}
+
+.avatar-preview {
+  width: 112rpx;
+  height: 112rpx;
+  display: block;
+}
+
+.nickname-input {
+  flex: 1;
+  min-width: 0;
+  height: 88rpx;
+  padding: 0 24rpx;
+  box-sizing: border-box;
+  border: 2rpx solid #d7e7f2;
+  border-radius: 8rpx;
+  color: #1f2d3d;
+  font-size: 30rpx;
+  line-height: 88rpx;
+  background: #fbfdff;
 }
 
 .login-box {
@@ -45,6 +89,18 @@ page {
 
 .login-btn:active {
   background: #2f92df;
+}
+
+.login-btn[disabled] {
+  background: #9ccdec;
+  color: #ffffff;
+}
+
+.member-tip {
+  margin-top: 20rpx;
+  font-size: 24rpx;
+  line-height: 34rpx;
+  color: #667887;
 }
 
 .agreement-row {

@@ -43,9 +43,11 @@ type JWTConfig struct {
 }
 
 type WechatConfig struct {
-	AppID     string
-	AppSecret string
-	LoginURL  string
+	AppID          string
+	AppSecret      string
+	LoginURL       string
+	AccessTokenURL string
+	PhoneNumberURL string
 }
 
 type SMSConfig struct {
@@ -119,9 +121,11 @@ func LoadConfig() Config {
 			RefreshTokenTTL: time.Duration(getEnvInt("JWT_REFRESH_TOKEN_TTL_HOURS", 24)),
 		},
 		WechatConfig: WechatConfig{
-			AppID:     getEnv("WECHAT_APP_ID", ""),
-			AppSecret: getEnv("WECHAT_APP_SECRET", ""),
-			LoginURL:  getEnv("WECHAT_LOGIN_URL", ""),
+			AppID:          getEnv("WECHAT_APP_ID", ""),
+			AppSecret:      getEnv("WECHAT_APP_SECRET", ""),
+			LoginURL:       getEnv("WECHAT_LOGIN_URL", "https://api.weixin.qq.com/sns/jscode2session"),
+			AccessTokenURL: getEnv("WECHAT_ACCESS_TOKEN_URL", "https://api.weixin.qq.com/cgi-bin/stable_token"),
+			PhoneNumberURL: getEnv("WECHAT_PHONE_NUMBER_URL", "https://api.weixin.qq.com/wxa/business/getuserphonenumber"),
 		},
 		SMSConfig: SMSConfig{
 			AccessKeyID:     getEnv("ALIYUN_SMS_ACCESS_KEY_ID", ""),

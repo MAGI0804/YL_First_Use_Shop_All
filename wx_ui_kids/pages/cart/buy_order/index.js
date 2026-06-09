@@ -391,6 +391,20 @@ Page({
     });
     
     // 构建请求体数据
+    const userId = app.globalData.userInfo && app.globalData.userInfo.user_id
+      ? app.globalData.userInfo.user_id
+      : wx.getStorageSync('user_id')
+    if (!userId) {
+      wx.showToast({
+        title: '请先登录',
+        icon: 'none'
+      })
+      wx.navigateTo({
+        url: '/pages/accUser/index'
+      })
+      return
+    }
+
     const requestData = {
       receiver_name: address.name,
       receiver_phone: address.phone,
@@ -400,7 +414,7 @@ Page({
       detailed_address: address.detail,
       order_amount: this.data.finalPrice,
       product_list: product_list,
-      user_id: app.globalData.userInfo && app.globalData.userInfo.user_id ? app.globalData.userInfo.user_id : 774231,
+      user_id: userId,
       remark: this.data.remark
     };
     

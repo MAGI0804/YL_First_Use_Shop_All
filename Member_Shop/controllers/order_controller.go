@@ -182,6 +182,11 @@ func (oc *OrderController) OrderCreate(c *gin.Context) {
 		return
 	}
 
+	if err := method.EnsureActiveMemberUser(req.UserID); err != nil {
+		c.JSON(http.StatusForbidden, msg.ErrResponseStr("只有会员用户才能下单"))
+		return
+	}
+
 	order, err := method.CreateOrder(req.UserID, req.ReceiverName, receiverPhoneStr, req.Province, req.City, req.County, req.DetailedAddress, req.OrderAmount, req.ProductList, req.ExpressCompany, req.ExpressNumber, req.Remark)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, msg.ErrResponseStr("创建订单失败"))

@@ -63,9 +63,9 @@ Base URL：`http://localhost:3088`
 
 | 接口 | 用途 | 请求示例 |
 | --- | --- | --- |
-| `POST /ordinary_user/wechat_login` | 微信登录/自动注册 | `{ "code": "wx_code", "userInfo": { "nickName": "小兰", "avatarUrl": "https://example.com/a.png" } }` |
+| `POST /ordinary_user/wechat_login` | 微信会员手机号授权登录 | `{ "code": "wx_login_code", "phone_code": "getPhoneNumber_code", "userInfo": { "nickName": "小兰", "avatarUrl": "https://example.com/a.png" } }` |
 | `POST /ordinary_user/send_register_captcha` | 发送手机号验证码 | `{ "mobile": "13800000000" }` |
-| `POST /ordinary_user/bind_wechat_phone` | 绑定微信 openid 和手机号/会员 | `{ "openid": "openid_xxx", "mobile": "13800000000", "captcha": "123456" }` |
+| `POST /ordinary_user/bind_wechat_phone` | 绑定微信 openid 和已有会员手机号 | `{ "openid": "openid_xxx", "mobile": "13800000000", "captcha": "123456", "nickname": "小兰", "avatar_url": "https://example.com/a.png" }` |
 | `POST /ordinary_user/find_data` | 查询用户扩展数据 | `{ "user_id": 10001 }` |
 | `POST /ordinary_user/add_data` | 新增用户扩展数据 | `{ "user_id": 10001, "data_type": "favorite", "data_value": "dress" }` |
 | `POST /ordinary_user/Modify_data` | 修改用户资料，支持 JSON 或表单头像上传 | `{ "user_id": 10001, "nickname": "小兰", "province": "浙江省", "city": "杭州市", "county": "西湖区", "detailed_address": "文一路1号" }` |
@@ -73,7 +73,15 @@ Base URL：`http://localhost:3088`
 | `POST /ordinary_user/update_platform_info` | 更新会员天猫/有赞信息 | `{ "user_id": 10001, "tmall_id": "tm001", "tmall_amount": 100, "youzan_id": "yz001", "youzan_amount": 50 }` |
 | `POST /ordinary_user/member_amount_summary` | 会员金额汇总 | `{ "user_id": 10001, "member_no": "M001", "mobile": "13800000000" }` |
 
-字段含义：`code` 为微信临时登录 code；`openid` 为微信 openid；`mobile` 为手机号；`captcha` 为验证码；`user_id` 为系统用户 ID；`member_no` 为会员编号；`tmall_id/youzan_id` 为外部平台 ID；`tmall_amount/youzan_amount` 为外部平台消费金额。
+字段含义：`code` 为 `wx.login` 返回的微信临时登录 code；`phone_code` 为小程序 `button open-type="getPhoneNumber"` 返回的动态 code，后端通过微信 `getuserphonenumber` 接口换取手机号；`openid` 为微信 openid；`mobile` 为手机号；`captcha` 为验证码；`user_id` 为系统用户 ID；`member_no` 为会员编号；`tmall_id/youzan_id` 为外部平台 ID；`tmall_amount/youzan_amount` 为外部平台消费金额。
+
+会员登录规则：
+
+- 登录页一次用户动作触发手机号授权登录；头像使用 `open-type="chooseAvatar"`，昵称使用 `input type="nickname"` 在同页收集。
+- `wechat_login` 必须同时收到 `code` 和 `phone_code`，后端先换 openid，再换手机号。
+- 手机号必须已经存在于 `member_info` 且会员状态不是 `disabled`；非会员手机号返回 `403`。
+- 首次登录成功后，`member_info.mobile`、`member_info.user_id`、`member_info.openid` 与 `users_user.mobile` 绑定；一个手机号只对应一个 `user_id`，不能再绑定其他微信 openid。
+- 小程序端登录成功后保存 `token`、`refresh_token`、`user_id`、`userInfo`；临时头像路径通过 `Modify_data` 上传后再写入用户资料。
 
 微信登录成功示例：
 
@@ -90,7 +98,7 @@ Base URL：`http://localhost:3088`
 失败示例：
 
 ```json
-{"code":201,"msg":"Invalid request","data":{},"Err":"mobile为必填字段"}
+{"code":403,"message":"该手机号不是会员，请联系商家开通会员"}
 ```
 
 ### 3.2 商品与活动展示
@@ -184,7 +192,7 @@ Base URL：`http://localhost:3088`
 
 字段含义：`user_id` 下单用户；`receiver_*` 收货信息；`order_amount` 订单金额；`product_list` 商品列表；`commodity_id/sku_id/product_id/id` 用于识别 SKU；`qty/quantity/num` 为数量；`remark` 为备注。
 
-关键规则：当前实现采用下单扣库存；库存不足时订单创建失败，不生成错误库存。
+关键规则：只有已绑定 active 会员的 `user_id` 才能下单；当前实现采用下单扣库存；库存不足时订单创建失败，不生成错误库存。
 
 成功示例：
 

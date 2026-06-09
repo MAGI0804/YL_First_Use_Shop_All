@@ -9,6 +9,7 @@ import (
 	"Member_shop/service/msg"
 	sms "Member_shop/service/sms"
 	"Member_shop/utils"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -271,131 +272,65 @@ func (uc *UserController) UserGetID(t *gin.Context) {
 
 // WechatLogin 微信小程序登录
 func (uc *UserController) WechatLogin(c *gin.Context) {
-	var requestData map[string]interface{}
-	if err := c.ShouldBindJSON(&requestData); err != nil {
+	var req requestbody.WechatLoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的JSON格式"})
-		return
-	}
-
-	code, ok := requestData["code"].(string)
-	if !ok || code == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少code参数"})
 		return
 	}
 
 	// 获取微信配置
 	cfg := config.LoadConfig()
 
-	// 调用微信API获取openid
-	wxURL := fmt.Sprintf("%s?appid=%s&secret=%s&js_code=%s&grant_type=authorization_code",
-		cfg.WechatConfig.LoginURL,
-		cfg.WechatConfig.AppID,
-		cfg.WechatConfig.AppSecret,
-		code,
-	)
-
-	resp, err := http.Get(wxURL)
+	openid, err := getWechatOpenID(cfg, req.Code)
 	if err != nil {
-		log.Printf("微信API请求失败: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "微信登录失败"})
+		log.Printf("微信登录失败: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	mobile, err := getWechatPhoneNumber(cfg, req.PhoneCode)
 	if err != nil {
-		log.Printf("读取微信API响应失败: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "微信登录失败"})
+		log.Printf("微信手机号授权失败: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
-	}
-
-	var wxResult map[string]interface{}
-	if err := json.Unmarshal(body, &wxResult); err != nil {
-		log.Printf("解析微信API响应失败: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "微信登录失败"})
-		return
-	}
-
-	// 检查是否有错误
-	if _, ok := wxResult["errcode"]; ok {
-		errMsg := wxResult["errmsg"].(string)
-		log.Printf("微信登录失败: %v", wxResult)
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("微信登录失败: %s", errMsg)})
-		return
-	}
-
-	openid, ok := wxResult["openid"].(string)
-	if !ok || openid == "" {
-		log.Printf("微信返回数据中没有openid: %v", wxResult)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "微信登录失败，未获取到openid"})
-		return
-	}
-
-	// 获取用户信息
-	userInfo := make(map[string]interface{})
-	if userInfoMap, ok := requestData["userInfo"].(map[string]interface{}); ok {
-		userInfo = userInfoMap
 	}
 
 	// 解析昵称
 	nickname := ""
-	if nicknameVal, ok := userInfo["nickName"].(string); ok {
+	if nicknameVal, ok := req.UserInfo["nickName"].(string); ok {
 		nickname = nicknameVal
-	} else if nicknameVal, ok := userInfo["nickname"].(string); ok {
+	} else if nicknameVal, ok := req.UserInfo["nickname"].(string); ok {
 		nickname = nicknameVal
-	}
-
-	if nickname == "" {
-		// 如果没有昵称，生成默认昵称
-		if len(openid) > 8 {
-			nickname = "微信用户_" + openid[:8]
-		} else {
-			nickname = "微信用户_" + openid
-		}
 	}
 
 	// 解析头像URL
 	avatarURL := ""
-	if avatarVal, ok := userInfo["avatarUrl"].(string); ok {
+	if avatarVal, ok := req.UserInfo["avatarUrl"].(string); ok {
 		avatarURL = avatarVal
-	} else if avatarVal, ok := userInfo["avatar_url"].(string); ok {
+	} else if avatarVal, ok := req.UserInfo["avatar_url"].(string); ok {
 		avatarURL = avatarVal
 	}
 
-	// 查询或创建用户
-	var user models.User
-	if err := db.DB.Where("openid = ?", openid).First(&user).Error; err != nil {
-		// 用户不存在，创建新用户
-		user = models.User{
-			OpenID:           openid,
-			Nickname:         nickname,
-			UserImg:          avatarURL,
-			RegistrationDate: time.Now(),
-			IsActive:         true,
-			IsStaff:          false,
+	member, err := method.BindWechatPhone(requestbody.BindWechatPhoneRequest{
+		OpenID:    openid,
+		Mobile:    mobile,
+		Nickname:  nickname,
+		AvatarURL: avatarURL,
+	})
+	if err != nil {
+		status := http.StatusBadRequest
+		if err.Error() == "mobile is not a member" || err.Error() == "member disabled" {
+			status = http.StatusForbidden
 		}
+		c.JSON(status, gin.H{"code": status, "message": memberLoginErrorMessage(err)})
+		return
+	}
 
-		if err := db.DB.Create(&user).Error; err != nil {
-			log.Printf("创建用户失败: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "服务器内部错误"})
-			return
-		}
-	} else {
-		// 用户已存在，检查是否需要更新头像和昵称
-		// 只有当数据库中的头像为空且微信提供了头像时才更新
-		if user.UserImg == "" && avatarURL != "" {
-			user.UserImg = avatarURL
-		}
-		// 只有当数据库中的昵称是默认值且微信提供了新昵称时才更新
-		if strings.HasPrefix(user.Nickname, "微信用户_") && nickname != "" && !strings.HasPrefix(nickname, "微信用户_") {
-			user.Nickname = nickname
-		}
-		// 更新最后登录时间
-		user.LastLogin = time.Now()
-		// 保存更新
-		if err := db.DB.Save(&user).Error; err != nil {
-			log.Printf("更新用户信息失败: %v", err)
-		}
+	var user models.User
+	if err := db.DB.Where("user_id = ?", member.UserID).First(&user).Error; err != nil {
+		log.Printf("查询微信用户失败: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "服务器内部错误"})
+		return
 	}
 
 	// 生成令牌
@@ -404,22 +339,6 @@ func (uc *UserController) WechatLogin(c *gin.Context) {
 		log.Printf("生成令牌失败: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "服务器内部错误"})
 		return
-	}
-
-	// 准备响应数据
-	// Member data is stored in member_info, not users_user.
-	var member models.Member
-	memberNo := ""
-	memberMobile := user.Mobile
-	phoneBound := user.Mobile != ""
-	memberErr := db.DB.Where("user_id = ?", user.UserID).First(&member).Error
-	if memberErr != nil && user.OpenID != "" {
-		memberErr = db.DB.Where("openid = ?", user.OpenID).First(&member).Error
-	}
-	if memberErr == nil {
-		memberNo = member.MemberNo
-		memberMobile = member.Mobile
-		phoneBound = member.Mobile != ""
 	}
 
 	responseData := gin.H{
@@ -431,9 +350,9 @@ func (uc *UserController) WechatLogin(c *gin.Context) {
 				"refresh": refreshToken,
 			},
 			"user_id":     user.UserID,
-			"member_no":   memberNo,
-			"mobile":      memberMobile,
-			"phone_bound": phoneBound,
+			"member_no":   member.MemberNo,
+			"mobile":      member.Mobile,
+			"phone_bound": true,
 			"nickname":    user.Nickname,
 		},
 	}
@@ -452,6 +371,137 @@ func (uc *UserController) WechatLogin(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, responseData)
+}
+
+func getWechatOpenID(cfg config.Config, code string) (string, error) {
+	wxURL := fmt.Sprintf("%s?appid=%s&secret=%s&js_code=%s&grant_type=authorization_code",
+		cfg.WechatConfig.LoginURL,
+		cfg.WechatConfig.AppID,
+		cfg.WechatConfig.AppSecret,
+		code,
+	)
+
+	resp, err := http.Get(wxURL)
+	if err != nil {
+		return "", fmt.Errorf("微信登录失败")
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("微信登录失败")
+	}
+
+	var wxResult map[string]interface{}
+	if err := json.Unmarshal(body, &wxResult); err != nil {
+		return "", fmt.Errorf("微信登录失败")
+	}
+
+	if errcode, ok := wxResult["errcode"]; ok {
+		errMsg, _ := wxResult["errmsg"].(string)
+		return "", fmt.Errorf("微信登录失败: %v %s", errcode, errMsg)
+	}
+
+	openid, ok := wxResult["openid"].(string)
+	if !ok || openid == "" {
+		return "", fmt.Errorf("微信登录失败，未获取到openid")
+	}
+	return openid, nil
+}
+
+func getWechatPhoneNumber(cfg config.Config, phoneCode string) (string, error) {
+	accessToken, err := getWechatStableAccessToken(cfg)
+	if err != nil {
+		return "", err
+	}
+
+	payload, _ := json.Marshal(map[string]string{"code": phoneCode})
+	resp, err := http.Post(
+		fmt.Sprintf("%s?access_token=%s", cfg.WechatConfig.PhoneNumberURL, accessToken),
+		"application/json",
+		bytes.NewReader(payload),
+	)
+	if err != nil {
+		return "", fmt.Errorf("微信手机号授权失败")
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("微信手机号授权失败")
+	}
+
+	var wxResult struct {
+		ErrCode   int    `json:"errcode"`
+		ErrMsg    string `json:"errmsg"`
+		PhoneInfo struct {
+			PhoneNumber     string `json:"phoneNumber"`
+			PurePhoneNumber string `json:"purePhoneNumber"`
+		} `json:"phone_info"`
+	}
+	if err := json.Unmarshal(body, &wxResult); err != nil {
+		return "", fmt.Errorf("微信手机号授权失败")
+	}
+	if wxResult.ErrCode != 0 {
+		return "", fmt.Errorf("微信手机号授权失败: %s", wxResult.ErrMsg)
+	}
+	mobile := wxResult.PhoneInfo.PurePhoneNumber
+	if mobile == "" {
+		mobile = wxResult.PhoneInfo.PhoneNumber
+	}
+	if !method.IsValidMobile(mobile) {
+		return "", fmt.Errorf("微信手机号格式无效")
+	}
+	return mobile, nil
+}
+
+func getWechatStableAccessToken(cfg config.Config) (string, error) {
+	payload, _ := json.Marshal(map[string]interface{}{
+		"grant_type":    "client_credential",
+		"appid":         cfg.WechatConfig.AppID,
+		"secret":        cfg.WechatConfig.AppSecret,
+		"force_refresh": false,
+	})
+	resp, err := http.Post(cfg.WechatConfig.AccessTokenURL, "application/json", bytes.NewReader(payload))
+	if err != nil {
+		return "", fmt.Errorf("微信access_token获取失败")
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("微信access_token获取失败")
+	}
+
+	var wxResult struct {
+		AccessToken string `json:"access_token"`
+		ErrCode     int    `json:"errcode"`
+		ErrMsg      string `json:"errmsg"`
+	}
+	if err := json.Unmarshal(body, &wxResult); err != nil {
+		return "", fmt.Errorf("微信access_token获取失败")
+	}
+	if wxResult.ErrCode != 0 || wxResult.AccessToken == "" {
+		return "", fmt.Errorf("微信access_token获取失败: %s", wxResult.ErrMsg)
+	}
+	return wxResult.AccessToken, nil
+}
+
+func memberLoginErrorMessage(err error) string {
+	switch err.Error() {
+	case "mobile is not a member":
+		return "该手机号不是会员，请联系商家开通会员"
+	case "member disabled":
+		return "该会员已停用，请联系商家处理"
+	case "mobile already linked to another wechat user", "mobile already bound to another openid":
+		return "该手机号已绑定其他微信账号"
+	case "openid already bound to another mobile":
+		return "当前微信账号已绑定其他手机号"
+	case "member already linked to another user":
+		return "该会员已绑定其他用户ID"
+	default:
+		return err.Error()
+	}
 }
 
 // AddData 添加用户数据

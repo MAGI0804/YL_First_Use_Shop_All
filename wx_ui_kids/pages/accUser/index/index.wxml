@@ -1,31 +1,48 @@
-<!--pages/accUser/index.wxml-->
-<view class="container">
-  <view class="content">
-    <view class="logo-section">
-      <image class="logo" src="/images/home.png" mode="aspectFit"></image>
-    </view>
-    
-    <view class="title-section">
-      <text class="title">幼岚星球</text>
-      <text class="subtitle">儿童成长奇妙世界</text>
-    </view>
-    
-    <view class="login-section">
-      <view class="login-btn" bindtap="getUserProfile">
-        <text class="btn-text">微信一键登录</text>
+<!--pages/accUser/index/index.wxml-->
+<view class="login-page">
+  <image class="title-image" src="/images/title.jpg" mode="widthFix"></image>
+
+  <view class="profile-panel">
+    <button class="avatar-button" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+      <image class="avatar-preview" src="{{avatarUrl || '/images/home.png'}}" mode="aspectFill"></image>
+    </button>
+    <input
+      class="nickname-input"
+      type="nickname"
+      value="{{nickname}}"
+      placeholder="微信昵称"
+      maxlength="24"
+      bindinput="onNicknameInput"
+    />
+  </view>
+
+  <view class="login-box">
+    <button
+      wx:if="{{agreementChecked}}"
+      class="login-btn"
+      open-type="getPhoneNumber"
+      bindgetphonenumber="handlePhoneLogin"
+      loading="{{loginLoading}}"
+      disabled="{{loginLoading}}"
+    >
+      {{loginLoading ? '登录中' : '手机号授权登录'}}
+    </button>
+    <button wx:else class="login-btn" bindtap="promptAgreement">手机号授权登录</button>
+  </view>
+
+  <view class="member-tip">仅已登记会员手机号可登录下单</view>
+
+  <view class="agreement-row">
+    <view class="checkbox-hit" bindtap="toggleAgreement">
+      <view class="checkbox {{agreementChecked ? 'checked' : ''}}">
+        <text wx:if="{{agreementChecked}}" class="check-mark">✓</text>
       </view>
     </view>
-    
-    <view class="agreement-section">
-      <view class="checkbox" bindtap="toggleAgreement">
-        <view class="checkbox-inner {{agreementChecked ? 'checked' : ''}}"></view>
-      </view>
-      <view class="agreement-text">
-        <text class="text">登录即代表您已同意</text>
-        <text class="link" bindtap="navigateToAgreement">用户协议</text>
-        <text class="text">和</text>
-        <text class="link" bindtap="navigateToPrivacy">隐私政策</text>
-      </view>
+    <view class="agreement-copy">
+      <text class="agreement-text">同意</text>
+      <text class="agreement-link" catchtap="navigateToAgreement">《用户协议》</text>
+      <text class="agreement-text">和</text>
+      <text class="agreement-link" catchtap="navigateToPrivacy">《隐私政策》</text>
     </view>
   </view>
 </view>
