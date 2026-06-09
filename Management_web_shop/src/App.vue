@@ -69,4 +69,42 @@ html, body {
 .el-input__wrapper.is-focus {
   border-color: #87ceeb;
 }
+
+.dp__theme_light {
+  --dp-primary-color: #5bc0de;
+  --dp-border-color-hover: #87ceeb;
+  --dp-border-radius: 0;
+  --dp-font-family: inherit;
+}
+
+.dp__menu {
+  border-color: #e5e7eb;
+  border-radius: 0;
+  box-shadow: none;
+  z-index: 3000;
+}
+
+.dp__outer_menu_wrap {
+  z-index: 3000 !important;
+}
+
+.dp__preset_dates {
+  width: 72px;
+  padding: 8px 0;
+  border-right-color: #edf0f4;
+}
+
+.dp__preset_date {
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+.dp__calendar_header,
+.dp__calendar {
+  font-size: 12px;
+}
+
+.dp__action_row {
+  padding: 8px 12px;
+}
 </style>

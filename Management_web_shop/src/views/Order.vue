@@ -5,32 +5,23 @@
         v-model="searchOrderNo"
         placeholder="请输入订单号"
         prefix-icon="Search"
-        style="width: 250px;"
+        style="width: 210px;"
         clearable
         @keyup.enter="handleSearch"
       />
-      <el-input v-model="searchMobile" placeholder="手机号" style="width: 150px;" clearable @keyup.enter="handleSearch" />
-      <el-input v-model="searchMemberNo" placeholder="会员号" style="width: 160px;" clearable @keyup.enter="handleSearch" />
-      <el-input v-model="searchSubOrderId" placeholder="子订单号" style="width: 170px;" clearable @keyup.enter="handleSearch" />
-      <span class="time-label">下单时间</span>
-      <el-date-picker
+      <el-input v-model="searchMobile" placeholder="手机号" style="width: 140px;" clearable @keyup.enter="handleSearch" />
+      <el-input v-model="searchMemberNo" placeholder="会员号" style="width: 150px;" clearable @keyup.enter="handleSearch" />
+      <CompactDateRangePicker
         v-model="dateRange"
         type="datetimerange"
-        range-separator="至"
-        start-placeholder="开始时间"
-        end-placeholder="结束时间"
-        style="width: 320px; margin-left: 8px;"
         value-format="YYYY-MM-DD HH:mm:ss"
-        :default-time="[new Date(2000, 1, 1, 0, 0, 0), new Date(2000, 1, 1, 23, 59, 59)]"
-        :shortcuts="shortcuts"
       />
-      <div class="shortcuts">
-        <el-button link @click="setToday">今</el-button>
-        <el-button link @click="setYesterday">昨</el-button>
-        <el-button link @click="setLast7Days">近7天</el-button>
-        <el-button link @click="setLast30Days">近30天</el-button>
+      <div class="order-shortcuts">
+        <el-button v-for="shortcut in shortcuts" :key="shortcut.text" link @click="applyShortcut(shortcut)">
+          {{ shortcut.text }}
+        </el-button>
       </div>
-      <el-select v-model="statusFilter" placeholder="状态" style="width: 120px; margin-left: 8px;">
+      <el-select v-model="statusFilter" placeholder="状态" style="width: 120px;">
         <el-option label="全部" value="" />
         <el-option label="未发货" value="pending" />
         <el-option label="已发货" value="shipped" />
@@ -43,9 +34,9 @@
         <el-option label="未支付" value="unpaid" />
         <el-option label="已支付" value="paid" />
       </el-select>
-      <el-button type="primary" style="margin-left: 8px;" @click="handleSearch">搜索</el-button>
+      <el-button type="primary" @click="handleSearch">搜索</el-button>
       <el-button @click="handleReset">重置</el-button>
-      <el-button :icon="Download" @click="handleExportTask">生成下载任务</el-button>
+      <el-button :icon="Download" @click="handleExportTask">导出</el-button>
     </div>
 
     <el-table :data="orderList" style="width: 100%; margin-top: 20px;" row-key="id">
@@ -174,13 +165,13 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download, Search } from '@element-plus/icons-vue'
+import CompactDateRangePicker from '@/components/CompactDateRangePicker.vue'
 import { queryOrders, getToken, batchGetProducts, updatePaymentAmount, confirmOrderPayment, deliverOrder, receiveOrder, createDownloadTask } from '@/api'
 
 const router = useRouter()
 const searchOrderNo = ref('')
 const searchMobile = ref('')
 const searchMemberNo = ref('')
-const searchSubOrderId = ref('')
 const dateRange = ref<[string, string] | null>(null)
 const statusFilter = ref('')
 const payStatusFilter = ref('')
@@ -238,7 +229,7 @@ const saveToCache = (orders: any[], products: any, totalCount: number) => {
 }
 
 const fetchOrders = async () => {
-  const isFirstPage = currentPage.value === 1 && !searchOrderNo.value && !searchMobile.value && !searchMemberNo.value && !searchSubOrderId.value && !dateRange.value && !statusFilter.value && !payStatusFilter.value
+  const isFirstPage = currentPage.value === 1 && !searchOrderNo.value && !searchMobile.value && !searchMemberNo.value && !dateRange.value && !statusFilter.value && !payStatusFilter.value
   
   if (isFirstPage && loadFromCache()) {
     return
@@ -259,7 +250,6 @@ const fetchOrders = async () => {
     if (searchOrderNo.value) params.tid = searchOrderNo.value
     if (searchMobile.value) params.mobile = searchMobile.value
     if (searchMemberNo.value) params.member_no = searchMemberNo.value
-    if (searchSubOrderId.value) params.sub_order_id = searchSubOrderId.value
     const res = await queryOrders(params)
     if (res.code === 200 && res.data?.code === 200) {
       const orders = res.data.data
@@ -333,14 +323,14 @@ const handlePageChange = (page: number) => {
 }
 
 const shortcuts = [
-  { text: '今天', value: () => {
+  { text: '今', value: () => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const end = new Date()
     end.setHours(23, 59, 59, 999)
     return [today, end]
   }},
-  { text: '昨天', value: () => {
+  { text: '昨', value: () => {
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
     yesterday.setHours(0, 0, 0, 0)
@@ -349,7 +339,7 @@ const shortcuts = [
     end.setHours(23, 59, 59, 999)
     return [yesterday, end]
   }},
-  { text: '近7天', value: () => {
+  { text: '7天', value: () => {
     const start = new Date()
     start.setDate(start.getDate() - 7)
     start.setHours(0, 0, 0, 0)
@@ -357,7 +347,7 @@ const shortcuts = [
     end.setHours(23, 59, 59, 999)
     return [start, end]
   }},
-  { text: '近30天', value: () => {
+  { text: '30天', value: () => {
     const start = new Date()
     start.setDate(start.getDate() - 30)
     start.setHours(0, 0, 0, 0)
@@ -367,43 +357,7 @@ const shortcuts = [
   }}
 ]
 
-const setToday = () => {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const end = new Date()
-  end.setHours(23, 59, 59, 999)
-  dateRange.value = [formatDate(today), formatDate(end)]
-}
-
-const setYesterday = () => {
-  const yesterday = new Date()
-  yesterday.setDate(yesterday.getDate() - 1)
-  yesterday.setHours(0, 0, 0, 0)
-  const end = new Date()
-  end.setDate(end.getDate() - 1)
-  end.setHours(23, 59, 59, 999)
-  dateRange.value = [formatDate(yesterday), formatDate(end)]
-}
-
-const setLast7Days = () => {
-  const start = new Date()
-  start.setDate(start.getDate() - 7)
-  start.setHours(0, 0, 0, 0)
-  const end = new Date()
-  end.setHours(23, 59, 59, 999)
-  dateRange.value = [formatDate(start), formatDate(end)]
-}
-
-const setLast30Days = () => {
-  const start = new Date()
-  start.setDate(start.getDate() - 30)
-  start.setHours(0, 0, 0, 0)
-  const end = new Date()
-  end.setHours(23, 59, 59, 999)
-  dateRange.value = [formatDate(start), formatDate(end)]
-}
-
-const formatDate = (date: Date): string => {
+const formatDateTime = (date: Date): string => {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
@@ -413,11 +367,15 @@ const formatDate = (date: Date): string => {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
 }
 
+const applyShortcut = (shortcut: { text: string; value: () => Date[] }) => {
+  const [start, end] = shortcut.value()
+  dateRange.value = [formatDateTime(start), formatDateTime(end)]
+}
+
 const handleReset = () => {
   searchOrderNo.value = ''
   searchMobile.value = ''
   searchMemberNo.value = ''
-  searchSubOrderId.value = ''
   dateRange.value = null
   statusFilter.value = ''
   payStatusFilter.value = ''
@@ -438,7 +396,6 @@ const handleExportTask = async () => {
         order_id: searchOrderNo.value || undefined,
         mobile: searchMobile.value || undefined,
         member_no: searchMemberNo.value || undefined,
-        sub_order_id: searchSubOrderId.value || undefined,
         pay_status: payStatusFilter.value || undefined
       }
     })
@@ -617,23 +574,30 @@ const receiveOrderAction = async (row: any) => {
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
+  min-height: 34px;
 }
 
-.time-label {
-  margin-left: 8px;
-  font-size: 14px;
-  color: #666;
+.search-bar :deep(.el-input__wrapper),
+.search-bar :deep(.el-select__wrapper) {
+  height: 34px;
+  min-height: 34px;
+}
+
+.search-bar :deep(.el-button) {
+  height: 34px;
+}
+
+.order-shortcuts {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
   white-space: nowrap;
 }
 
-.shortcuts {
-  display: flex;
-  gap: 4px;
-  margin-left: 8px;
-}
-
-.shortcuts .el-button {
-  padding: 4px 8px;
+.order-shortcuts .el-button {
+  height: 34px;
+  padding: 0 2px;
   font-size: 12px;
 }
 

@@ -9,17 +9,9 @@
           clearable
         />
 
-        <el-date-picker
-          v-model="dateRange"
-          type="daterange"
-          range-separator="至"
-          start-placeholder="开始日期"
-          end-placeholder="结束日期"
-          style="width: 260px; margin-left: 12px;"
-          value-format="YYYY-MM-DD"
-        />
+        <CompactDateRangePicker v-model="dateRange" />
 
-        <el-select v-model="queryParams.category" placeholder="商品类别" style="width: 150px; margin-left: 12px;">
+        <el-select v-model="queryParams.category" placeholder="商品类别" style="width: 150px;">
           <el-option
             v-for="cat in categories"
             :key="cat"
@@ -28,13 +20,13 @@
           />
         </el-select>
 
-        <el-select v-model="selectedClothingType" placeholder="服装分类" style="width: 150px; margin-left: 12px;">
+        <el-select v-model="selectedClothingType" placeholder="服装分类" style="width: 150px;">
           <el-option label="全部" value="" />
           <el-option label="童装" value="kids" />
           <el-option label="成人装" value="adult" />
         </el-select>
 
-        <el-select v-model="queryParams.status" placeholder="商品状态" style="width: 150px; margin-left: 12px;">
+        <el-select v-model="queryParams.status" placeholder="商品状态" style="width: 150px;">
           <el-option label="全部" value="" />
           <el-option label="上架" value="online" />
           <el-option label="下架" value="offline" />
@@ -63,13 +55,13 @@
             </div>
           </div>
           <template #reference>
-            <el-button style="margin-left: 12px;">选择标签</el-button>
+            <el-button>标签</el-button>
           </template>
         </el-popover>
 
-        <el-button type="primary" style="margin-left: 12px;" @click="handleSearch">搜索</el-button>
+        <el-button type="primary" @click="handleSearch">搜索</el-button>
         <el-button @click="handleReset">重置</el-button>
-        <el-button :icon="Download" @click="handleExportTask">生成下载任务</el-button>
+        <el-button :icon="Download" @click="handleExportTask">导出</el-button>
       </div>
     </div>
 
@@ -131,6 +123,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
+import CompactDateRangePicker from '@/components/CompactDateRangePicker.vue'
 import { getToken, getAllLabels, getAllCategories, goodsQuery, createDownloadTask } from '@/api'
 
 const router = useRouter()
@@ -382,7 +375,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0;
+  gap: 8px;
 }
 
 .label-tag {

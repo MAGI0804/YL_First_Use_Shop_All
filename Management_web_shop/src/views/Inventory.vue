@@ -20,7 +20,7 @@
             />
             <el-button type="primary" :icon="Search" :loading="queryLoading" @click="handleInventoryQuery">查询</el-button>
             <el-button :icon="Refresh" @click="resetInventoryQuery">重置</el-button>
-            <el-button :icon="Download" @click="handleInventoryExport('query')">生成下载任务</el-button>
+            <el-button :icon="Download" @click="handleInventoryExport('query')">导出</el-button>
             <span v-if="queryTotalInventory !== null" class="summary">总库存 {{ queryTotalInventory }}</span>
           </div>
 
@@ -45,7 +45,7 @@
             <el-input-number v-model="warningParams.threshold" :min="1" :max="9999" controls-position="right" />
             <el-button type="primary" :icon="Search" :loading="warningLoading" @click="loadWarnings">查询</el-button>
             <el-button :icon="Refresh" @click="resetWarnings">重置</el-button>
-            <el-button :icon="Download" @click="handleInventoryExport('warnings')">生成下载任务</el-button>
+            <el-button :icon="Download" @click="handleInventoryExport('warnings')">导出</el-button>
             <span class="summary">阈值 {{ warningThreshold }}</span>
           </div>
 
@@ -93,7 +93,7 @@
             </el-select>
             <el-button type="primary" :icon="Search" :loading="logLoading" @click="loadLogs">查询</el-button>
             <el-button :icon="Refresh" @click="resetLogs">重置</el-button>
-            <el-button :icon="Download" @click="handleInventoryExport('logs')">生成下载任务</el-button>
+            <el-button :icon="Download" @click="handleInventoryExport('logs')">导出</el-button>
           </div>
 
           <el-table :data="logRows" border height="520" empty-text="暂无库存日志">

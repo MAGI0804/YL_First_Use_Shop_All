@@ -1,0 +1,14 @@
+./access_token_controller.go
+./activity_controller.go
+./address_controller.go
+./analytics_controller.go
+./cart_controller.go
+./commodity_controller.go
+./download_center_controller.go
+./inventory_controller.go
+./message_controller.go
+./operationuser_controller.go
+./order_controller.go
+./return_order_controller.go
+./review_controller.go
+./user_controller.go

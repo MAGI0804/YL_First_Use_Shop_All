@@ -59,14 +59,10 @@
               <el-option label="可跳转" :value="true" />
               <el-option label="不可跳转" :value="false" />
             </el-select>
-            <el-date-picker
+            <CompactDateRangePicker
               v-model="dateRange"
               type="datetimerange"
-              range-separator="至"
-              start-placeholder="开始日期"
-              end-placeholder="结束日期"
               size="small"
-              style="width: 380px;"
               value-format="YYYY-MM-DD HH:mm:ss"
             />
             <el-button type="primary" size="small" @click="handleSearch">搜索</el-button>
@@ -189,6 +185,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete, Search, Rank, Link } from '@element-plus/icons-vue'
+import CompactDateRangePicker from '@/components/CompactDateRangePicker.vue'
 import { 
   batchQueryActivityImages, 
   updateActivityImageRelations,
@@ -721,6 +718,7 @@ const saveOrder = async () => {
 
 .filter-bar {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 16px;
   padding-bottom: 12px;

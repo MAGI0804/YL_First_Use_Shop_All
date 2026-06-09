@@ -40,18 +40,10 @@
           <el-option label="已完成" value="completed" />
           <el-option label="已取消" value="canceled" />
         </el-select>
-        <el-date-picker
-          v-model="dateRange"
-          type="daterange"
-          range-separator="至"
-          start-placeholder="开始日期"
-          end-placeholder="结束日期"
-          value-format="YYYY-MM-DD"
-          class="date-field"
-        />
+        <CompactDateRangePicker v-model="dateRange" />
         <el-button type="primary" :icon="Search" :loading="loading" @click="handleSearch">查询</el-button>
         <el-button :icon="Refresh" @click="handleReset">重置</el-button>
-        <el-button :icon="Download" @click="handleExportTask">生成下载任务</el-button>
+        <el-button :icon="Download" @click="handleExportTask">导出</el-button>
       </div>
 
       <el-table :data="displayRows" border height="560" row-key="return_id" empty-text="暂无售后记录">
@@ -130,6 +122,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download, Refresh, Search } from '@element-plus/icons-vue'
+import CompactDateRangePicker from '@/components/CompactDateRangePicker.vue'
 import {
   approveReturnOrder,
   createDownloadTask,
@@ -435,10 +428,6 @@ onMounted(() => {
 
 .field {
   width: 160px;
-}
-
-.date-field {
-  width: 260px;
 }
 
 .pagination {

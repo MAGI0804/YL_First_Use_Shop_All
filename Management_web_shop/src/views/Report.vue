@@ -2,20 +2,12 @@
   <div class="report-page">
     <section class="panel">
       <div class="toolbar">
-        <el-date-picker
-          v-model="dateRange"
-          type="daterange"
-          range-separator="至"
-          start-placeholder="开始日期"
-          end-placeholder="结束日期"
-          value-format="YYYY-MM-DD"
-          class="date-field"
-        />
+        <CompactDateRangePicker v-model="dateRange" />
         <el-input v-model="filters.category" placeholder="商品分类" clearable class="field" @keyup.enter="handleSearch" />
         <el-input v-model="filters.style_code" placeholder="款号" clearable class="field" @keyup.enter="handleSearch" />
         <el-input-number v-model="filters.low_inventory_threshold" :min="0" :max="9999" controls-position="right" class="number-field" />
         <el-button type="primary" :icon="Search" :loading="loading" @click="handleSearch">查询</el-button>
-        <el-button :icon="Download" @click="handleExport">生成下载任务</el-button>
+        <el-button :icon="Download" @click="handleExport">导出</el-button>
       </div>
     </section>
 
@@ -133,6 +125,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Download, Search } from '@element-plus/icons-vue'
+import CompactDateRangePicker from '@/components/CompactDateRangePicker.vue'
 import {
   createDownloadTask,
   queryProductSummary,
@@ -262,10 +255,6 @@ onMounted(() => {
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
-}
-
-.date-field {
-  width: 260px;
 }
 
 .field {

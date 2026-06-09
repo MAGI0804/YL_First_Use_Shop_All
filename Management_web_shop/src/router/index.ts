@@ -16,6 +16,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '忘记密码' }
   },
   {
+    path: '/register',
+    name: 'Register',
+    component: () => import('@/views/Register.vue'),
+    meta: { title: '注册' }
+  },
+  {
     path: '/',
     component: () => import('@/layout/MainLayout.vue'),
     redirect: '/dashboard',
@@ -127,7 +133,7 @@ router.beforeEach(async (to, _from, next) => {
   if (to.meta.title) {
     document.title = to.meta.title as string
   }
-  if (to.path === '/login' || to.path === '/forgot-password') {
+  if (to.path === '/login' || to.path === '/forgot-password' || to.path === '/register') {
     next()
     return
   }

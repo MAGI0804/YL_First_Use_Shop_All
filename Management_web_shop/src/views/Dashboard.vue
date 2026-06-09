@@ -1,18 +1,8 @@
 <template>
   <div class="dashboard">
     <div class="filter-bar">
-      <div class="date-picker-wrapper">
-        <el-date-picker
-          v-model="dateRange"
-          type="daterange"
-          range-separator="至"
-          start-placeholder="开始日期"
-          end-placeholder="结束日期"
-          style="width: 100%;"
-          value-format="YYYY-MM-DD"
-        />
-      </div>
-      <el-button type="primary" style="margin-left: 12px;" @click="handleSearch">查询</el-button>
+      <CompactDateRangePicker v-model="dateRange" />
+      <el-button type="primary" @click="handleSearch">查询</el-button>
     </div>
 
     <div class="stats-grid">
@@ -72,6 +62,7 @@
 import { reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Document, Money, Box, Goods, TrendCharts } from '@element-plus/icons-vue'
+import CompactDateRangePicker from '@/components/CompactDateRangePicker.vue'
 
 const dateRange = ref<[string, string] | null>(null)
 
@@ -100,12 +91,8 @@ const handleSearch = () => {
 .filter-bar {
   display: flex;
   align-items: center;
-  width: 33.33%;
+  gap: 8px;
   margin-bottom: 20px;
-}
-
-.date-picker-wrapper {
-  flex: 1;
 }
 
 .stats-grid {

@@ -26,9 +26,9 @@
 
 | 业务链路 | 当前状态 | 已有能力 | 主要缺口 |
 | --- | --- | --- | --- |
-| 订单发货 | 部分完成 | `/order/add_order` 创建订单并上传聚水潭；`/order/jushuitan_ship_info` 接收聚水潭发货推送；本地有发货、签收、确认支付 | 缺少物流同步 `/open/logistic/upload`、物流查询 `/open/logistic/query` 的聚水潭封装；缺少发货推送幂等表和失败重试任务 |
-| 售后 | 第一版完成 | `/return_order/create` 创建售后并调用 `/open/aftersale/upload`；支持聚水潭售后推送和实际收货查询；售后入库回滚库存 | 售后类型缺少“补发”一等公民；状态映射需要按聚水潭真实文档字段校准；缺少补发单、换货单和退款状态的管理端闭环 |
-| 库存 | 本地完成，ERP 同步预留 | 本地库存查询、调整、日志、预警、调拨、盘点；有聚水潭 `/open/inventory/query` 封装 | `/inventory/sync_jushuitan` 仍返回 501；缺少 `business_sku_syn` 库存推送接收；缺少 `/open/inventory/upload` 新建盘点单封装 |
+| 订单发货 | 部分完成 | `/order/add_order` 创建订单并上传聚水潭；`/order/jushuitan_ship_info` 接收聚水潭发货推送；`/order/query_jushuitan_logistic` 查询聚水潭发货信息并回写商城订单；本地有发货、签收、确认支付 | 缺少物流上传 `/open/logistic/upload` 的聚水潭封装；缺少发货推送幂等表和失败重试任务 |
+| 售后 | 第一版完成 | `/return_order/create` 创建售后并调用 `/open/aftersale/upload`；支持 `replacement/reissue` 补发类型并上传聚水潭“补发”；支持聚水潭售后推送和实际收货查询；售后入库回滚库存 | 状态映射需要按聚水潭真实文档字段校准；缺少补发单、换货单和退款状态的管理端闭环 |
+| 库存 | ERP 查询/同步第一版完成 | 本地库存查询、调整、日志、预警、调拨、盘点；`/inventory/jushuitan_sku_sync` 接收 `business_sku_syn`；`/inventory/query_jushuitan` 查询 ERP 库存；`/inventory/sync_jushuitan` 查询后应用本地库存 | 缺少 `/open/inventory/upload` 新建盘点单封装；缺少库存同步失败重放和管理端差异视图 |
 
 ## 3. 总体集成原则
 
@@ -89,6 +89,7 @@ flowchart LR
 | 下单扣库存 | `method.DeductInventoryForOrder` | 创建订单事务内扣减库存并写库存日志 |
 | 上传聚水潭订单 | `jushuitan.SendOrder` | 调用 `/open/jushuitan/orders/upload` |
 | ERP 发货回传 | `POST /order/jushuitan_ship_info` | 接收聚水潭发货消息，更新主订单和子订单物流 |
+| ERP 发货查询 | `POST /order/query_jushuitan_logistic`，`POST /order/sync_logistics_info` | 商城侧触发 `/open/logistic/query`，按 `so_id` 回写主订单物流和子订单发货信息 |
 | 本地运营发货 | `POST /order/deliver` | 兼容后台手动发货，状态从 `pending` 到 `shipped` |
 | 买家确认收货 | `POST /order/order_receive` | 状态从 `shipped` 到 `delivered` |
 | 运营确认支付 | `POST /order/confirm_payment` | 签收后确认支付，支付状态变为 `paid` |
@@ -169,7 +170,7 @@ flowchart LR
 | 优先级 | 任务 | 涉及文件 | 验收标准 |
 | --- | --- | --- | --- |
 | P0 | 补聚水潭物流上传封装 `/open/logistic/upload` | 新增 `service/jushuitan/logistic.go` | 后台发货时可把物流信息同步给聚水潭 |
-| P0 | 补聚水潭物流查询封装 `/open/logistic/query` | 新增 `service/jushuitan/logistic.go`、订单控制器 | 可按订单号查询 ERP 物流轨迹并回写 `logistics_process` |
+| P0 | 补聚水潭物流查询封装 `/open/logistic/query` | `service/jushuitan/logistic.go`、订单控制器 | 已完成：可按订单号查询 ERP 发货信息并回写 `logistics_process` |
 | P0 | 发货推送幂等 | `order_controller.go`、`jushuitan_push_raw_data` | 重复推送不重复改状态、不重复写异常日志 |
 | P1 | 订单上传失败重试 | 新增任务或管理端按钮 | 上传失败可按订单重试，记录最后响应 |
 | P1 | 管理端显示 ERP 状态 | `Management_web_shop/src/views/Order*.vue` | 订单详情显示聚水潭单号、发货来源、推送状态 |
@@ -235,11 +236,11 @@ flowchart LR
 | `return_refund` | 退货退款 | `退货退款` |
 | `exchange` | 换货 | `换货` |
 
-需要补齐：
+已补齐：
 
 | 建议新增类型 | 中文 | 说明 |
 | --- | --- | --- |
-| `replacement` | 补发 | 对应流程图中的“补发”，ERP 审核后生成补发订单 |
+| `replacement` | 补发 | 对应流程图中的“补发”，兼容小程序旧值 `reissue`，上传聚水潭时主单和明细类型均传“补发” |
 
 ### 5.5 售后接口契约
 
@@ -324,7 +325,7 @@ flowchart LR
 
 | 优先级 | 任务 | 涉及文件 | 验收标准 |
 | --- | --- | --- | --- |
-| P0 | 增加补发售后类型 `replacement` | `requestbody/return_order.go`、`method/return_order.go`、小程序售后页、管理端售后页 | 买家可申请补发，聚水潭上传类型正确 |
+| P0 | 增加补发售后类型 `replacement` | `requestbody/return_order.go`、`method/return_order.go` | 已完成：商城兼容 `replacement/reissue`，聚水潭上传类型为“补发” |
 | P0 | 按聚水潭真实文档校准售后字段 | `service/jushuitan/after_sale.go` | 请求字段与聚水潭 docId=171 完全一致 |
 | P0 | 售后推送幂等 | `return_order_controller.go`、`jushuitan_push_raw_data` | 重复推送不重复回滚库存 |
 | P1 | 管理端售后 ERP 状态展示 | `Management_web_shop/src/views/AfterSales.vue` | 展示聚水潭售后单号、推送状态、最后响应 |
@@ -358,7 +359,9 @@ flowchart LR
 | 商城库存调拨 | `POST /inventory/transfer` | 本地调拨日志 |
 | 商城库存盘点 | `POST /inventory/stock_check` | 本地盘点修正库存 |
 | 聚水潭库存查询封装 | `jushuitan.QueryInventory` | 调用 `/open/inventory/query`，当前使用生产配置 |
-| 聚水潭库存同步路由 | `POST /inventory/sync_jushuitan` | 当前为预留接口，返回 501 |
+| 聚水潭库存同步路由 | `POST /inventory/sync_jushuitan` | 已实现：查询聚水潭 `/open/inventory/query` 并按 ERP 可售口径应用到本地库存 |
+| 聚水潭库存查询路由 | `POST /inventory/query_jushuitan` | 已实现：只查询 ERP 库存，不修改本地库存 |
+| 聚水潭库存推送接收 | `POST /inventory/jushuitan_sku_sync` | 已实现：接收 `business_sku_syn`，更新本地库存并写 `jushuitan_sync` 日志 |
 
 ### 6.3 库存同步规则
 
@@ -389,7 +392,7 @@ flowchart LR
 
 #### 聚水潭库存推送商城
 
-建议新增商城接口：`POST /inventory/jushuitan_sku_sync`
+商城接口：`POST /inventory/jushuitan_sku_sync`
 
 消息类型：`business_sku_syn`
 
@@ -416,7 +419,7 @@ flowchart LR
 处理规则：
 
 - 通过 `sku_id` 或 `shop_sku_id` 定位本地 `commodity_id`。
-- 可售库存建议口径：`qty - order_lock - pick_lock`，最低为 0。
+- 可售库存口径按聚水潭库存文档：`qty - orderLock + virtualQty`，最低为 0。
 - 更新本地商品库存并写 `InventoryLog`，`change_type=jushuitan_sync`。
 - 保存原始推送和处理结果。
 - 返回聚水潭成功格式。
@@ -438,7 +441,9 @@ flowchart LR
 
 聚水潭路径：`/open/inventory/query`
 
-建议新增商城接口：`POST /inventory/query_jushuitan`
+商城接口：`POST /inventory/query_jushuitan`
+
+同步应用接口：`POST /inventory/sync_jushuitan`
 
 用途：
 
@@ -450,10 +455,10 @@ flowchart LR
 
 | 优先级 | 任务 | 涉及文件 | 验收标准 |
 | --- | --- | --- | --- |
-| P0 | 实现聚水潭库存推送接收 `business_sku_syn` | `inventory_route.go`、`inventory_controller.go`、`inventory_method.go` | ERP 推送后本地库存更新并写日志 |
-| P0 | 实现库存同步幂等和原始数据保存 | `jushuitan_push_raw_data` 或新增库存同步表 | 重复推送不重复写库存变动 |
+| P0 | 实现聚水潭库存推送接收 `business_sku_syn` | `inventory_route.go`、`inventory_controller.go`、`inventory_method.go` | 已完成：ERP 推送后本地库存更新并写日志 |
+| P0 | 实现库存同步幂等和原始数据保存 | `jushuitan_push_raw_data`、`inventory_log` | 已完成：同一 SKU 同一 `modified` 重复推送不重复写库存变动 |
 | P0 | 实现 `/open/inventory/upload` 盘点上传 | 新增 `service/jushuitan/inventory_upload.go` | 本地盘点后可创建聚水潭盘点单 |
-| P1 | 完成 `/inventory/sync_jushuitan` | `inventory_controller.go` | 不再返回 501，可按 SKU 拉取 ERP 库存 |
+| P1 | 完成 `/inventory/sync_jushuitan` | `inventory_controller.go` | 已完成：不再返回 501，可按 SKU 拉取并应用 ERP 库存 |
 | P1 | 管理端库存差异视图 | `Management_web_shop/src/views/Inventory.vue` | 可查看本地库存、ERP 库存、差异和同步状态 |
 
 ## 7. 数据模型改造清单

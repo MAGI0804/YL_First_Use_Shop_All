@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@vuepic/vue-datepicker": "^14.0.0"
+  }
+}

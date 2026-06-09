@@ -1,0 +1,15 @@
+./access_token_requestbody.go
+./actvity_requestbody.go
+./address_requestbody.go
+./analytics_requestbody.go
+./cart_requestbody.go
+./commodity_requestbody.go
+./download_center_requestbody.go
+./inventory_requestbody.go
+./message_requestbody.go
+./operationuser_requestbody.go
+./order_requestbody.go
+./return_order.go
+./review_requestbody.go
+./stylecode_search_requestbody.go
+./user_requestbody.go
