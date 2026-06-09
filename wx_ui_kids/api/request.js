@@ -28,15 +28,18 @@ const safeCallback = (callback, payload) => {
   }
 }
 
-const goHome = () => {
-  wx.switchTab({
-    url: '/pages/index/index',
-    fail() {
-      wx.reLaunch({
-        url: '/pages/index/index'
-      })
-    }
-  })
+const isAuthFailure = (res) => {
+  const statusCode = Number(res && res.statusCode)
+  const bodyCode = Number(res && res.data && res.data.code)
+  return statusCode === 401 || statusCode === 402 || bodyCode === 401 || bodyCode === 402
+}
+
+const clearAccessToken = () => {
+  wx.removeStorageSync('access_token')
+}
+
+const isTimeoutError = (err) => {
+  return !!(err && err.errMsg && err.errMsg.includes('timeout'))
 }
 
 /**
@@ -93,6 +96,8 @@ const getAccessToken = (success, fail) => {
 };
 
 const http = (method, url, data, response, error, options = {}) => {
+  const originalUrl = url
+
   // 获取存储的access_token
   const accessToken = wx.getStorageSync('access_token')
   
@@ -101,7 +106,7 @@ const http = (method, url, data, response, error, options = {}) => {
     getAccessToken(
       (token) => {
         // 成功获取到token后，重新调用http函数
-        http(method, url, data, response, error, options);
+        http(method, originalUrl, data, response, error, options);
       },
       (errMsg) => {
         console.error('获取access_token失败:', errMsg);
@@ -112,8 +117,8 @@ const http = (method, url, data, response, error, options = {}) => {
   }
   
   // 处理URL，为所有请求在URL参数中添加access_token
-  const separator = url.includes('?') ? '&' : '?';
-  url = `${url}${separator}access_token=${encodeURIComponent(accessToken)}`;
+  const separator = originalUrl.includes('?') ? '&' : '?';
+  const requestUrl = `${originalUrl}${separator}access_token=${encodeURIComponent(accessToken)}`;
   
   // wx.showLoading({
   //   title: '加载中...',
@@ -127,7 +132,7 @@ const http = (method, url, data, response, error, options = {}) => {
   
   wx.request({
     method: method,
-    url: requestHost + url,
+    url: requestHost + requestUrl,
     timeout: options.timeout || 12000,
     header: {
       'content-type': 'application/json'
@@ -135,6 +140,35 @@ const http = (method, url, data, response, error, options = {}) => {
     data: data,  // 直接使用原始数据，不添加access_token
     success: res => {
       // console.log('HTTP请求成功响应:', res);
+      if (isAuthFailure(res)) {
+        if (options.authRetried) {
+          clearAccessToken()
+          safeCallback(error, {
+            message: `token验证失败(${res.statusCode})`,
+            statusCode: res.statusCode,
+            data: res.data
+          })
+          return
+        }
+
+        clearAccessToken()
+        getAccessToken(
+          () => {
+            http(method, originalUrl, data, response, error, {
+              ...options,
+              authRetried: true
+            })
+          },
+          (errMsg) => {
+            safeCallback(error, {
+              message: errMsg || '获取access_token失败',
+              statusCode: 401
+            })
+          }
+        )
+        return
+      }
+
       if (res.statusCode < 200 || res.statusCode >= 300) {
         safeCallback(error, {
           message: `请求失败(${res.statusCode})`,
@@ -147,16 +181,20 @@ const http = (method, url, data, response, error, options = {}) => {
     },
     fail: err => {
       console.error('HTTP请求失败:', err);
+      if (isTimeoutError(err)) {
+        safeCallback(error, {
+          ...err,
+          message: '请求超时，请稍后重试'
+        })
+        return
+      }
       safeCallback(error, err)
     },
     complete: info => {
       if(info.data && (info.data.code===401 || info.data.code===402)){
-        if(url.includes('bonus/detail')){
+        clearAccessToken()
+        if(requestUrl.includes('bonus/detail')){
           wx.hideLoading();
-        }else{
-          // 清除失效的token
-          wx.removeStorageSync('access_token');
-          goHome()
         }
       } else if(info.data && info.data.code===201){
         // 走注册流程
@@ -177,7 +215,7 @@ const http = (method, url, data, response, error, options = {}) => {
           console.log('提示信息:', info.data.message);
         }
       }
-      if(url.includes('order/submit') && info.data && info.data.code===200){
+      if(requestUrl.includes('order/submit') && info.data && info.data.code===200){
         // do
       }else{
         wx.hideLoading();

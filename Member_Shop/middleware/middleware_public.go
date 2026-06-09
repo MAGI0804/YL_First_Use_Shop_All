@@ -175,8 +175,7 @@ func AccessTokenValidationMiddleware() gin.HandlerFunc {
 		}
 
 		// 验证token是否存在且有效
-		//获取ip
-		clientIP := c.ClientIP()
+		clientIP := getAccessTokenClientIP(c)
 		log.Printf("Token验证 - ClientIP: %s", clientIP)
 
 		// 检查Redis是否初始化
@@ -245,6 +244,25 @@ func AccessTokenValidationMiddleware() gin.HandlerFunc {
 		// 验证通过，继续处理请求
 		c.Next()
 	}
+}
+
+func getAccessTokenClientIP(c *gin.Context) string {
+	xForwardedFor := c.GetHeader("X-Forwarded-For")
+	if xForwardedFor != "" {
+		ips := strings.Split(xForwardedFor, ",")
+		if len(ips) > 0 {
+			ip := strings.TrimSpace(ips[0])
+			if ip != "" {
+				return ip
+			}
+		}
+	}
+
+	clientIP := c.ClientIP()
+	if clientIP == "" {
+		return "unknown"
+	}
+	return clientIP
 }
 
 // CORSMiddleware 跨域中间件

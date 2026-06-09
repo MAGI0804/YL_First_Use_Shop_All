@@ -371,6 +371,12 @@ Base URL：`http://localhost:3088`
 
 字段含义：`shopname` 为店铺名，`get_ips` 必须传 `youlan_kids`。
 
+Token 规则：
+
+- 除白名单接口外，小程序请求必须在 URL query 或表单中携带 `access_token`。
+- `POST /access_token/get_token` 按客户端 IP 获取或生成 token；线上反向代理场景下，发 token 和验 token 都优先使用 `X-Forwarded-For` 的第一个 IP，避免同一请求链路因 IP 口径不一致返回 `401`。
+- 小程序端本地缓存的 `access_token` 只作为加速使用；普通接口遇到 HTTP `401/402` 或响应体 `code=401/402` 时，应清除缓存、重新调用 `get_token`，并对原请求最多重试一次。
+
 成功示例：
 
 ```json
