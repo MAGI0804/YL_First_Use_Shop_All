@@ -28,7 +28,7 @@ import (
 type UserController struct{}
 
 var (
-	wechatHTTPClient = &http.Client{Timeout: 8 * time.Second}
+	wechatHTTPClient = &http.Client{Timeout: 5 * time.Second}
 	wechatTokenCache = struct {
 		sync.Mutex
 		token     string
@@ -282,28 +282,42 @@ func (uc *UserController) UserGetID(t *gin.Context) {
 
 // WechatLogin 微信小程序登录
 func (uc *UserController) WechatLogin(c *gin.Context) {
+	requestID := fmt.Sprintf("%d", time.Now().UnixNano())
+	startedAt := time.Now()
+	log.Printf("[WechatLogin] start requestID=%s", requestID)
+
 	var req requestbody.WechatLoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("[WechatLogin] bind request failed requestID=%s elapsed=%s err=%v", requestID, time.Since(startedAt), err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的JSON格式"})
 		return
 	}
 
 	// 获取微信配置
 	cfg := config.LoadConfig()
+	if strings.TrimSpace(cfg.WechatConfig.AppID) == "" || strings.TrimSpace(cfg.WechatConfig.AppSecret) == "" {
+		log.Printf("[WechatLogin] missing wechat config requestID=%s elapsed=%s", requestID, time.Since(startedAt))
+		c.JSON(http.StatusInternalServerError, gin.H{"code": http.StatusInternalServerError, "message": "微信登录配置缺失"})
+		return
+	}
 
+	stepStartedAt := time.Now()
 	openid, err := getWechatOpenID(cfg, req.Code)
 	if err != nil {
-		log.Printf("微信登录失败: %v", err)
+		log.Printf("[WechatLogin] jscode2session failed requestID=%s elapsed=%s stepElapsed=%s err=%v", requestID, time.Since(startedAt), time.Since(stepStartedAt), err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	log.Printf("[WechatLogin] jscode2session success requestID=%s elapsed=%s stepElapsed=%s", requestID, time.Since(startedAt), time.Since(stepStartedAt))
 
+	stepStartedAt = time.Now()
 	mobile, err := getWechatPhoneNumber(cfg, req.PhoneCode)
 	if err != nil {
-		log.Printf("微信手机号授权失败: %v", err)
+		log.Printf("[WechatLogin] get phone failed requestID=%s elapsed=%s stepElapsed=%s err=%v", requestID, time.Since(startedAt), time.Since(stepStartedAt), err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	log.Printf("[WechatLogin] get phone success requestID=%s elapsed=%s stepElapsed=%s", requestID, time.Since(startedAt), time.Since(stepStartedAt))
 
 	// 解析昵称
 	nickname := ""
@@ -321,6 +335,7 @@ func (uc *UserController) WechatLogin(c *gin.Context) {
 		avatarURL = avatarVal
 	}
 
+	stepStartedAt = time.Now()
 	member, err := method.BindWechatPhone(requestbody.BindWechatPhoneRequest{
 		OpenID:    openid,
 		Mobile:    mobile,
@@ -332,13 +347,15 @@ func (uc *UserController) WechatLogin(c *gin.Context) {
 		if err.Error() == "mobile is not a member" || err.Error() == "member disabled" {
 			status = http.StatusForbidden
 		}
+		log.Printf("[WechatLogin] bind member failed requestID=%s elapsed=%s stepElapsed=%s err=%v", requestID, time.Since(startedAt), time.Since(stepStartedAt), err)
 		c.JSON(status, gin.H{"code": status, "message": memberLoginErrorMessage(err)})
 		return
 	}
+	log.Printf("[WechatLogin] bind member success requestID=%s elapsed=%s stepElapsed=%s userID=%d", requestID, time.Since(startedAt), time.Since(stepStartedAt), member.UserID)
 
 	var user models.User
 	if err := db.DB.Where("user_id = ?", member.UserID).First(&user).Error; err != nil {
-		log.Printf("查询微信用户失败: %v", err)
+		log.Printf("[WechatLogin] query user failed requestID=%s elapsed=%s err=%v", requestID, time.Since(startedAt), err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "服务器内部错误"})
 		return
 	}
@@ -346,7 +363,7 @@ func (uc *UserController) WechatLogin(c *gin.Context) {
 	// 生成令牌
 	accessToken, refreshToken, err := utils.GenerateTokens(user.UserID, cfg)
 	if err != nil {
-		log.Printf("生成令牌失败: %v", err)
+		log.Printf("[WechatLogin] generate token failed requestID=%s elapsed=%s err=%v", requestID, time.Since(startedAt), err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "服务器内部错误"})
 		return
 	}
@@ -380,6 +397,7 @@ func (uc *UserController) WechatLogin(c *gin.Context) {
 		}
 	}
 
+	log.Printf("[WechatLogin] success requestID=%s elapsed=%s userID=%d", requestID, time.Since(startedAt), user.UserID)
 	c.JSON(http.StatusOK, responseData)
 }
 
@@ -391,16 +409,18 @@ func getWechatOpenID(cfg config.Config, code string) (string, error) {
 		code,
 	)
 
+	startedAt := time.Now()
 	resp, err := wechatHTTPClient.Get(wxURL)
 	if err != nil {
-		return "", fmt.Errorf("微信登录失败")
+		return "", fmt.Errorf("微信登录失败: %v", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("微信登录失败")
+		return "", fmt.Errorf("微信登录失败: %v", err)
 	}
+	log.Printf("[WechatLogin] jscode2session http status=%d elapsed=%s", resp.StatusCode, time.Since(startedAt))
 
 	var wxResult map[string]interface{}
 	if err := json.Unmarshal(body, &wxResult); err != nil {
@@ -435,16 +455,18 @@ func getWechatPhoneNumber(cfg config.Config, phoneCode string) (string, error) {
 		return "", fmt.Errorf("微信手机号授权失败")
 	}
 	req.Header.Set("Content-Type", "application/json")
+	startedAt := time.Now()
 	resp, err := wechatHTTPClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("微信手机号授权失败")
+		return "", fmt.Errorf("微信手机号授权失败: %v", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("微信手机号授权失败")
+		return "", fmt.Errorf("微信手机号授权失败: %v", err)
 	}
+	log.Printf("[WechatLogin] getuserphonenumber http status=%d elapsed=%s", resp.StatusCode, time.Since(startedAt))
 
 	var wxResult struct {
 		ErrCode   int    `json:"errcode"`
@@ -490,16 +512,18 @@ func getWechatStableAccessToken(cfg config.Config) (string, error) {
 		return "", fmt.Errorf("微信access_token获取失败")
 	}
 	req.Header.Set("Content-Type", "application/json")
+	startedAt := time.Now()
 	resp, err := wechatHTTPClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("微信access_token获取失败")
+		return "", fmt.Errorf("微信access_token获取失败: %v", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("微信access_token获取失败")
+		return "", fmt.Errorf("微信access_token获取失败: %v", err)
 	}
+	log.Printf("[WechatLogin] stable_token http status=%d elapsed=%s", resp.StatusCode, time.Since(startedAt))
 
 	var wxResult struct {
 		AccessToken string `json:"access_token"`

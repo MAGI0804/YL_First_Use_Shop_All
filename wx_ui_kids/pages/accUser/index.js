@@ -3,6 +3,9 @@ const app = getApp()
 const req = app.req
 const request = require('../../api/request').default
 
+const LOGIN_REQUEST_TIMEOUT = 20000
+const WX_LOGIN_TIMEOUT = 8000
+
 Page({
   data: {
     bar: {
@@ -55,6 +58,13 @@ Page({
   },
 
   handlePhoneLogin(e) {
+    const requestId = Date.now().toString()
+    console.log('[wechat-login] getPhoneNumber event', {
+      requestId,
+      errMsg: e.detail && e.detail.errMsg,
+      hasPhoneCode: !!(e.detail && e.detail.code)
+    })
+
     if (this.data.loginLoading) {
       return
     }
@@ -72,7 +82,12 @@ Page({
 
     this.setData({ loginLoading: true })
     wx.login({
+      timeout: WX_LOGIN_TIMEOUT,
       success: (loginRes) => {
+        console.log('[wechat-login] wx.login success', {
+          requestId,
+          hasCode: !!loginRes.code
+        })
         if (!loginRes.code) {
           this.setData({ loginLoading: false })
           wx.showToast({
@@ -81,7 +96,7 @@ Page({
           })
           return
         }
-        this.loginWithWechatCode(loginRes.code, e.detail.code)
+        this.loginWithWechatCode(loginRes.code, e.detail.code, requestId)
       },
       fail: (err) => {
         this.setData({ loginLoading: false })
@@ -94,11 +109,15 @@ Page({
     })
   },
 
-  loginWithWechatCode(code, phoneCode) {
+  loginWithWechatCode(code, phoneCode, requestId) {
+    console.log('[wechat-login] request start', {
+      requestId,
+      host: request.getHost()
+    })
     wx.request({
       url: `${request.getHost()}/ordinary_user/wechat_login`,
       method: 'POST',
-      timeout: 30000,
+      timeout: LOGIN_REQUEST_TIMEOUT,
       header: {
         'content-type': 'application/json'
       },
@@ -109,6 +128,12 @@ Page({
       },
       success: (httpRes) => {
         const res = httpRes.data || {}
+        console.log('[wechat-login] request success', {
+          requestId,
+          statusCode: httpRes.statusCode,
+          code: res.code,
+          message: res.message || res.error || ''
+        })
         if (httpRes.statusCode >= 200 && httpRes.statusCode < 300 && res.code === 200 && res.data) {
           this.persistLogin(res.data)
           this.setData({
@@ -129,7 +154,10 @@ Page({
           title: isTimeout ? '登录超时，请重试' : '网络错误，登录失败',
           icon: 'none'
         })
-        console.error('登录失败:', err)
+        console.error('[wechat-login] request fail:', {
+          requestId,
+          err
+        })
       },
       complete: () => {
         this.setData({ loginLoading: false })
