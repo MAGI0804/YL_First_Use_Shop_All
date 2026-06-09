@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -25,6 +26,15 @@ import (
 
 // 用户控制器
 type UserController struct{}
+
+var (
+	wechatHTTPClient = &http.Client{Timeout: 8 * time.Second}
+	wechatTokenCache = struct {
+		sync.Mutex
+		token     string
+		expiresAt time.Time
+	}{}
+)
 
 // 查询用户信息
 func (uc *UserController) QueryUserInfo(t *gin.Context) {
@@ -381,7 +391,7 @@ func getWechatOpenID(cfg config.Config, code string) (string, error) {
 		code,
 	)
 
-	resp, err := http.Get(wxURL)
+	resp, err := wechatHTTPClient.Get(wxURL)
 	if err != nil {
 		return "", fmt.Errorf("微信登录失败")
 	}
@@ -416,11 +426,16 @@ func getWechatPhoneNumber(cfg config.Config, phoneCode string) (string, error) {
 	}
 
 	payload, _ := json.Marshal(map[string]string{"code": phoneCode})
-	resp, err := http.Post(
+	req, err := http.NewRequest(
+		http.MethodPost,
 		fmt.Sprintf("%s?access_token=%s", cfg.WechatConfig.PhoneNumberURL, accessToken),
-		"application/json",
 		bytes.NewReader(payload),
 	)
+	if err != nil {
+		return "", fmt.Errorf("微信手机号授权失败")
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := wechatHTTPClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("微信手机号授权失败")
 	}
@@ -456,13 +471,26 @@ func getWechatPhoneNumber(cfg config.Config, phoneCode string) (string, error) {
 }
 
 func getWechatStableAccessToken(cfg config.Config) (string, error) {
+	wechatTokenCache.Lock()
+	if wechatTokenCache.token != "" && time.Now().Before(wechatTokenCache.expiresAt) {
+		token := wechatTokenCache.token
+		wechatTokenCache.Unlock()
+		return token, nil
+	}
+	wechatTokenCache.Unlock()
+
 	payload, _ := json.Marshal(map[string]interface{}{
 		"grant_type":    "client_credential",
 		"appid":         cfg.WechatConfig.AppID,
 		"secret":        cfg.WechatConfig.AppSecret,
 		"force_refresh": false,
 	})
-	resp, err := http.Post(cfg.WechatConfig.AccessTokenURL, "application/json", bytes.NewReader(payload))
+	req, err := http.NewRequest(http.MethodPost, cfg.WechatConfig.AccessTokenURL, bytes.NewReader(payload))
+	if err != nil {
+		return "", fmt.Errorf("微信access_token获取失败")
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := wechatHTTPClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("微信access_token获取失败")
 	}
@@ -484,6 +512,10 @@ func getWechatStableAccessToken(cfg config.Config) (string, error) {
 	if wxResult.ErrCode != 0 || wxResult.AccessToken == "" {
 		return "", fmt.Errorf("微信access_token获取失败: %s", wxResult.ErrMsg)
 	}
+	wechatTokenCache.Lock()
+	wechatTokenCache.token = wxResult.AccessToken
+	wechatTokenCache.expiresAt = time.Now().Add(110 * time.Minute)
+	wechatTokenCache.Unlock()
 	return wxResult.AccessToken, nil
 }
 

@@ -95,33 +95,45 @@ Page({
   },
 
   loginWithWechatCode(code, phoneCode) {
-    req.post('/ordinary_user/wechat_login', {
-      code,
-      phone_code: phoneCode,
-      userInfo: {}
-    }, (res) => {
-      this.setData({ loginLoading: false })
-      if (res.code === 200 && res.data) {
-        this.persistLogin(res.data)
-        this.setData({
-          phoneAuthed: true,
-          nickname: res.data.nickname || '',
-          avatarUrl: res.data.avatar_url || ''
+    wx.request({
+      url: `${request.getHost()}/ordinary_user/wechat_login`,
+      method: 'POST',
+      timeout: 30000,
+      header: {
+        'content-type': 'application/json'
+      },
+      data: {
+        code,
+        phone_code: phoneCode,
+        userInfo: {}
+      },
+      success: (httpRes) => {
+        const res = httpRes.data || {}
+        if (httpRes.statusCode >= 200 && httpRes.statusCode < 300 && res.code === 200 && res.data) {
+          this.persistLogin(res.data)
+          this.setData({
+            phoneAuthed: true,
+            nickname: res.data.nickname || '',
+            avatarUrl: res.data.avatar_url || ''
+          })
+          return
+        }
+        wx.showToast({
+          title: res.message || res.error || `登录失败(${httpRes.statusCode})`,
+          icon: 'none'
         })
-        return
+      },
+      fail: (err) => {
+        const isTimeout = err && err.errMsg && err.errMsg.includes('timeout')
+        wx.showToast({
+          title: isTimeout ? '登录超时，请重试' : '网络错误，登录失败',
+          icon: 'none'
+        })
+        console.error('登录失败:', err)
+      },
+      complete: () => {
+        this.setData({ loginLoading: false })
       }
-      wx.showToast({
-        title: res.message || res.error || '登录失败',
-        icon: 'none'
-      })
-    }, (err) => {
-      this.setData({ loginLoading: false })
-      const data = err && err.data ? err.data : {}
-      wx.showToast({
-        title: data.message || data.error || err.message || '登录失败',
-        icon: 'none'
-      })
-      console.error('登录失败:', err)
     })
   },
 
