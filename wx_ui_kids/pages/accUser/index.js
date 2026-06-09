@@ -9,9 +9,11 @@ Page({
       hide: true
     },
     agreementChecked: false,
+    phoneAuthed: false,
     avatarUrl: '',
     nickname: '',
-    loginLoading: false
+    loginLoading: false,
+    profileSaving: false
   },
 
   toggleAgreement() {
@@ -57,10 +59,7 @@ Page({
       return
     }
     if (!this.data.agreementChecked) {
-      wx.showToast({
-        title: '请先同意协议',
-        icon: 'none'
-      })
+      this.promptAgreement()
       return
     }
     if (!e.detail || e.detail.errMsg !== 'getPhoneNumber:ok' || !e.detail.code) {
@@ -96,22 +95,18 @@ Page({
   },
 
   loginWithWechatCode(code, phoneCode) {
-    const avatarUrl = this.isTemporaryAvatar(this.data.avatarUrl) ? '' : this.data.avatarUrl
     req.post('/ordinary_user/wechat_login', {
       code,
       phone_code: phoneCode,
-      userInfo: {
-        nickName: this.data.nickname,
-        nickname: this.data.nickname,
-        avatarUrl,
-        avatar_url: avatarUrl
-      }
+      userInfo: {}
     }, (res) => {
       this.setData({ loginLoading: false })
       if (res.code === 200 && res.data) {
         this.persistLogin(res.data)
-        this.uploadAvatarIfNeeded(res.data.user_id, () => {
-          this.redirectAfterLogin()
+        this.setData({
+          phoneAuthed: true,
+          nickname: res.data.nickname || '',
+          avatarUrl: res.data.avatar_url || ''
         })
         return
       }
@@ -136,8 +131,8 @@ Page({
       user_id: data.user_id,
       member_no: data.member_no,
       mobile: data.mobile,
-      nickname: data.nickname || this.data.nickname || '微信用户',
-      user_img: data.avatar_url || this.data.avatarUrl || '/images/home.png',
+      nickname: data.nickname || '微信用户',
+      user_img: data.avatar_url || '/images/home.png',
       phone_bound: data.phone_bound === true
     }
 
@@ -151,12 +146,28 @@ Page({
     app.globalData.user_id = data.user_id
   },
 
-  uploadAvatarIfNeeded(userId, done) {
-    if (!this.isTemporaryAvatar(this.data.avatarUrl) || !userId) {
-      done()
+  saveProfileAndEnter() {
+    if (this.data.profileSaving) {
+      return
+    }
+    const userId = wx.getStorageSync('user_id')
+    if (!userId) {
+      wx.showToast({
+        title: '请先授权手机号',
+        icon: 'none'
+      })
       return
     }
 
+    this.setData({ profileSaving: true })
+    if (this.isTemporaryAvatar(this.data.avatarUrl)) {
+      this.uploadAvatarProfile(userId)
+      return
+    }
+    this.updateNicknameProfile(userId)
+  },
+
+  uploadAvatarProfile(userId) {
     const accessToken = wx.getStorageSync('access_token')
     wx.uploadFile({
       url: `${request.getHost()}/ordinary_user/Modify_data?access_token=${encodeURIComponent(accessToken)}`,
@@ -164,29 +175,69 @@ Page({
       name: 'user_img',
       formData: {
         user_id: userId.toString(),
-        nickname: this.data.nickname
+        nickname: this.data.nickname || '微信用户'
       },
       success: (res) => {
         try {
           const data = typeof res.data === 'string' ? JSON.parse(res.data) : res.data
           const avatarURL = data && (data.avatar_url || (data.data && data.data.avatar_url))
-          if (avatarURL) {
-            const userInfo = {
-              ...app.globalData.userInfo,
-              user_img: avatarURL
-            }
-            app.globalData.userInfo = userInfo
-            wx.setStorageSync('userInfo', userInfo)
-          }
+          this.mergeStoredUserInfo({
+            nickname: this.data.nickname || app.globalData.userInfo.nickname,
+            user_img: avatarURL || this.data.avatarUrl || app.globalData.userInfo.user_img
+          })
         } catch (parseErr) {
           console.warn('头像上传响应解析失败:', parseErr)
+          this.mergeStoredUserInfo({
+            nickname: this.data.nickname || app.globalData.userInfo.nickname
+          })
         }
       },
       fail: (err) => {
-        console.warn('头像上传失败，保留本地头像:', err)
+        console.warn('头像上传失败:', err)
+        this.mergeStoredUserInfo({
+          nickname: this.data.nickname || app.globalData.userInfo.nickname
+        })
       },
-      complete: done
+      complete: () => {
+        this.setData({ profileSaving: false })
+        this.redirectAfterLogin()
+      }
     })
+  },
+
+  updateNicknameProfile(userId) {
+    const nickname = this.data.nickname
+    if (!nickname || nickname === (app.globalData.userInfo && app.globalData.userInfo.nickname)) {
+      this.setData({ profileSaving: false })
+      this.redirectAfterLogin()
+      return
+    }
+    req.post('/ordinary_user/Modify_data', {
+      user_id: userId,
+      nickname
+    }, () => {
+      this.mergeStoredUserInfo({ nickname })
+      this.setData({ profileSaving: false })
+      this.redirectAfterLogin()
+    }, (err) => {
+      console.warn('昵称保存失败:', err)
+      this.setData({ profileSaving: false })
+      this.redirectAfterLogin()
+    })
+  },
+
+  skipProfile() {
+    this.redirectAfterLogin()
+  },
+
+  mergeStoredUserInfo(nextInfo) {
+    const current = app.globalData.userInfo || wx.getStorageSync('userInfo') || {}
+    const userInfo = {
+      ...current,
+      ...nextInfo
+    }
+    app.globalData.userInfo = userInfo
+    wx.setStorageSync('userInfo', userInfo)
   },
 
   isTemporaryAvatar(avatarUrl) {

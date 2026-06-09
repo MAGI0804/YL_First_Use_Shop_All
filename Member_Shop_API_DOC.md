@@ -77,11 +77,12 @@ Base URL：`http://localhost:3088`
 
 会员登录规则：
 
-- 登录页一次用户动作触发手机号授权登录；头像使用 `open-type="chooseAvatar"`，昵称使用 `input type="nickname"` 在同页收集。
+- 登录页第一步只触发手机号授权登录；登录成功后再显示头像昵称补全区。
+- 头像使用 `open-type="chooseAvatar"`，昵称使用 `input type="nickname"`。按微信小程序能力限制，头像和昵称不能合并成一个手机号授权弹窗；可在资料补全区提供“保存并进入”和“暂不完善，直接进入”。
 - `wechat_login` 必须同时收到 `code` 和 `phone_code`，后端先换 openid，再换手机号。
 - 手机号必须已经存在于 `member_info` 且会员状态不是 `disabled`；非会员手机号返回 `403`。
 - 首次登录成功后，`member_info.mobile`、`member_info.user_id`、`member_info.openid` 与 `users_user.mobile` 绑定；一个手机号只对应一个 `user_id`，不能再绑定其他微信 openid。
-- 小程序端登录成功后保存 `token`、`refresh_token`、`user_id`、`userInfo`；临时头像路径通过 `Modify_data` 上传后再写入用户资料。
+- 小程序端手机号登录成功后保存 `token`、`refresh_token`、`user_id`、`userInfo`；临时头像路径通过 `Modify_data` 上传后再写入用户资料。
 
 微信登录成功示例：
 

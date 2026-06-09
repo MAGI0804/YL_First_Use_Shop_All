@@ -2,47 +2,60 @@
 <view class="login-page">
   <image class="title-image" src="/images/title.jpg" mode="widthFix"></image>
 
-  <view class="profile-panel">
-    <button class="avatar-button" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
-      <image class="avatar-preview" src="{{avatarUrl || '/images/home.png'}}" mode="aspectFill"></image>
-    </button>
-    <input
-      class="nickname-input"
-      type="nickname"
-      value="{{nickname}}"
-      placeholder="微信昵称"
-      maxlength="24"
-      bindinput="onNicknameInput"
-    />
-  </view>
+  <block wx:if="{{!phoneAuthed}}">
+    <view class="login-box">
+      <button
+        wx:if="{{agreementChecked}}"
+        class="login-btn"
+        open-type="getPhoneNumber"
+        bindgetphonenumber="handlePhoneLogin"
+        loading="{{loginLoading}}"
+        disabled="{{loginLoading}}"
+      >
+        {{loginLoading ? '授权中' : '手机号授权登录'}}
+      </button>
+      <button wx:else class="login-btn" bindtap="promptAgreement">手机号授权登录</button>
+    </view>
 
-  <view class="login-box">
-    <button
-      wx:if="{{agreementChecked}}"
-      class="login-btn"
-      open-type="getPhoneNumber"
-      bindgetphonenumber="handlePhoneLogin"
-      loading="{{loginLoading}}"
-      disabled="{{loginLoading}}"
-    >
-      {{loginLoading ? '登录中' : '手机号授权登录'}}
-    </button>
-    <button wx:else class="login-btn" bindtap="promptAgreement">手机号授权登录</button>
-  </view>
+    <view class="member-tip">仅已登记会员手机号可登录下单</view>
 
-  <view class="member-tip">仅已登记会员手机号可登录下单</view>
-
-  <view class="agreement-row">
-    <view class="checkbox-hit" bindtap="toggleAgreement">
-      <view class="checkbox {{agreementChecked ? 'checked' : ''}}">
-        <text wx:if="{{agreementChecked}}" class="check-mark">✓</text>
+    <view class="agreement-row">
+      <view class="checkbox-hit" bindtap="toggleAgreement">
+        <view class="checkbox {{agreementChecked ? 'checked' : ''}}">
+          <text wx:if="{{agreementChecked}}" class="check-mark">✓</text>
+        </view>
+      </view>
+      <view class="agreement-copy">
+        <text class="agreement-text">同意</text>
+        <text class="agreement-link" catchtap="navigateToAgreement">《用户协议》</text>
+        <text class="agreement-text">和</text>
+        <text class="agreement-link" catchtap="navigateToPrivacy">《隐私政策》</text>
       </view>
     </view>
-    <view class="agreement-copy">
-      <text class="agreement-text">同意</text>
-      <text class="agreement-link" catchtap="navigateToAgreement">《用户协议》</text>
-      <text class="agreement-text">和</text>
-      <text class="agreement-link" catchtap="navigateToPrivacy">《隐私政策》</text>
+  </block>
+
+  <block wx:else>
+    <view class="profile-panel">
+      <button class="avatar-button" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+        <image class="avatar-preview" src="{{avatarUrl || '/images/home.png'}}" mode="aspectFill"></image>
+      </button>
+      <input
+        class="nickname-input"
+        type="nickname"
+        value="{{nickname}}"
+        placeholder="微信昵称"
+        maxlength="24"
+        bindinput="onNicknameInput"
+      />
     </view>
-  </view>
+
+    <view class="profile-tip">完善头像和昵称后进入商城</view>
+
+    <view class="login-box">
+      <button class="login-btn" loading="{{profileSaving}}" disabled="{{profileSaving}}" bindtap="saveProfileAndEnter">
+        {{profileSaving ? '保存中' : '保存并进入'}}
+      </button>
+      <button class="skip-btn" bindtap="skipProfile">暂不完善，直接进入</button>
+    </view>
+  </block>
 </view>
