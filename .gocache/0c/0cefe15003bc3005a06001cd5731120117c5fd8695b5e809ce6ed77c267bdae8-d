@@ -1,6 +1,0 @@
-./after_sale.go
-./environment.go
-./get_token.go
-./logistic.go
-./query_kucun.go
-./send_order.go
