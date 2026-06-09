@@ -6,6 +6,15 @@ const request = require('../../api/request').default
 const LOGIN_REQUEST_TIMEOUT = 20000
 const WX_LOGIN_TIMEOUT = 8000
 
+const getMiniProgramInfo = () => {
+  try {
+    const accountInfo = wx.getAccountInfoSync()
+    return accountInfo && accountInfo.miniProgram ? accountInfo.miniProgram : {}
+  } catch (err) {
+    return {}
+  }
+}
+
 Page({
   data: {
     bar: {
@@ -57,12 +66,29 @@ Page({
     })
   },
 
+  showPhoneAuthFail(detail) {
+    const errMsg = detail && detail.errMsg ? detail.errMsg : ''
+    const isDataEmpty = errMsg.includes('data empty')
+    const content = isDataEmpty
+      ? '微信未返回手机号授权凭证。请确认使用真机预览/体验版，并确认当前小程序 AppID 已开通手机号快速验证能力。'
+      : '需要授权手机号后才能登录。'
+
+    wx.showModal({
+      title: '手机号授权失败',
+      content,
+      showCancel: false
+    })
+  },
+
   handlePhoneLogin(e) {
     const requestId = Date.now().toString()
+    const miniProgramInfo = getMiniProgramInfo()
     console.log('[wechat-login] getPhoneNumber event', {
       requestId,
       errMsg: e.detail && e.detail.errMsg,
-      hasPhoneCode: !!(e.detail && e.detail.code)
+      hasPhoneCode: !!(e.detail && e.detail.code),
+      appId: miniProgramInfo.appId,
+      envVersion: miniProgramInfo.envVersion
     })
 
     if (this.data.loginLoading) {
@@ -73,10 +99,7 @@ Page({
       return
     }
     if (!e.detail || e.detail.errMsg !== 'getPhoneNumber:ok' || !e.detail.code) {
-      wx.showToast({
-        title: '需要授权手机号登录',
-        icon: 'none'
-      })
+      this.showPhoneAuthFail(e.detail)
       return
     }
 
