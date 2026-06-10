@@ -64,8 +64,8 @@ type JushuitanConfig struct {
 	AppSecretTest                 string
 	AppKeyProd                    string
 	AppSecretProd                 string
+	AuthCodeTest                  string
 	AuthCodeProd                  string
-	AccessTokenTest               string
 	ShopID                        string
 	GetTokenURLTest               string
 	GetTokenURLProd               string
@@ -140,8 +140,8 @@ func LoadConfig() Config {
 			AppSecretTest:                 getEnv("JST_APP_SECRET_TEST", ""),
 			AppKeyProd:                    getEnv("JST_APP_KEY_PROD", ""),
 			AppSecretProd:                 getEnv("JST_APP_SECRET_PROD", ""),
+			AuthCodeTest:                  getEnv("JST_AUTH_CODE_TEST", ""),
 			AuthCodeProd:                  getEnv("JST_AUTH_CODE_PROD", ""),
-			AccessTokenTest:               getEnv("JST_ACCESS_TOKEN_TEST", ""),
 			ShopID:                        getEnv("JST_SHOP_ID", ""),
 			GetTokenURLTest:               getEnv("JST_GET_TOKEN_URL_TEST", ""),
 			GetTokenURLProd:               getEnv("JST_GET_TOKEN_URL_PROD", ""),

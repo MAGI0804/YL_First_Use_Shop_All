@@ -34,7 +34,7 @@ func refreshJushuitanAutomationEnv() config.Config {
 	if automationUsesTestJushuitan(cfg) {
 		AppKey = cfg.JushuitanConfig.AppKeyTest
 		AppSelect = cfg.JushuitanConfig.AppSecretTest
-		Code = ""
+		Code = cfg.JushuitanConfig.AuthCodeTest
 		return cfg
 	}
 	AppKey = cfg.JushuitanConfig.AppKeyProd
@@ -122,14 +122,8 @@ func MD5Encrypt(input string) string {
 
 func GetToken() (string, error) {
 	cfg := refreshJushuitanAutomationEnv()
-	if automationUsesTestJushuitan(cfg) {
-		if cfg.JushuitanConfig.AccessTokenTest == "" {
-			return "", fmt.Errorf("JST_ACCESS_TOKEN_TEST未配置")
-		}
-		return cfg.JushuitanConfig.AccessTokenTest, nil
-	}
 	if AppKey == "" || AppSelect == "" || Code == "" {
-		return "", fmt.Errorf("聚水潭正式应用配置未完整设置")
+		return "", fmt.Errorf("聚水潭应用配置未完整设置")
 	}
 
 	timestamp := time.Now().Unix()

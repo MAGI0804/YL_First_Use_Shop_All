@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -30,10 +31,13 @@ func md5Encrypt(paymentStr string) string {
 
 func GetTokenTest() (string, error) {
 	cfg := config.LoadConfig()
-	if cfg.JushuitanConfig.AccessTokenTest == "" {
-		return "", fmt.Errorf("JST_ACCESS_TOKEN_TEST未配置")
-	}
-	return cfg.JushuitanConfig.AccessTokenTest, nil
+	return requestToken(
+		cfg.JushuitanConfig.AppKeyTest,
+		cfg.JushuitanConfig.AppSecretTest,
+		cfg.JushuitanConfig.AuthCodeTest,
+		cfg.JushuitanConfig.GetTokenURLTest,
+		"测试",
+	)
 }
 
 func GetToken() (string, error) {
@@ -46,27 +50,40 @@ func GetToken() (string, error) {
 
 func GetTokenProd() (string, error) {
 	cfg := config.LoadConfig()
-	if cfg.JushuitanConfig.AppKeyProd == "" || cfg.JushuitanConfig.AppSecretProd == "" || cfg.JushuitanConfig.AuthCodeProd == "" {
-		return "", fmt.Errorf("聚水潭生产应用配置未完整设置")
-	}
+	return requestToken(
+		cfg.JushuitanConfig.AppKeyProd,
+		cfg.JushuitanConfig.AppSecretProd,
+		cfg.JushuitanConfig.AuthCodeProd,
+		cfg.JushuitanConfig.GetTokenURLProd,
+		"生产",
+	)
+}
 
+func requestToken(appKey, appSecret, authCode, tokenURL, envName string) (string, error) {
+	if appKey == "" || appSecret == "" || authCode == "" {
+		return "", fmt.Errorf("聚水潭%s应用配置未完整设置", envName)
+	}
+	tokenURL = strings.TrimSpace(tokenURL)
+	if tokenURL == "" {
+		return "", fmt.Errorf("聚水潭%s应用token刷新URL未配置", envName)
+	}
 	timestamp := int(time.Now().Unix())
 	charset := "UTF-8"
 	grantType := "authorization_code"
-	code := cfg.JushuitanConfig.AuthCodeProd
 
 	convertedStr := fmt.Sprintf("%sapp_key%scharset%scode%sgrant_type%stimestamp%d",
-		cfg.JushuitanConfig.AppSecretProd, cfg.JushuitanConfig.AppKeyProd, charset, code, grantType, timestamp)
+		appSecret, appKey, charset, authCode, grantType, timestamp)
 	sign := md5Encrypt(convertedStr)
 
-	url := cfg.JushuitanConfig.GetTokenURLProd
-	if strings.TrimSpace(url) == "" {
-		return "", fmt.Errorf("JST_GET_TOKEN_URL_PROD未配置")
-	}
-	data := fmt.Sprintf("app_key=%s&grant_type=%s&timestamp=%d&code=%s&charset=%s&sign=%s",
-		cfg.JushuitanConfig.AppKeyProd, grantType, timestamp, code, charset, sign)
+	data := url.Values{}
+	data.Set("app_key", appKey)
+	data.Set("grant_type", grantType)
+	data.Set("timestamp", fmt.Sprintf("%d", timestamp))
+	data.Set("code", authCode)
+	data.Set("charset", charset)
+	data.Set("sign", sign)
 
-	resp, err := http.Post(url, "application/x-www-form-urlencoded", strings.NewReader(data))
+	resp, err := http.Post(tokenURL, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
 	if err != nil {
 		return "", err
 	}
@@ -77,7 +94,7 @@ func GetTokenProd() (string, error) {
 		return "", err
 	}
 
-	fmt.Printf("GetTokenProd response: %s\n", string(body))
+	fmt.Printf("GetToken%s response: %s\n", envName, string(body))
 
 	return parseTokenFromResponse(body)
 }

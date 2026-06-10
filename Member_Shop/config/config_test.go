@@ -50,6 +50,7 @@ func TestLoadConfigReadsEnvironmentOverrides(t *testing.T) {
 	t.Setenv("WECHAT_PHONE_NUMBER_URL", "https://wechat.example.com/phone-number")
 	t.Setenv("ALIYUN_SMS_TEMPLATE_CODE", "sms-template")
 	t.Setenv("JST_ENV_STAGE", "test")
+	t.Setenv("JST_AUTH_CODE_TEST", "test-auth-code")
 	t.Setenv("JST_APP_KEY_PROD", "jst-key")
 	t.Setenv("JST_SHOP_ID", "10001")
 	t.Setenv("JST_ORDER_UPLOAD_URL_TEST", "https://jst.example.com/order-upload")
@@ -91,7 +92,7 @@ func TestLoadConfigReadsEnvironmentOverrides(t *testing.T) {
 	if cfg.JushuitanConfig.AppKeyProd != "jst-key" {
 		t.Fatalf("expected Jushuitan env override")
 	}
-	if cfg.JushuitanConfig.Stage != "test" || cfg.JushuitanConfig.ShopID != "10001" {
+	if cfg.JushuitanConfig.Stage != "test" || cfg.JushuitanConfig.AuthCodeTest != "test-auth-code" || cfg.JushuitanConfig.ShopID != "10001" {
 		t.Fatalf("expected Jushuitan stage/shop overrides, got stage=%q shop_id=%q", cfg.JushuitanConfig.Stage, cfg.JushuitanConfig.ShopID)
 	}
 	if cfg.JushuitanConfig.OrderUploadURLTest != "https://jst.example.com/order-upload" {
