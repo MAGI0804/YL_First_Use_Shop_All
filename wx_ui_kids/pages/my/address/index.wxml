@@ -6,12 +6,12 @@
   </view> -->
 
   <!-- 地址列表 -->
-  <view class="address-sync-panel">
+  <!-- <view class="address-sync-panel">
     <button class="wechat-address-btn" bindtap="syncWechatAddress" loading="{{syncingWechatAddress}}" disabled="{{syncingWechatAddress}}">
       同步微信地址
     </button>
     <text class="wechat-address-tip">从微信收货地址簿选择后自动保存到商城地址</text>
-  </view>
+  </view> -->
 
   <!-- 地址列表 -->
   <view class="address-list" wx:if="{{addressList.length > 0}}">
@@ -47,8 +47,11 @@
   </view>
 
   <!-- 添加地址按钮 -->
-  <view class="add-address-fixed" wx:if="{{addressList.length > 0}}" bindtap="navigateToAddAddress">
-    <text class="add-address-icon">+</text>
-    <text class="add-address-text">添加收货地址</text>
+  <view class="address-fixed-actions" wx:if="{{addressList.length > 0}}">
+    <view class="add-address-fixed" bindtap="navigateToAddAddress">
+      <text class="add-address-icon">+</text>
+      <text class="add-address-text">添加收货地址</text>
+    </view>
+    <view class="sync-address-link" bindtap="syncWechatAddress">同步微信地址</view>
   </view>
 </view>

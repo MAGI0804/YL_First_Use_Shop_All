@@ -180,11 +180,18 @@
 }
 
 /* 固定添加按钮 */
-.add-address-fixed {
+.address-fixed-actions {
   position: fixed;
   bottom: 30rpx;
   left: 50%;
   transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28rpx;
+}
+
+.add-address-fixed {
   background-color: #68B9FA;
   color: #fff;
   font-size: 32rpx;
