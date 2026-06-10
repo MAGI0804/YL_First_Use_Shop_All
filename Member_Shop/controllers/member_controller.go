@@ -4,6 +4,7 @@ import (
 	"Member_shop/requestbody"
 	"Member_shop/service/method"
 	"Member_shop/service/msg"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -81,6 +82,58 @@ func (mc *MemberController) MemberDetail(c *gin.Context) {
 		return
 	}
 	data := map[string]any{"detail": detail}
+	c.JSON(http.StatusOK, msg.SuccessResponse("success", &data))
+}
+
+func (mc *MemberController) DownloadImportTemplate(c *gin.Context) {
+	content, err := method.BuildMemberImportTemplate()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, msg.ErrResponseStr(err.Error()))
+		return
+	}
+	fileName := "member_import_template.xlsx"
+	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, fileName))
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", content)
+}
+
+func (mc *MemberController) MatchImportFile(c *gin.Context) {
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr("请上传Excel文件"))
+		return
+	}
+	file, err := fileHeader.Open()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr("Excel文件打开失败"))
+		return
+	}
+	defer file.Close()
+
+	result, err := method.MatchMemberImportFile(file)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr(err.Error()))
+		return
+	}
+	data := map[string]any{"result": result}
+	c.JSON(http.StatusOK, msg.SuccessResponse("success", &data))
+}
+
+func (mc *MemberController) ConfirmImport(c *gin.Context) {
+	operator, ok := requireBackendOperator(c)
+	if !ok {
+		return
+	}
+	var req requestbody.MemberImportConfirmRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponse("invalid request", err))
+		return
+	}
+	result, err := method.ConfirmMemberImport(req, operator, requestMeta(c))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr(err.Error()))
+		return
+	}
+	data := map[string]any{"result": result}
 	c.JSON(http.StatusOK, msg.SuccessResponse("success", &data))
 }
 

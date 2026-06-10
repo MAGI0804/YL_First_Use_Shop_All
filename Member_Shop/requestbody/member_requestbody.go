@@ -54,6 +54,21 @@ type MemberDetailRequest struct {
 	UserID   int    `json:"user_id"`
 }
 
+type MemberImportItemRequest struct {
+	Mobile           string  `json:"mobile"`
+	ManualUniqueCode string  `json:"manual_unique_code"`
+	Nickname         string  `json:"nickname"`
+	TmallID          string  `json:"tmall_id"`
+	TmallAmount      float64 `json:"tmall_amount"`
+	YouzanID         string  `json:"youzan_id"`
+	YouzanAmount     float64 `json:"youzan_amount"`
+	Remarks          string  `json:"remarks"`
+}
+
+type MemberImportConfirmRequest struct {
+	Items []MemberImportItemRequest `json:"items" binding:"required"`
+}
+
 type MemberTagListRequest struct {
 	Name     string `json:"name"`
 	Page     int    `json:"page"`

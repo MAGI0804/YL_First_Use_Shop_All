@@ -258,6 +258,44 @@ export interface MemberDetailResponse {
   msg: string
 }
 
+export interface MemberImportRow {
+  row_index: number
+  mobile: string
+  manual_unique_code: string
+  nickname: string
+  tmall_id: string
+  tmall_amount: number
+  youzan_id: string
+  youzan_amount: number
+  remarks: string
+  matched: boolean
+  errors: string[]
+}
+
+export interface MemberImportMatchResponse {
+  code: number
+  data: {
+    result: {
+      items: MemberImportRow[]
+      total_rows: number
+      matched_count: number
+      invalid_count: number
+    }
+  }
+  msg: string
+}
+
+export interface MemberImportConfirmResponse {
+  code: number
+  data: {
+    result: {
+      imported_count: number
+      members: MemberItem[]
+    }
+  }
+  msg: string
+}
+
 export interface AddressItem {
   address_id: number
   user_id: number
@@ -351,6 +389,22 @@ export const updateMember = (params: Partial<MemberItem> & { id: number }) => {
 
 export const queryMemberDetail = (params: { id?: number; member_no?: string; mobile?: string; user_id?: number }) => {
   return http.post<MemberDetailResponse>('/member/detail', params)
+}
+
+export const downloadMemberImportTemplate = () => {
+  return http.get<Blob>('/member/import/template', { responseType: 'blob' })
+}
+
+export const matchMemberImportFile = (formData: FormData) => {
+  return http.post<MemberImportMatchResponse>('/member/import/match', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+}
+
+export const confirmMemberImport = (params: { items: Partial<MemberItem>[] }) => {
+  return http.post<MemberImportConfirmResponse>('/member/import/confirm', params)
 }
 
 export const queryAddresses = (params: { user_id: number }) => {
