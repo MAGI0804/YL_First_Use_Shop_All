@@ -83,6 +83,7 @@ md_file
 .gocache/
 
 
-wx_ui_kids\package-lock.json
-wx_ui_kids\project.config.json
-wx_ui_kids\project.config.json
+/package.json
+/package-lock.json
+wx_ui_kids/package-lock.json
+wx_ui_kids/project.config.json
