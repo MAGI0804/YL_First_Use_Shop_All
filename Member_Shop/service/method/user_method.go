@@ -163,9 +163,6 @@ func findOrCreateWechatMemberUser(tx *gorm.DB, member models.Member, req request
 
 	mobileErr := tx.Where("mobile = ?", req.Mobile).First(&user).Error
 	if mobileErr == nil {
-		if hasBoundWechatOpenID(user.OpenID) && user.OpenID != req.OpenID {
-			return models.User{}, fmt.Errorf("mobile already bound to another openid")
-		}
 		if member.UserID != 0 && member.UserID != user.UserID {
 			return models.User{}, fmt.Errorf("member already linked to another user")
 		}
@@ -202,11 +199,8 @@ func findOrCreateWechatMemberUser(tx *gorm.DB, member models.Member, req request
 }
 
 func updateWechatMemberUser(tx *gorm.DB, user models.User, req requestbody.BindWechatPhoneRequest) (models.User, error) {
-	if user.Mobile != "" && user.Mobile != req.Mobile {
-		return models.User{}, fmt.Errorf("openid already bound to another mobile")
-	}
-	if hasBoundWechatOpenID(user.OpenID) && user.OpenID != req.OpenID {
-		return models.User{}, fmt.Errorf("mobile already bound to another openid")
+	if err := validateWechatUserMobileForBinding(user, req.Mobile); err != nil {
+		return models.User{}, err
 	}
 
 	updates := map[string]interface{}{
@@ -230,6 +224,13 @@ func updateWechatMemberUser(tx *gorm.DB, user models.User, req requestbody.BindW
 		return models.User{}, err
 	}
 	return user, nil
+}
+
+func validateWechatUserMobileForBinding(user models.User, mobile string) error {
+	if user.Mobile != "" && user.Mobile != mobile {
+		return fmt.Errorf("openid already bound to another mobile")
+	}
+	return nil
 }
 
 func validateMemberStatus(member models.Member) error {

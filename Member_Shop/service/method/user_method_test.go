@@ -62,6 +62,22 @@ func TestHasBoundWechatOpenIDTreatsZeroAsUnbound(t *testing.T) {
 	}
 }
 
+func TestValidateWechatUserMobileForBindingAllowsSameMobileWithOldOpenID(t *testing.T) {
+	user := models.User{UserID: 10, Mobile: "13800138000", OpenID: "old-openid"}
+
+	if err := validateWechatUserMobileForBinding(user, "13800138000"); err != nil {
+		t.Fatalf("same mobile should allow openid refresh, got %v", err)
+	}
+}
+
+func TestValidateWechatUserMobileForBindingRejectsDifferentMobile(t *testing.T) {
+	user := models.User{UserID: 10, Mobile: "13800138000", OpenID: "openid-a"}
+
+	if err := validateWechatUserMobileForBinding(user, "13900139000"); err == nil {
+		t.Fatalf("different mobile should be rejected")
+	}
+}
+
 func TestShouldUpdateWechatNicknameOnlyReplacesDefaults(t *testing.T) {
 	if !shouldUpdateWechatNickname("微信用户_openid", "幼岚会员") {
 		t.Fatalf("default nickname should be replaceable")
