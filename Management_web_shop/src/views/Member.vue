@@ -15,7 +15,10 @@
         <el-button type="primary" @click="handleSearch">搜索</el-button>
         <el-button @click="handleReset">重置</el-button>
       </div>
-      <el-button type="primary" @click="openAddDialog">新增会员</el-button>
+      <div class="toolbar-actions">
+        <el-button @click="openImportDrawer">导入名单</el-button>
+        <el-button type="primary" @click="openAddDialog">新增会员</el-button>
+      </div>
     </div>
 
     <el-table v-loading="loading" :data="members" row-key="id" class="member-table">
@@ -120,22 +123,98 @@
         <el-button type="primary" :loading="submitting" @click="saveTags">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-drawer v-model="importDrawerVisible" title="导入会员名单" size="820px" destroy-on-close @closed="resetImportState">
+      <div class="import-panel">
+        <div class="import-actions">
+          <el-upload
+            accept=".xlsx"
+            :auto-upload="false"
+            :show-file-list="false"
+            :on-change="handleImportFileChange"
+          >
+            <el-button type="primary">导入Excel</el-button>
+          </el-upload>
+          <el-button @click="downloadImportTemplate">下载模板</el-button>
+          <el-button :disabled="!importFile" :loading="matching" @click="matchImportFile">匹配名单</el-button>
+        </div>
+
+        <div v-if="importFile" class="import-file">
+          当前文件：{{ importFile.name }}
+        </div>
+
+        <el-alert
+          v-if="importResult"
+          class="import-summary"
+          :closable="false"
+          type="info"
+          show-icon
+        >
+          <template #title>
+            共读取 {{ importResult.total_rows }} 行，匹配可导入 {{ importResult.matched_count }} 行，不符合 {{ importResult.invalid_count }} 行
+          </template>
+        </el-alert>
+
+        <el-table v-if="importRows.length" :data="importRows" max-height="480" class="import-table">
+          <el-table-column prop="row_index" label="Excel行" width="80" />
+          <el-table-column prop="mobile" label="手机号" min-width="130" />
+          <el-table-column prop="manual_unique_code" label="唯一字段" min-width="130" show-overflow-tooltip />
+          <el-table-column prop="nickname" label="昵称" min-width="110" show-overflow-tooltip />
+          <el-table-column label="平台金额" min-width="180">
+            <template #default="{ row }">
+              <div class="amount-lines">
+                <span>天猫 {{ row.tmall_id || '-' }} / ¥{{ formatMoney(row.tmall_amount) }}</span>
+                <span>有赞 {{ row.youzan_id || '-' }} / ¥{{ formatMoney(row.youzan_amount) }}</span>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="匹配结果" min-width="190">
+            <template #default="{ row }">
+              <el-tag v-if="row.matched" type="success" size="small">可导入</el-tag>
+              <div v-else class="import-errors">
+                <el-tag type="danger" size="small">不符合</el-tag>
+                <span>{{ row.errors.join('；') }}</span>
+              </div>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <el-empty v-else class="import-empty" description="请先导入Excel并点击匹配名单" />
+      </div>
+
+      <template #footer>
+        <el-button @click="importDrawerVisible = false">关闭</el-button>
+        <el-button
+          type="primary"
+          :disabled="matchedImportRows.length === 0"
+          :loading="confirmingImport"
+          @click="confirmImportRows"
+        >
+          确认导入{{ matchedImportRows.length ? ` ${matchedImportRows.length} 条` : '' }}
+        </el-button>
+      </template>
+    </el-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import type { UploadFile } from 'element-plus'
 import {
+  confirmMemberImport,
   createMember,
   createMemberTag,
+  downloadMemberImportTemplate,
+  matchMemberImportFile,
   queryMemberDetail,
   queryMembers,
   queryMemberTags,
   setMemberTags,
   updateMember,
   type MemberItem,
+  type MemberImportRow,
   type MemberTagItem
 } from '@/api'
 
@@ -149,9 +228,17 @@ const page = ref(1)
 const pageSize = 10
 const addDialogVisible = ref(false)
 const tagDialogVisible = ref(false)
+const importDrawerVisible = ref(false)
 const currentMember = ref<MemberItem | null>(null)
 const selectedTagIds = ref<number[]>([])
 const newTagName = ref('')
+const importFile = ref<File | null>(null)
+const importResult = ref<{ total_rows: number; matched_count: number; invalid_count: number } | null>(null)
+const importRows = ref<MemberImportRow[]>([])
+const matching = ref(false)
+const confirmingImport = ref(false)
+
+const matchedImportRows = computed(() => importRows.value.filter(row => row.matched))
 
 const filters = reactive({
   mobile: '',
@@ -229,6 +316,108 @@ const openAddDialog = () => {
     remarks: ''
   })
   addDialogVisible.value = true
+}
+
+const openImportDrawer = () => {
+  importDrawerVisible.value = true
+}
+
+const resetImportState = () => {
+  importFile.value = null
+  importResult.value = null
+  importRows.value = []
+  matching.value = false
+  confirmingImport.value = false
+}
+
+const handleImportFileChange = (uploadFile: UploadFile) => {
+  const file = uploadFile.raw
+  if (!file) return
+  if (!/\.xlsx$/i.test(file.name)) {
+    ElMessage.warning('请上传 .xlsx 格式的Excel文件')
+    return
+  }
+  importFile.value = file
+  importResult.value = null
+  importRows.value = []
+}
+
+const downloadImportTemplate = async () => {
+  try {
+    const blob = await downloadMemberImportTemplate()
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = '会员导入模板.xlsx'
+    link.click()
+    URL.revokeObjectURL(url)
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.msg || '模板下载失败')
+  }
+}
+
+const matchImportFile = async () => {
+  if (!importFile.value) {
+    ElMessage.warning('请先选择Excel文件')
+    return
+  }
+  const formData = new FormData()
+  formData.append('file', importFile.value)
+  matching.value = true
+  try {
+    const res = await matchMemberImportFile(formData)
+    if (res.code === 200) {
+      importResult.value = {
+        total_rows: res.data.result.total_rows,
+        matched_count: res.data.result.matched_count,
+        invalid_count: res.data.result.invalid_count
+      }
+      importRows.value = res.data.result.items || []
+      if (res.data.result.matched_count === 0) {
+        ElMessage.warning('没有匹配到可导入的数据')
+      } else {
+        ElMessage.success(`已匹配 ${res.data.result.matched_count} 条可导入数据`)
+      }
+    }
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.msg || '名单匹配失败')
+  } finally {
+    matching.value = false
+  }
+}
+
+const confirmImportRows = async () => {
+  if (matchedImportRows.value.length === 0) {
+    ElMessage.warning('没有可导入的数据')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(`确认导入 ${matchedImportRows.value.length} 条会员？`, '确认导入', { type: 'warning' })
+  } catch {
+    return
+  }
+  confirmingImport.value = true
+  try {
+    const items = matchedImportRows.value.map(row => ({
+      mobile: row.mobile,
+      manual_unique_code: row.manual_unique_code,
+      nickname: row.nickname,
+      tmall_id: row.tmall_id,
+      tmall_amount: row.tmall_amount,
+      youzan_id: row.youzan_id,
+      youzan_amount: row.youzan_amount,
+      remarks: row.remarks
+    }))
+    const res = await confirmMemberImport({ items })
+    ElMessage.success(`已导入 ${res.data.result.imported_count} 条会员`)
+    importDrawerVisible.value = false
+    page.value = 1
+    fetchMembers()
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.msg || '确认导入失败，请重新匹配后再试')
+  } finally {
+    confirmingImport.value = false
+  }
 }
 
 const submitMember = async () => {
@@ -339,6 +528,12 @@ onMounted(async () => {
   width: 150px;
 }
 
+.toolbar-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .member-table {
   width: 100%;
   margin-top: 18px;
@@ -376,5 +571,55 @@ onMounted(async () => {
   display: flex;
   gap: 8px;
   margin-top: 14px;
+}
+
+.import-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.import-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.import-file {
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.import-summary {
+  margin-top: 2px;
+}
+
+.import-table {
+  width: 100%;
+}
+
+.import-errors {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #b91c1c;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.import-empty {
+  padding: 44px 0;
+}
+
+@media (max-width: 900px) {
+  .toolbar {
+    flex-direction: column;
+  }
+
+  .toolbar-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
 </style>
