@@ -228,6 +228,12 @@ Page({
     if (res && typeof res.data === 'string') {
       return JSON.parse(res.data)
     }
+    if (res && (res.code !== undefined || res.msg || res.message || res.error)) {
+      return res
+    }
+    if (res && res.statusCode && res.data) {
+      return res.data
+    }
     return res && res.data ? res.data : res
   },
 
