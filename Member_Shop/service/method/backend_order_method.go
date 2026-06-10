@@ -16,6 +16,10 @@ import (
 )
 
 func CreateBackendOrder(req requestbody.BackendCreateOrderRequest, operator BackendOperatorSnapshot, requestMeta OperationRequestMeta) (*models.Order, error) {
+	return CreateBackendOrderWithAfterCreate(req, operator, requestMeta, nil)
+}
+
+func CreateBackendOrderWithAfterCreate(req requestbody.BackendCreateOrderRequest, operator BackendOperatorSnapshot, requestMeta OperationRequestMeta, afterCreate func(*models.Order) error) (*models.Order, error) {
 	var createdOrder models.Order
 	err := db.DB.Transaction(func(tx *gorm.DB) error {
 		member, err := resolveMemberTx(tx, req.MemberID, req.MemberNo, req.Mobile, req.UserID)
@@ -196,6 +200,11 @@ func CreateBackendOrder(req requestbody.BackendCreateOrderRequest, operator Back
 			UserAgent:  requestMeta.UserAgent,
 		}); err != nil {
 			return err
+		}
+		if afterCreate != nil {
+			if err := afterCreate(&order); err != nil {
+				return err
+			}
 		}
 		createdOrder = order
 		return nil

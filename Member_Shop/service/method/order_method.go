@@ -523,6 +523,10 @@ func ChangeOrderStatus(orderID, status, expressCompany, expressNumber string, lo
 
 // CreateOrder 创建订单
 func CreateOrder(userID int, receiverName, receiverPhone, province, city, county, detailedAddress string, orderAmount float64, productList interface{}, expressCompany, expressNumber, remark string) (*models.Order, error) {
+	return CreateOrderWithAfterCreate(userID, receiverName, receiverPhone, province, city, county, detailedAddress, orderAmount, productList, expressCompany, expressNumber, remark, nil)
+}
+
+func CreateOrderWithAfterCreate(userID int, receiverName, receiverPhone, province, city, county, detailedAddress string, orderAmount float64, productList interface{}, expressCompany, expressNumber, remark string, afterCreate func(*models.Order) error) (*models.Order, error) {
 	orderID := GenerateOrderNo()
 
 	productListJSON, err := json.Marshal(productList)
@@ -707,7 +711,13 @@ func CreateOrder(userID int, receiverName, receiverPhone, province, city, county
 		}
 		subOrderIDsJSON, _ := json.Marshal(subOrderIDs)
 		order.SubOrderIDs = string(subOrderIDsJSON)
-		return tx.Model(&order).Update("sub_order_ids", order.SubOrderIDs).Error
+		if err := tx.Model(&order).Update("sub_order_ids", order.SubOrderIDs).Error; err != nil {
+			return err
+		}
+		if afterCreate != nil {
+			return afterCreate(&order)
+		}
+		return nil
 	}); err != nil {
 		return nil, err
 	}

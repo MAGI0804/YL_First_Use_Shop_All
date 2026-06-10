@@ -187,8 +187,21 @@ func (oc *OrderController) OrderCreate(c *gin.Context) {
 		return
 	}
 
-	order, err := method.CreateOrder(req.UserID, req.ReceiverName, receiverPhoneStr, req.Province, req.City, req.County, req.DetailedAddress, req.OrderAmount, req.ProductList, req.ExpressCompany, req.ExpressNumber, req.Remark)
+	var jushuitanResp string
+	order, err := method.CreateOrderWithAfterCreate(req.UserID, req.ReceiverName, receiverPhoneStr, req.Province, req.City, req.County, req.DetailedAddress, req.OrderAmount, req.ProductList, req.ExpressCompany, req.ExpressNumber, req.Remark, func(order *models.Order) error {
+		resp, err := syncCreatedOrderToJushuitan(order)
+		if err != nil {
+			return fmt.Errorf("同步到聚水潭失败: %w", err)
+		}
+		jushuitanResp = resp
+		return nil
+	})
 	if err != nil {
+		log.Printf("创建订单失败: %v", err)
+		if strings.Contains(err.Error(), "同步到聚水潭失败") {
+			c.JSON(http.StatusInternalServerError, msg.ErrResponseStr("同步到聚水潭失败"))
+			return
+		}
 		c.JSON(http.StatusInternalServerError, msg.ErrResponseStr("创建订单失败"))
 		return
 	}
@@ -197,13 +210,7 @@ func (oc *OrderController) OrderCreate(c *gin.Context) {
 	c.Set("created_order_id", order.OrderID)
 	c.Set("created_order_user_id", req.UserID)
 
-	resp, err := syncCreatedOrderToJushuitan(order)
-	if err != nil {
-		log.Printf("上传订单到聚水潭失败: %v", err)
-		c.JSON(http.StatusInternalServerError, msg.ErrResponseStr("同步到聚水潭失败"))
-		return
-	}
-	log.Printf("上传订单到聚水潭成功: %s", resp)
+	log.Printf("上传订单到聚水潭成功: %s", jushuitanResp)
 
 	responseData := map[string]interface{}{
 		"order_id":         order.OrderID,
@@ -354,18 +361,25 @@ func (oc *OrderController) BackendCreateOrder(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, msg.ErrResponse("请求参数错误", err))
 		return
 	}
-	order, err := method.CreateBackendOrder(req, operator, requestMeta(c))
+	var jushuitanResp string
+	order, err := method.CreateBackendOrderWithAfterCreate(req, operator, requestMeta(c), func(order *models.Order) error {
+		resp, err := syncCreatedOrderToJushuitan(order)
+		if err != nil {
+			return fmt.Errorf("同步到聚水潭失败: %w", err)
+		}
+		jushuitanResp = resp
+		return nil
+	})
 	if err != nil {
+		log.Printf("后台代下单失败: %v", err)
+		if strings.Contains(err.Error(), "同步到聚水潭失败") {
+			c.JSON(http.StatusInternalServerError, msg.ErrResponseStr("同步到聚水潭失败"))
+			return
+		}
 		c.JSON(http.StatusBadRequest, msg.ErrResponseStr(err.Error()))
 		return
 	}
-	resp, err := syncCreatedOrderToJushuitan(order)
-	if err != nil {
-		log.Printf("后台代下单上传订单到聚水潭失败: %v", err)
-		c.JSON(http.StatusInternalServerError, msg.ErrResponseStr("同步到聚水潭失败"))
-		return
-	}
-	log.Printf("后台代下单上传订单到聚水潭成功: %s", resp)
+	log.Printf("后台代下单上传订单到聚水潭成功: %s", jushuitanResp)
 
 	data := method.ConvertOrderToMap(*order)
 	c.JSON(http.StatusOK, msg.SuccessResponse("success", &data))
