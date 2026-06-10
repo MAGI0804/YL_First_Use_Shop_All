@@ -14,9 +14,9 @@
       </view>
     </view>
     <view class="sync-actions">
-      <button class="sync-btn" open-type="chooseAvatar" bindchooseavatar="onChooseWechatAvatar">同步微信头像</button>
+      <button class="sync-btn" open-type="chooseAvatar" bindchooseavatar="onChooseWechatAvatar" style="width: 239rpx; display: block; box-sizing: border-box; left: 0rpx; top: 0rpx">同步微信头像</button>
       <input
-        class="sync-btn sync-nickname-input"
+        class="sync-btn"
         type="nickname"
         value="{{wechatNicknameDraft}}"
         placeholder="同步微信昵称"

@@ -76,7 +76,7 @@
   height: 72rpx;
   line-height: 72rpx;
   padding: 0;
-  border-radius: 36rpx;
+  border-radius: 0rpx;
   background-color: #eaf6ff;
   color: #3CA5FA;
   font-size: 28rpx;
@@ -125,7 +125,7 @@
   font-size: 32rpx;
   text-align: center;
   line-height: 90rpx;
-  border-radius: 45rpx;
+  border-radius: 0rpx;
   box-shadow: 0 4rpx 20rpx rgba(60, 165, 250, 0.3);
 }
 

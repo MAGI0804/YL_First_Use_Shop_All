@@ -100,8 +100,8 @@
 .save-btn {
   margin: 50rpx 30rpx;
   height: 90rpx;
-  background-color: #FF6B6B;
-  border-radius: 45rpx;
+  background-color: #68B9FA;
+  border-radius: 0rpx;
   display: flex;
   align-items: center;
   justify-content: center;
