@@ -17,3 +17,12 @@ func TestNormalizeMemberDefaults(t *testing.T) {
 		t.Fatalf("empty source should default backend")
 	}
 }
+
+func TestNormalizeMemberOpenIDTreatsZeroAsEmpty(t *testing.T) {
+	if got := normalizeMemberOpenID("0"); got != "" {
+		t.Fatalf("zero placeholder should be normalized to empty, got %q", got)
+	}
+	if got := normalizeMemberOpenID(" openid-a "); got != "openid-a" {
+		t.Fatalf("real openid should be trimmed and kept, got %q", got)
+	}
+}

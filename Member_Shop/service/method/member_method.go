@@ -31,7 +31,7 @@ func CreateMember(req requestbody.MemberCreateRequest, operator BackendOperatorS
 		member = models.Member{
 			MemberNo:         strings.TrimSpace(req.MemberNo),
 			UserID:           req.UserID,
-			OpenID:           strings.TrimSpace(req.OpenID),
+			OpenID:           normalizeMemberOpenID(req.OpenID),
 			Mobile:           strings.TrimSpace(req.Mobile),
 			ManualUniqueCode: req.ManualUniqueCode,
 			Nickname:         strings.TrimSpace(req.Nickname),
@@ -88,7 +88,7 @@ func UpdateMember(req requestbody.MemberUpdateRequest, operator BackendOperatorS
 
 		member.MemberNo = keepOrTrim(req.MemberNo, member.MemberNo)
 		member.UserID = keepOrInt(req.UserID, member.UserID)
-		member.OpenID = keepOrTrim(req.OpenID, member.OpenID)
+		member.OpenID = keepOrMemberOpenID(req.OpenID, member.OpenID)
 		member.Mobile = mobile
 		member.ManualUniqueCode = manualUniqueCode
 		member.Nickname = keepOrTrim(req.Nickname, member.Nickname)
@@ -319,6 +319,22 @@ func validateMemberMobile(mobile string) error {
 		return fmt.Errorf("invalid mobile")
 	}
 	return nil
+}
+
+func normalizeMemberOpenID(openID string) string {
+	normalized := strings.TrimSpace(openID)
+	if normalized == "0" {
+		return ""
+	}
+	return normalized
+}
+
+func keepOrMemberOpenID(next, current string) string {
+	normalized := normalizeMemberOpenID(next)
+	if normalized == "" {
+		return normalizeMemberOpenID(current)
+	}
+	return normalized
 }
 
 func ensureMemberUnique(tx *gorm.DB, currentID uint, mobile, manualUniqueCode string) error {

@@ -23,12 +23,42 @@ func TestValidateMemberWechatLinkRejectsDifferentWechatUser(t *testing.T) {
 	}
 }
 
+func TestValidateMemberWechatLinkAllowsZeroOpenIDPlaceholder(t *testing.T) {
+	member := models.Member{UserID: 0, Mobile: "13800138000", OpenID: "0", Status: "active"}
+	user := models.User{UserID: 10, Mobile: "13800138000", OpenID: "openid-a"}
+
+	if err := validateMemberWechatLink(member, user, "openid-a", "13800138000"); err != nil {
+		t.Fatalf("expected placeholder openid to be treated as unbound, got %v", err)
+	}
+}
+
 func TestValidateMemberWechatLinkAllowsSameMemberUserAndMobile(t *testing.T) {
 	member := models.Member{UserID: 10, Mobile: "13800138000", OpenID: "openid-a", Status: "active"}
 	user := models.User{UserID: 10, Mobile: "13800138000", OpenID: "openid-a"}
 
 	if err := validateMemberWechatLink(member, user, "openid-a", "13800138000"); err != nil {
 		t.Fatalf("expected valid member link, got %v", err)
+	}
+}
+
+func TestHasBoundWechatOpenIDTreatsZeroAsUnbound(t *testing.T) {
+	cases := []struct {
+		name   string
+		openID string
+		want   bool
+	}{
+		{name: "empty", openID: "", want: false},
+		{name: "spaces", openID: "  ", want: false},
+		{name: "zero", openID: "0", want: false},
+		{name: "real", openID: "openid-a", want: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := hasBoundWechatOpenID(tc.openID); got != tc.want {
+				t.Fatalf("hasBoundWechatOpenID(%q) = %v, want %v", tc.openID, got, tc.want)
+			}
+		})
 	}
 }
 

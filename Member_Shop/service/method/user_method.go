@@ -114,7 +114,7 @@ func BindWechatPhone(req requestbody.BindWechatPhoneRequest) (*models.Member, er
 		tx.Rollback()
 		return nil, err
 	}
-	if member.OpenID != "" && member.OpenID != req.OpenID {
+	if hasBoundWechatOpenID(member.OpenID) && member.OpenID != req.OpenID {
 		tx.Rollback()
 		return nil, fmt.Errorf("mobile already linked to another wechat user")
 	}
@@ -163,7 +163,7 @@ func findOrCreateWechatMemberUser(tx *gorm.DB, member models.Member, req request
 
 	mobileErr := tx.Where("mobile = ?", req.Mobile).First(&user).Error
 	if mobileErr == nil {
-		if user.OpenID != "" && user.OpenID != req.OpenID {
+		if hasBoundWechatOpenID(user.OpenID) && user.OpenID != req.OpenID {
 			return models.User{}, fmt.Errorf("mobile already bound to another openid")
 		}
 		if member.UserID != 0 && member.UserID != user.UserID {
@@ -205,7 +205,7 @@ func updateWechatMemberUser(tx *gorm.DB, user models.User, req requestbody.BindW
 	if user.Mobile != "" && user.Mobile != req.Mobile {
 		return models.User{}, fmt.Errorf("openid already bound to another mobile")
 	}
-	if user.OpenID != "" && user.OpenID != req.OpenID {
+	if hasBoundWechatOpenID(user.OpenID) && user.OpenID != req.OpenID {
 		return models.User{}, fmt.Errorf("mobile already bound to another openid")
 	}
 
@@ -246,19 +246,24 @@ func validateMemberWechatLink(member models.Member, user models.User, openID, mo
 	if err := validateMemberStatus(member); err != nil {
 		return err
 	}
-	if member.OpenID != "" && member.OpenID != openID {
+	if hasBoundWechatOpenID(member.OpenID) && member.OpenID != openID {
 		return fmt.Errorf("mobile already linked to another wechat user")
 	}
 	if member.UserID != 0 && user.UserID != 0 && member.UserID != user.UserID {
 		return fmt.Errorf("member already linked to another user")
 	}
-	if user.OpenID != "" && user.OpenID != openID {
+	if hasBoundWechatOpenID(user.OpenID) && user.OpenID != openID {
 		return fmt.Errorf("mobile already bound to another openid")
 	}
 	if user.Mobile != "" && user.Mobile != mobile {
 		return fmt.Errorf("openid already bound to another mobile")
 	}
 	return nil
+}
+
+func hasBoundWechatOpenID(openID string) bool {
+	normalized := strings.TrimSpace(openID)
+	return normalized != "" && normalized != "0"
 }
 
 func shouldUpdateWechatNickname(current, next string) bool {
