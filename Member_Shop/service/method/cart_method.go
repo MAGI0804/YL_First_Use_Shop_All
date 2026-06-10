@@ -3,11 +3,14 @@ package method
 import (
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"Member_shop/db"
 	"Member_shop/models"
 	"Member_shop/requestbody"
+
+	"gorm.io/gorm"
 )
 
 func AddToCart(req requestbody.AddToCartRequest) (*map[string]any, error) {
@@ -18,10 +21,11 @@ func AddToCart(req requestbody.AddToCartRequest) (*map[string]any, error) {
 	}
 
 	var commodity models.Commodity
-	if err := db.DB.Where("commodity_id = ?", req.CommodityCode).First(&commodity).Error; err != nil {
+	if err := resolveCartCommodityTx(db.DB, req.CommodityCode, &commodity); err != nil {
 		log.Printf("商品不存在: %s", req.CommodityCode)
 		return nil, err
 	}
+	commodityCode := commodity.CommodityID
 
 	quantity := req.Quantity
 	if quantity <= 0 {
@@ -37,12 +41,12 @@ func AddToCart(req requestbody.AddToCartRequest) (*map[string]any, error) {
 	}
 
 	currentTime := time.Now().Format("2006-01-02 15:04:05")
-	if item, exists := cart.CartItems[req.CommodityCode]; exists {
+	if item, exists := cart.CartItems[commodityCode]; exists {
 		item.Quantity += quantity
 		item.AddedTime = currentTime
-		cart.CartItems[req.CommodityCode] = item
+		cart.CartItems[commodityCode] = item
 	} else {
-		cart.CartItems[req.CommodityCode] = models.CartItemJSON{
+		cart.CartItems[commodityCode] = models.CartItemJSON{
 			Quantity:  quantity,
 			AddedTime: currentTime,
 		}
@@ -59,13 +63,27 @@ func AddToCart(req requestbody.AddToCartRequest) (*map[string]any, error) {
 	}
 
 	data := map[string]any{
-		"commodity_code": req.CommodityCode,
-		"quantity":       cart.CartItems[req.CommodityCode].Quantity,
+		"commodity_code": commodityCode,
+		"quantity":       cart.CartItems[commodityCode].Quantity,
 		"total_items":    totalQuantity,
 	}
 
-	log.Printf("用户 %d 添加商品 %s 到购物车成功", req.UserID, req.CommodityCode)
+	log.Printf("用户 %d 添加商品 %s 到购物车成功", req.UserID, commodityCode)
 	return &data, nil
+}
+
+func resolveCartCommodityTx(tx *gorm.DB, input string, commodity *models.Commodity) error {
+	code := strings.TrimSpace(input)
+	if code == "" {
+		return fmt.Errorf("commodity code is required")
+	}
+
+	for _, field := range []string{"commodity_id", "spec_code", "style_code"} {
+		if err := tx.Where(field+" = ?", code).First(commodity).Error; err == nil {
+			return nil
+		}
+	}
+	return fmt.Errorf("商品不存在: %s", code)
 }
 
 func BatchDeleteFromCart(req requestbody.BatchDeleteFromCartRequest) (int64, []string, error) {

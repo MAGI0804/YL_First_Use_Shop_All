@@ -51,13 +51,14 @@ func AddMemberCartItem(req requestbody.MemberCartAddRequest, operator BackendOpe
 	}
 	before, after, err := mutateCart(member.UserID, func(tx *gorm.DB, cart *models.Cart) error {
 		var commodity models.Commodity
-		if err := tx.Where("commodity_id = ?", req.CommodityCode).First(&commodity).Error; err != nil {
+		if err := resolveCartCommodityTx(tx, req.CommodityCode, &commodity); err != nil {
 			return err
 		}
-		current := cart.CartItems[req.CommodityCode]
+		commodityCode := commodity.CommodityID
+		current := cart.CartItems[commodityCode]
 		current.Quantity += req.Quantity
 		current.AddedTime = time.Now().Format("2006-01-02 15:04:05")
-		cart.CartItems[req.CommodityCode] = current
+		cart.CartItems[commodityCode] = current
 		return nil
 	})
 	if err != nil {

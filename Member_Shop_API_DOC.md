@@ -145,7 +145,7 @@ Base URL：`http://localhost:3088`
 | `DELETE/POST /cart/batch_delete_from_cart` | 批量删除 | `{ "user_id": 10001, "commodity_codes": ["SKU001"] }` |
 | `DELETE/POST /cart/clear_cart` | 清空购物车 | `{ "user_id": 10001 }` |
 
-字段含义：`commodity_code` 为商品 SKU/编码；`quantity` 为数量；`commodity_codes` 为待删除 SKU 列表。
+字段含义：`commodity_code` 为商品标识，添加购物车时兼容 `Commodity_data.commodity_id`、`spec_code`、`style_code`，入库后统一使用真实 `commodity_id` 作为购物车 key；`quantity` 为数量；`commodity_codes` 为待删除商品标识列表。
 
 成功示例：`{"code":200,"msg":"操作成功","data":{}}`  
 失败示例：`{"code":201,"msg":"invalid request","data":{},"Err":"commodity_code为必填字段"}`
