@@ -526,7 +526,9 @@ func CreateOrder(userID int, receiverName, receiverPhone, province, city, county
 	return CreateOrderWithAfterCreate(userID, receiverName, receiverPhone, province, city, county, detailedAddress, orderAmount, productList, expressCompany, expressNumber, remark, nil)
 }
 
-func CreateOrderWithAfterCreate(userID int, receiverName, receiverPhone, province, city, county, detailedAddress string, orderAmount float64, productList interface{}, expressCompany, expressNumber, remark string, afterCreate func(*models.Order) error) (*models.Order, error) {
+type OrderAfterCreateFunc func(*gorm.DB, *models.Order) error
+
+func CreateOrderWithAfterCreate(userID int, receiverName, receiverPhone, province, city, county, detailedAddress string, orderAmount float64, productList interface{}, expressCompany, expressNumber, remark string, afterCreate OrderAfterCreateFunc) (*models.Order, error) {
 	orderID := GenerateOrderNo()
 
 	productListJSON, err := json.Marshal(productList)
@@ -715,7 +717,7 @@ func CreateOrderWithAfterCreate(userID int, receiverName, receiverPhone, provinc
 			return err
 		}
 		if afterCreate != nil {
-			return afterCreate(&order)
+			return afterCreate(tx, &order)
 		}
 		return nil
 	}); err != nil {

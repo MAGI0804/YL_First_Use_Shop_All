@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type OrderController struct{}
@@ -188,14 +189,7 @@ func (oc *OrderController) OrderCreate(c *gin.Context) {
 	}
 
 	var jushuitanResp string
-	order, err := method.CreateOrderWithAfterCreate(req.UserID, req.ReceiverName, receiverPhoneStr, req.Province, req.City, req.County, req.DetailedAddress, req.OrderAmount, req.ProductList, req.ExpressCompany, req.ExpressNumber, req.Remark, func(order *models.Order) error {
-		resp, err := syncCreatedOrderToJushuitan(order)
-		if err != nil {
-			return fmt.Errorf("同步到聚水潭失败: %w", err)
-		}
-		jushuitanResp = resp
-		return nil
-	})
+	order, err := method.CreateOrderWithAfterCreate(req.UserID, req.ReceiverName, receiverPhoneStr, req.Province, req.City, req.County, req.DetailedAddress, req.OrderAmount, req.ProductList, req.ExpressCompany, req.ExpressNumber, req.Remark, syncCreatedOrderToJushuitanInTx(&jushuitanResp))
 	if err != nil {
 		log.Printf("创建订单失败: %v", err)
 		if strings.Contains(err.Error(), "同步到聚水潭失败") {
@@ -213,20 +207,21 @@ func (oc *OrderController) OrderCreate(c *gin.Context) {
 	log.Printf("上传订单到聚水潭成功: %s", jushuitanResp)
 
 	responseData := map[string]interface{}{
-		"order_id":         order.OrderID,
-		"user_id":          req.UserID,
-		"receiver_name":    req.ReceiverName,
-		"receiver_phone":   receiverPhoneStr,
-		"express_company":  req.ExpressCompany,
-		"express_number":   req.ExpressNumber,
-		"remark":           req.Remark,
-		"sub_order_ids":    order.SubOrderIDs,
-		"status":           order.Status,
-		"pay_status":       order.PayStatus,
-		"order_amount":     order.OrderAmount,
-		"final_pay_amount": order.FinalPayAmount,
-		"discount_amount":  order.DiscountAmount,
-		"discount_reason":  order.DiscountReason,
+		"order_id":           order.OrderID,
+		"user_id":            req.UserID,
+		"receiver_name":      req.ReceiverName,
+		"receiver_phone":     receiverPhoneStr,
+		"express_company":    req.ExpressCompany,
+		"express_number":     req.ExpressNumber,
+		"remark":             req.Remark,
+		"sub_order_ids":      order.SubOrderIDs,
+		"status":             order.Status,
+		"pay_status":         order.PayStatus,
+		"order_amount":       order.OrderAmount,
+		"final_pay_amount":   order.FinalPayAmount,
+		"discount_amount":    order.DiscountAmount,
+		"discount_reason":    order.DiscountReason,
+		"jushuitan_order_id": order.JushuitanOrderID,
 	}
 	data := map[string]any{
 		"status":   "success",
@@ -362,14 +357,7 @@ func (oc *OrderController) BackendCreateOrder(c *gin.Context) {
 		return
 	}
 	var jushuitanResp string
-	order, err := method.CreateBackendOrderWithAfterCreate(req, operator, requestMeta(c), func(order *models.Order) error {
-		resp, err := syncCreatedOrderToJushuitan(order)
-		if err != nil {
-			return fmt.Errorf("同步到聚水潭失败: %w", err)
-		}
-		jushuitanResp = resp
-		return nil
-	})
+	order, err := method.CreateBackendOrderWithAfterCreate(req, operator, requestMeta(c), syncCreatedOrderToJushuitanInTx(&jushuitanResp))
 	if err != nil {
 		log.Printf("后台代下单失败: %v", err)
 		if strings.Contains(err.Error(), "同步到聚水潭失败") {
@@ -383,6 +371,85 @@ func (oc *OrderController) BackendCreateOrder(c *gin.Context) {
 
 	data := method.ConvertOrderToMap(*order)
 	c.JSON(http.StatusOK, msg.SuccessResponse("success", &data))
+}
+
+func syncCreatedOrderToJushuitanInTx(respTarget *string) method.OrderAfterCreateFunc {
+	return func(tx *gorm.DB, order *models.Order) error {
+		resp, err := syncCreatedOrderToJushuitan(order)
+		if err != nil {
+			return fmt.Errorf("同步到聚水潭失败: %w", err)
+		}
+		jushuitanOrderID, err := extractJushuitanOrderID(resp, order.OrderID)
+		if err != nil {
+			return fmt.Errorf("同步到聚水潭失败: %w", err)
+		}
+		if err := tx.Model(order).Update("jushuitan_order_id", jushuitanOrderID).Error; err != nil {
+			return fmt.Errorf("记录聚水潭订单号失败: %w", err)
+		}
+		order.JushuitanOrderID = jushuitanOrderID
+		*respTarget = resp
+		return nil
+	}
+}
+
+func extractJushuitanOrderID(respBody, orderID string) (string, error) {
+	var payload struct {
+		Code    int    `json:"code"`
+		Msg     string `json:"msg"`
+		Message string `json:"message"`
+		Data    struct {
+			Datas []struct {
+				Msg       string          `json:"msg"`
+				IsSuccess bool            `json:"issuccess"`
+				SoID      string          `json:"so_id"`
+				OID       json.RawMessage `json:"o_id"`
+			} `json:"datas"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(respBody), &payload); err != nil {
+		return "", fmt.Errorf("解析聚水潭订单上传响应失败: %w", err)
+	}
+	if payload.Code != 0 {
+		message := payload.Msg
+		if message == "" {
+			message = payload.Message
+		}
+		return "", fmt.Errorf("聚水潭订单上传失败: %s", message)
+	}
+	for _, item := range payload.Data.Datas {
+		if item.SoID != "" && item.SoID != orderID {
+			continue
+		}
+		if !item.IsSuccess {
+			return "", fmt.Errorf("聚水潭订单上传失败: %s", item.Msg)
+		}
+		jushuitanOrderID, err := parseJushuitanOID(item.OID)
+		if err != nil {
+			return "", err
+		}
+		return jushuitanOrderID, nil
+	}
+	return "", fmt.Errorf("聚水潭响应中未找到订单%s的成功记录", orderID)
+}
+
+func parseJushuitanOID(raw json.RawMessage) (string, error) {
+	value := strings.TrimSpace(string(raw))
+	if value == "" || value == "null" {
+		return "", fmt.Errorf("聚水潭响应缺少o_id")
+	}
+	var stringValue string
+	if err := json.Unmarshal(raw, &stringValue); err == nil {
+		stringValue = strings.TrimSpace(stringValue)
+		if stringValue == "" {
+			return "", fmt.Errorf("聚水潭响应缺少o_id")
+		}
+		return stringValue, nil
+	}
+	var numberValue json.Number
+	if err := json.Unmarshal(raw, &numberValue); err != nil {
+		return "", fmt.Errorf("聚水潭响应o_id格式错误: %w", err)
+	}
+	return numberValue.String(), nil
 }
 
 func getStringValue(m map[string]interface{}, key string) string {

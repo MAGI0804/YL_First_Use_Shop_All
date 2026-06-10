@@ -19,7 +19,7 @@ func CreateBackendOrder(req requestbody.BackendCreateOrderRequest, operator Back
 	return CreateBackendOrderWithAfterCreate(req, operator, requestMeta, nil)
 }
 
-func CreateBackendOrderWithAfterCreate(req requestbody.BackendCreateOrderRequest, operator BackendOperatorSnapshot, requestMeta OperationRequestMeta, afterCreate func(*models.Order) error) (*models.Order, error) {
+func CreateBackendOrderWithAfterCreate(req requestbody.BackendCreateOrderRequest, operator BackendOperatorSnapshot, requestMeta OperationRequestMeta, afterCreate OrderAfterCreateFunc) (*models.Order, error) {
 	var createdOrder models.Order
 	err := db.DB.Transaction(func(tx *gorm.DB) error {
 		member, err := resolveMemberTx(tx, req.MemberID, req.MemberNo, req.Mobile, req.UserID)
@@ -166,6 +166,11 @@ func CreateBackendOrderWithAfterCreate(req requestbody.BackendCreateOrderRequest
 		if err := tx.Save(&cart).Error; err != nil {
 			return err
 		}
+		if afterCreate != nil {
+			if err := afterCreate(tx, &order); err != nil {
+				return err
+			}
+		}
 		cartAfter := cloneCartItems(cart.CartItems)
 		if err := recordBackendOperation(tx, BackendOperationLogInput{
 			Operator:   operator,
@@ -200,11 +205,6 @@ func CreateBackendOrderWithAfterCreate(req requestbody.BackendCreateOrderRequest
 			UserAgent:  requestMeta.UserAgent,
 		}); err != nil {
 			return err
-		}
-		if afterCreate != nil {
-			if err := afterCreate(&order); err != nil {
-				return err
-			}
 		}
 		createdOrder = order
 		return nil
@@ -243,6 +243,7 @@ func orderOperationSnapshot(order models.Order) map[string]any {
 		"final_pay_amount":     order.FinalPayAmount,
 		"status":               order.Status,
 		"pay_status":           order.PayStatus,
+		"jushuitan_order_id":   order.JushuitanOrderID,
 		"created_by_backend":   order.CreatedByBackend,
 		"backend_operator_id":  order.BackendOperatorID,
 		"backend_order_remark": order.BackendOrderRemark,
