@@ -258,6 +258,28 @@ export interface MemberDetailResponse {
   msg: string
 }
 
+export interface AddressItem {
+  address_id: number
+  user_id: number
+  receiver_name: string
+  phone_number: string
+  province: string
+  city: string
+  county: string
+  detailed_address: string
+  is_default: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface AddressQueryResponse {
+  code: number
+  data: {
+    addresses: AddressItem[]
+  }
+  msg: string
+}
+
 export interface MemberTagQueryResponse {
   code: number
   data: {
@@ -329,6 +351,10 @@ export const updateMember = (params: Partial<MemberItem> & { id: number }) => {
 
 export const queryMemberDetail = (params: { id?: number; member_no?: string; mobile?: string; user_id?: number }) => {
   return http.post<MemberDetailResponse>('/member/detail', params)
+}
+
+export const queryAddresses = (params: { user_id: number }) => {
+  return http.post<AddressQueryResponse>('/address/get_addresses', params)
 }
 
 export const queryMemberTags = (params: { name?: string; page: number; page_size: number }) => {

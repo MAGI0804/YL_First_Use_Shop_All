@@ -94,6 +94,8 @@ func UpdateMember(req requestbody.MemberUpdateRequest, operator BackendOperatorS
 		member.Nickname = keepOrTrim(req.Nickname, member.Nickname)
 		member.Status = normalizeMemberStatus(keepOrTrim(req.Status, member.Status))
 		member.Source = normalizeMemberSource(keepOrTrim(req.Source, member.Source))
+		member.TotalOrderAmount = req.TotalOrderAmount
+		member.TotalPaidAmount = req.TotalPaidAmount
 		member.TmallID = strings.TrimSpace(req.TmallID)
 		member.TmallAmount = req.TmallAmount
 		member.YouzanID = strings.TrimSpace(req.YouzanID)

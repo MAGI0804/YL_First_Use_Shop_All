@@ -75,6 +75,8 @@ Base URL：`http://localhost:3088`
 
 字段含义：`code` 为 `wx.login` 返回的微信临时登录 code；`phone_code` 为小程序 `button open-type="getPhoneNumber"` 返回的动态 code，后端通过微信 `getuserphonenumber` 接口换取手机号；`openid` 为微信 openid；`mobile` 为手机号；`captcha` 为验证码；`user_id` 为系统用户 ID；`member_no` 为会员编号；`tmall_id/youzan_id` 为外部平台 ID；`tmall_amount/youzan_amount` 为外部平台消费金额。
 
+后台会员维护规则：`POST /member/update` 可维护会员金额字段，包括 `total_order_amount`、`total_paid_amount`、`tmall_amount`、`youzan_amount`，用于运营修正历史导入或线下核对后的金额。
+
 会员登录规则：
 
 - 登录页第一步只触发手机号授权登录；登录成功后再显示头像昵称补全区。
@@ -146,6 +148,8 @@ Base URL：`http://localhost:3088`
 | `DELETE/POST /cart/clear_cart` | 清空购物车 | `{ "user_id": 10001 }` |
 
 字段含义：`commodity_code` 为商品标识，添加购物车时兼容 `Commodity_data.commodity_id`、`spec_code`、`style_code`，入库后统一使用真实 `commodity_id` 作为购物车 key；`quantity` 为数量；`commodity_codes` 为待删除商品标识列表。
+
+后台代会员下单规则：从会员详情购物车下单时，后台只提交已勾选的购物车商品；收货地址可选择该用户已有地址，也可粘贴整段地址后识别并填入省市区、详细地址、收货人和手机号。
 
 成功示例：`{"code":200,"msg":"操作成功","data":{}}`  
 失败示例：`{"code":201,"msg":"invalid request","data":{},"Err":"commodity_code为必填字段"}`

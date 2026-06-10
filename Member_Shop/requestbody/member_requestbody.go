@@ -26,6 +26,8 @@ type MemberUpdateRequest struct {
 	Nickname         string  `json:"nickname"`
 	Status           string  `json:"status"`
 	Source           string  `json:"source"`
+	TotalOrderAmount float64 `json:"total_order_amount"`
+	TotalPaidAmount  float64 `json:"total_paid_amount"`
 	TmallID          string  `json:"tmall_id"`
 	TmallAmount      float64 `json:"tmall_amount"`
 	YouzanID         string  `json:"youzan_id"`
