@@ -80,3 +80,9 @@ Member_Shop/ssl
 #md文件
 md_file
 .gocache
+.gocache/
+
+
+wx_ui_kids\package-lock.json
+wx_ui_kids\project.config.json
+wx_ui_kids\project.config.json
