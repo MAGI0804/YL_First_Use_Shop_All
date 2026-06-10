@@ -26,7 +26,9 @@
 /* 头像区域 */
 .avatar-container {
   display: flex;
+  flex-direction: column;
   justify-content: center;
+  align-items: center;
   padding: 60rpx 0;
   background-color: #fff;
   margin-bottom: 20rpx;
@@ -61,6 +63,32 @@
   color: #fff;
   font-size: 20rpx;
   line-height: 24rpx;
+}
+
+.sync-actions {
+  display: flex;
+  gap: 24rpx;
+  margin-top: 32rpx;
+}
+
+.sync-btn {
+  width: 240rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  padding: 0;
+  border-radius: 36rpx;
+  background-color: #eaf6ff;
+  color: #3CA5FA;
+  font-size: 28rpx;
+  text-align: center;
+}
+
+.sync-btn::after {
+  border-color: #b9defd;
+}
+
+.sync-nickname-input {
+  box-sizing: border-box;
 }
 
 /* 表单区域 */
@@ -99,4 +127,8 @@
   line-height: 90rpx;
   border-radius: 45rpx;
   box-shadow: 0 4rpx 20rpx rgba(60, 165, 250, 0.3);
+}
+
+.save-btn.disabled {
+  opacity: 0.7;
 }

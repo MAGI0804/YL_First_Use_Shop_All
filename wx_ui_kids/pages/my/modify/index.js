@@ -2,206 +2,141 @@
 const app = getApp()
 const request = require('../../../api/request').default
 
+const getCurrentUser = () => {
+  return {
+    ...(app.globalData.userInfo || {}),
+    ...(wx.getStorageSync('userInfo') || {})
+  }
+}
+
+const getCurrentUserId = () => {
+  const userInfo = getCurrentUser()
+  return userInfo.user_id || app.globalData.user_id || wx.getStorageSync('user_id') || null
+}
+
+const isTemporaryAvatar = (avatarUrl) => {
+  return !!avatarUrl && (avatarUrl.startsWith('wxfile://') || avatarUrl.startsWith('http://tmp/'))
+}
+
 Page({
-  /**
-   * 页面的初始数据
-   */
   data: {
     userInfo: {
       nickName: '',
       avatarUrl: '',
       mobile: ''
     },
+    originalUserInfo: {
+      nickName: '',
+      avatarUrl: '',
+      mobile: ''
+    },
+    wechatNicknameDraft: '',
+    saving: false,
     nav: {
       title: '修改个人信息',
       showHome: true
     }
   },
 
-  /**
-   * 生命周期函数--监听页面加载
-   */
-  onLoad(options) {
-    // 初始化用户信息
+  onLoad() {
     this.initUserInfo()
   },
 
-  /**
-   * 生命周期函数--监听页面显示
-   */
   onShow() {
-    // 每次显示页面时刷新用户信息
-    this.initUserInfo()
-  },
-
-  /**
-   * 初始化用户信息
-   */
-  initUserInfo() {
-    // 从本地存储获取用户信息，确保能获取到完整的用户数据
-    const storedUserInfo = wx.getStorageSync('userInfo') || {}
-    // 结合全局数据，确保信息完整
-    const globalUserInfo = app.globalData.userInfo || {}
-    // 合并用户信息，优先使用本地存储的数据
-    const userInfo = {
-      ...globalUserInfo,
-      ...storedUserInfo
+    if (!this.data.originalUserInfo.nickName && !this.data.originalUserInfo.avatarUrl) {
+      this.initUserInfo()
     }
-    
-    // 确保用户信息正确显示，根据my/index/index.js中的定义，头像是user_img字段
-    this.setData({
-      userInfo: {
-        nickName: userInfo.nickName || userInfo.nickname || '',
-        avatarUrl: userInfo.user_img || userInfo.avatarUrl || userInfo.avatar || '',
-        mobile: userInfo.mobile || ''
-      }
-    })
-    
-    console.log('初始化用户信息:', this.data.userInfo)
-    console.log('原始用户数据(包含user_img):', userInfo)
   },
 
-  /**
-   * 上传头像
-   */
+  initUserInfo() {
+    const userInfo = getCurrentUser()
+    const nextUserInfo = {
+      nickName: userInfo.nickName || userInfo.nickname || '',
+      avatarUrl: userInfo.user_img || userInfo.avatarUrl || userInfo.avatar || '',
+      mobile: userInfo.mobile || ''
+    }
+
+    this.setData({
+      userInfo: { ...nextUserInfo },
+      originalUserInfo: { ...nextUserInfo },
+      wechatNicknameDraft: ''
+    })
+  },
+
   uploadAvatar() {
-    const that = this
     wx.chooseMedia({
       count: 1,
       mediaType: ['image'],
       sourceType: ['album', 'camera'],
-      sizeType: ['compressed'], // 压缩图片
-      success(res) {
-        const tempFilePath = res.tempFiles[0].tempFilePath
-        const fileSize = res.tempFiles[0].size
-        
-        // 检查文件大小，限制在5MB以内
-        if (fileSize > 5 * 1024 * 1024) {
+      sizeType: ['compressed'],
+      success: (res) => {
+        const tempFile = res.tempFiles && res.tempFiles[0]
+        if (!tempFile || !tempFile.tempFilePath) {
+          return
+        }
+        if (tempFile.size > 5 * 1024 * 1024) {
           wx.showToast({
             title: '图片大小不能超过5MB',
             icon: 'none'
           })
           return
         }
-        
-        // 获取access_token
-        const accessToken = wx.getStorageSync('access_token')
-        if (!accessToken) {
-          wx.showToast({
-            title: '请先登录',
-            icon: 'none'
-          })
-          return
-        }
-        
-        // 获取用户ID
-        const user_id = app.globalData.userInfo.user_id || 
-                      (wx.getStorageSync('userInfo') ? wx.getStorageSync('userInfo').user_id : null)
-        
-        if (!user_id) {
-          wx.showToast({
-            title: '用户信息不完整',
-            icon: 'none'
-          })
-          return
-        }
-        
-        // 显示加载提示
-        wx.showLoading({
-          title: '上传中...',
-        })
-        
-        // 使用wx.uploadFile上传图片，自动使用multipart/form-data格式
-        wx.uploadFile({
-          url: `${request.getHost()}/ordinary_user/Modify_data?access_token=${accessToken}`,
-          filePath: tempFilePath,
-          name: 'user_img', // 根据后端要求，文件参数名必须是user_img
-          formData: {
-            user_id: user_id.toString() // 后端需要user_id参数
-          },
-          header: {
-            'content-type': 'multipart/form-data'
-          },
-          success(res) {
-            try {
-              const data = JSON.parse(res.data)
-              if (data.message === '用户信息更新成功') {
-                // 上传成功，设置头像URL
-                that.setData({
-                  'userInfo.avatarUrl': tempFilePath // 临时使用本地路径，后续会在保存时更新
-                })
-                wx.showToast({
-                  title: '上传成功',
-                  icon: 'success'
-                })
-              } else {
-                wx.showToast({
-                  title: data.error || data.message || '上传失败',
-                  icon: 'none'
-                })
-              }
-            } catch (e) {
-              console.error('解析上传结果失败:', e)
-              wx.showToast({
-                title: '上传失败，请重试',
-                icon: 'none'
-              })
-            }
-          },
-          fail(err) {
-            console.error('上传图片失败:', err)
-            wx.showToast({
-              title: '网络异常，请重试',
-              icon: 'none'
-            })
-          },
-          complete() {
-            wx.hideLoading()
-          }
+        this.setData({
+          'userInfo.avatarUrl': tempFile.tempFilePath
         })
       },
-      fail(err) {
+      fail: (err) => {
         console.error('选择图片失败:', err)
       }
     })
   },
 
-  /**
-   * 监听昵称输入
-   */
+  onChooseWechatAvatar(e) {
+    const avatarUrl = e.detail && e.detail.avatarUrl ? e.detail.avatarUrl : ''
+    if (avatarUrl) {
+      this.setData({
+        'userInfo.avatarUrl': avatarUrl
+      })
+    }
+  },
+
+  onWechatNicknameInput(e) {
+    const nickname = (e.detail.value || '').trim()
+    if (nickname) {
+      this.setData({
+        'userInfo.nickName': nickname,
+        wechatNicknameDraft: nickname
+      })
+    }
+  },
+
   onNickNameInput(e) {
     this.setData({
       'userInfo.nickName': e.detail.value
     })
   },
 
-  /**
-   * 监听手机号输入
-   */
   onMobileInput(e) {
     this.setData({
       'userInfo.mobile': e.detail.value
     })
   },
 
-  /**
-   * 保存用户信息
-   */
   saveUserInfo() {
-    const { nickName, avatarUrl } = this.data.userInfo
-    // 从全局或本地存储获取用户ID
-    const user_id = app.globalData.userInfo.user_id || 
-                  (wx.getStorageSync('userInfo') ? wx.getStorageSync('userInfo').user_id : null)
+    if (this.data.saving) {
+      return
+    }
 
-    if (!user_id) {
+    const { nickName, avatarUrl } = this.data.userInfo
+    const userId = getCurrentUserId()
+
+    if (!userId) {
       wx.showToast({
         title: '请先登录',
         icon: 'none'
       })
       return
     }
-
-    // 验证昵称不能为空
     if (!nickName || nickName.trim() === '') {
       wx.showToast({
         title: '昵称不能为空',
@@ -210,28 +145,44 @@ Page({
       return
     }
 
-    // 获取本地存储的access_token
+    this.setData({ saving: true })
+    wx.showLoading({
+      title: '保存中...',
+      mask: true
+    })
+
+    if (isTemporaryAvatar(avatarUrl)) {
+      this.uploadProfileWithAvatar(userId, nickName.trim(), avatarUrl)
+      return
+    }
+    this.saveProfileWithoutAvatar(userId, nickName.trim())
+  },
+
+  getAccessToken(callback) {
     const accessToken = wx.getStorageSync('access_token')
-    
-    if (!accessToken) {
+    if (accessToken) {
+      callback(accessToken)
+      return
+    }
+    request.getAccessToken((token) => {
+      callback(token)
+    }, () => {
+      this.finishSaving()
       wx.showToast({
         title: '请先登录',
         icon: 'none'
       })
-      return
-    }
+    })
+  },
 
-    // 检查avatarUrl是否为临时文件路径（包含wxfile://前缀）
-    const isTempFilePath = avatarUrl && avatarUrl.startsWith('wxfile://')
-    
-    if (isTempFilePath) {
-      // 当用户选择了新头像时，使用wx.uploadFile
+  uploadProfileWithAvatar(userId, nickName, avatarUrl) {
+    this.getAccessToken((accessToken) => {
       wx.uploadFile({
-        url: `${request.getHost()}/ordinary_user/Modify_data?access_token=${accessToken}`,
+        url: `${request.getHost()}/ordinary_user/Modify_data?access_token=${encodeURIComponent(accessToken)}`,
         filePath: avatarUrl,
         name: 'user_img',
         formData: {
-          user_id: user_id.toString(),
+          user_id: userId.toString(),
           nickname: nickName
         },
         success: (res) => {
@@ -243,57 +194,100 @@ Page({
             title: '保存失败',
             icon: 'none'
           })
+        },
+        complete: () => {
+          this.finishSaving()
         }
       })
-    } else {
-      app.req.post('/ordinary_user/Modify_data', {
-        user_id: user_id,
-        nickname: nickName
-      }, (res) => {
-        this.handleSaveResult(res)
-      }, (err) => {
-        console.error('保存用户信息失败:', err)
-        wx.showToast({
-          title: '保存失败',
-          icon: 'none'
-        })
-      })
-    }
+    })
   },
-  
-  /**
-   * 处理保存结果
-   */
+
+  saveProfileWithoutAvatar(userId, nickName) {
+    app.req.post('/ordinary_user/Modify_data', {
+      user_id: userId,
+      nickname: nickName
+    }, (res) => {
+      this.finishSaving()
+      this.handleSaveResult(res)
+    }, (err) => {
+      this.finishSaving()
+      console.error('保存用户信息失败:', err)
+      wx.showToast({
+        title: '保存失败',
+        icon: 'none'
+      })
+    })
+  },
+
+  finishSaving() {
+    wx.hideLoading()
+    this.setData({ saving: false })
+  },
+
+  parseSaveResponse(res) {
+    if (res && typeof res.data === 'string') {
+      return JSON.parse(res.data)
+    }
+    return res && res.data ? res.data : res
+  },
+
+  isSaveSuccess(data) {
+    return data && (
+      data.code === 200 ||
+      data.message === '用户信息更新成功' ||
+      data.message === '信息修改成功' ||
+      data.msg === '信息修改成功'
+    )
+  },
+
+  updateStoredUserInfo(data) {
+    const current = getCurrentUser()
+    const avatarUrl = data.avatar_url ||
+      data.user_img ||
+      (data.data && (data.data.avatar_url || data.data.user_img)) ||
+      this.data.userInfo.avatarUrl
+    const nickname = this.data.userInfo.nickName
+    const updatedUserInfo = {
+      ...current,
+      nickName: nickname,
+      nickname,
+      avatarUrl,
+      user_img: avatarUrl
+    }
+
+    app.globalData.userInfo = updatedUserInfo
+    wx.setStorageSync('userInfo', updatedUserInfo)
+    this.setData({
+      originalUserInfo: {
+        nickName: updatedUserInfo.nickname || '',
+        avatarUrl: updatedUserInfo.user_img || '',
+        mobile: updatedUserInfo.mobile || ''
+      },
+      wechatNicknameDraft: ''
+    })
+  },
+
   handleSaveResult(res) {
     try {
-      const data = typeof res.data === 'string' ? JSON.parse(res.data) : res
-      if (data.code === 200 || data.message === '用户信息更新成功' || data.msg === '信息修改成功') {
-        // 更新成功，更新全局和本地存储的用户信息
-        const updatedUserInfo = {
-          ...app.globalData.userInfo,
-          nickName: this.data.userInfo.nickName,
-          avatarUrl: data.avatar_url || this.data.userInfo.avatarUrl
-        }
-        app.globalData.userInfo = updatedUserInfo
-        wx.setStorageSync('userInfo', updatedUserInfo)
-
+      const data = this.parseSaveResponse(res)
+      if (this.isSaveSuccess(data)) {
+        this.updateStoredUserInfo(data)
         wx.showToast({
           title: '保存成功',
           icon: 'success',
           duration: 2000,
           success: () => {
-            // 延迟跳转回用户页面
             setTimeout(() => {
               wx.navigateBack()
             }, 1500)
           }
         })
-      } else {
-        wx.showToast({
-          title: data.message || '保存失败',
-          icon: 'none'
-        })
+        return
       }
+      wx.showToast({
+        title: (data && (data.message || data.msg || data.error)) || '保存失败',
+        icon: 'none'
+      })
     } catch (e) {
       console.error('保存用户信息失败:', e)
       wx.showToast({
