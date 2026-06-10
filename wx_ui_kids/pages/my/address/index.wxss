@@ -29,20 +29,19 @@
   font-weight: 500;
 }
 
-.address-action-panel {
+.address-sync-panel {
   margin-top: 88rpx;
   background-color: #fff;
+  border-radius: 0;
   padding: 24rpx;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16rpx;
 }
 
 .wechat-address-btn {
   width: 100%;
   height: 88rpx;
   line-height: 88rpx;
-  background-color: #ff6b6b;
+  border-radius: 0;
+  background-color: #68B9FA;
   color: #fff;
   font-size: 30rpx;
 }
@@ -52,8 +51,17 @@
 }
 
 .wechat-address-btn[disabled] {
-  background-color: #f1a2a2;
+  background-color: #a7d7ff;
   color: #fff;
+}
+
+.wechat-address-tip {
+  display: block;
+  margin-top: 16rpx;
+  color: #999;
+  font-size: 24rpx;
+  line-height: 34rpx;
+  text-align: center;
 }
 
 /* 地址列表 */
@@ -63,13 +71,14 @@
 
 .address-item {
   background-color: #fff;
+  border-radius: 0;
   padding: 30rpx;
   margin-bottom: 20rpx;
   position: relative;
 }
 
 .address-item.default {
-  border: 2rpx solid #ff6b6b;
+  border: 2rpx solid #68B9FA;
 }
 
 .address-header {
@@ -91,10 +100,11 @@
 }
 
 .default-tag {
-  background-color: #ff6b6b;
+  background-color: #68B9FA;
   color: #fff;
   font-size: 24rpx;
   padding: 6rpx 16rpx;
+  border-radius: 0;
 }
 
 .address-detail {
@@ -125,16 +135,68 @@
 }
 
 .address-set-default {
-  color: #ff6b6b;
+  color: #68B9FA;
+}
+
+/* 无地址提示 */
+.no-address {
+  margin-top: 40rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 100rpx;
+}
+
+.no-address image {
+  width: 240rpx;
+  height: 240rpx;
+  margin-bottom: 40rpx;
+}
+
+.no-address-text {
+  font-size: 32rpx;
+  color: #999;
+  margin-bottom: 60rpx;
 }
 
 .add-address-btn {
-  background-color: #ff6b6b;
+  background-color: #68B9FA;
   color: #fff;
+  font-size: 32rpx;
+  padding: 24rpx 80rpx;
+  border-radius: 0;
+}
+
+.empty-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28rpx;
+}
+
+.sync-address-link {
+  color: #68B9FA;
   font-size: 30rpx;
-  height: 88rpx;
-  line-height: 88rpx;
+}
+
+/* 固定添加按钮 */
+.add-address-fixed {
+  position: fixed;
+  bottom: 30rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #68B9FA;
+  color: #fff;
+  font-size: 32rpx;
+  padding: 24rpx 80rpx;
+  border-radius: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
+  box-shadow: 0 4rpx 20rpx rgba(104, 185, 250, 0.3);
+}
+
+.add-address-icon {
+  font-size: 36rpx;
+  margin-right: 12rpx;
+  font-weight: bold;
 }
