@@ -1301,7 +1301,7 @@ func (oc *OrderController) OrderUpdate(c *gin.Context) {
 	if paymentTime, ok := updateData["payment_time"].(string); ok && paymentTime != "" {
 		parsedTime, timeErr := time.Parse("2006-01-02 15:04:05", paymentTime)
 		if timeErr == nil {
-			order.PaymentTime = parsedTime
+			order.PaymentTime = &parsedTime
 		}
 	}
 
@@ -1430,10 +1430,11 @@ func (oc *OrderController) JushuitanShipInfo(c *gin.Context) {
 	// 构建原始请求数据用于保存
 	requestData := fmt.Sprintf("biz=%s&action_code=%s&sign=%s&timestamp=%s",
 		c.PostForm("biz"), c.PostForm("action_code"), c.PostForm("sign"), c.PostForm("timestamp"))
+	requestTime := time.Now()
 	rawData := models.JushuitanPushRawData{
 		RequestURL:  requestURL,
 		RequestIP:   clientIP,
-		RequestTime: time.Now(),
+		RequestTime: &requestTime,
 		Response:    responseResult,
 		RawData:     requestData,
 		Remarks:     fmt.Sprintf("订单号: %s, 子订单数: %d", req.SoID, len(req.Items)),

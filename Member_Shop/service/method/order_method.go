@@ -93,25 +93,25 @@ func convertOrderToMap(order models.Order, afterSaleStatus *string) map[string]i
 	result["express_company"] = order.ExpressCompany
 	result["express_number"] = order.ExpressNumber
 
-	if !order.ShippedTime.IsZero() {
+	if order.ShippedTime != nil {
 		result["shipped_time"] = order.ShippedTime.Format("2006-01-02 15:04:05")
 	} else {
 		result["shipped_time"] = ""
 	}
 
-	if !order.DeliveredTime.IsZero() {
+	if order.DeliveredTime != nil {
 		result["delivered_time"] = order.DeliveredTime.Format("2006-01-02 15:04:05")
 	} else {
 		result["delivered_time"] = ""
 	}
 
-	if !order.CanceledTime.IsZero() {
+	if order.CanceledTime != nil {
 		result["canceled_time"] = order.CanceledTime.Format("2006-01-02 15:04:05")
 	} else {
 		result["canceled_time"] = ""
 	}
 
-	if !order.ProcessingTime.IsZero() {
+	if order.ProcessingTime != nil {
 		result["processing_time"] = order.ProcessingTime.Format("2006-01-02 15:04:05")
 	} else {
 		result["processing_time"] = ""
@@ -134,7 +134,7 @@ func convertOrderToMap(order models.Order, afterSaleStatus *string) map[string]i
 	result["payment_method"] = order.PaymentMethod
 	result["delivery_method"] = order.DeliveryMethod
 
-	if !order.PaymentTime.IsZero() {
+	if order.PaymentTime != nil {
 		result["payment_time"] = order.PaymentTime.Format("2006-01-02 15:04:05")
 	} else {
 		result["payment_time"] = ""
@@ -823,7 +823,8 @@ func payOrderLegacy(orderID string) error {
 	}
 
 	order.PayStatus = "paid"
-	order.PaymentTime = time.Now()
+	paymentTime := time.Now()
+	order.PaymentTime = &paymentTime
 	if err := db.DB.Save(&order).Error; err != nil {
 		return err
 	}
@@ -845,7 +846,8 @@ func DeliverOrder(orderID, expressCompany, expressNumber string) error {
 	order.Status = "shipped"
 	order.ExpressCompany = expressCompany
 	order.ExpressNumber = expressNumber
-	order.ShippedTime = time.Now()
+	shippedTime := time.Now()
+	order.ShippedTime = &shippedTime
 	if err := db.DB.Select("status", "express_company", "express_number", "shipped_time").Save(&order).Error; err != nil {
 		return err
 	}
@@ -865,7 +867,8 @@ func ReceiveOrder(orderID string) error {
 	}
 
 	order.Status = "delivered"
-	order.DeliveredTime = time.Now()
+	deliveredTime := time.Now()
+	order.DeliveredTime = &deliveredTime
 	if err := db.DB.Select("status", "delivered_time").Save(&order).Error; err != nil {
 		return err
 	}

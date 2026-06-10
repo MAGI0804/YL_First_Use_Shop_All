@@ -424,10 +424,11 @@ func parseJushuitanAfterSalePushRequest(c *gin.Context) (requestbody.JushuitanAf
 }
 
 func saveJushuitanAfterSaleRawData(c *gin.Context, rawData, response string, req requestbody.JushuitanAfterSalePushRequest) {
+	requestTime := time.Now()
 	record := models.JushuitanPushRawData{
 		RequestURL:  c.Request.URL.String(),
 		RequestIP:   c.ClientIP(),
-		RequestTime: time.Now(),
+		RequestTime: &requestTime,
 		Response:    response,
 		RawData:     rawData,
 		Remarks:     fmt.Sprintf("售后单: %s, 聚水潭售后单: %s, 订单号: %s", req.ReturnOrderID, req.JushuitanAfterSaleID, req.OrderID),

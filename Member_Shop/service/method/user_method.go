@@ -182,13 +182,14 @@ func findOrCreateWechatMemberUser(tx *gorm.DB, member models.Member, req request
 		}
 	}
 
+	now := time.Now()
 	user = models.User{
 		OpenID:           req.OpenID,
 		Mobile:           req.Mobile,
 		Nickname:         normalizedWechatNickname(req.Nickname, req.OpenID),
 		UserImg:          normalizedWechatAvatar(req.AvatarURL),
-		RegistrationDate: time.Now(),
-		LastLogin:        time.Now(),
+		RegistrationDate: now,
+		LastLogin:        &now,
 		IsActive:         true,
 		IsStaff:          false,
 	}

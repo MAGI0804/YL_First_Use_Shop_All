@@ -290,10 +290,11 @@ func (ic *InventoryController) JushuitanSkuSync(c *gin.Context) {
 	}
 
 	responseResult := `code=0&msg=执行成功`
+	requestTime := time.Now()
 	rawRecord := models.JushuitanPushRawData{
 		RequestURL:  c.Request.URL.String(),
 		RequestIP:   c.ClientIP(),
-		RequestTime: time.Now(),
+		RequestTime: &requestTime,
 		Response:    responseResult,
 		RawData:     rawData,
 		Remarks:     fmt.Sprintf("库存同步: msg_type=%s, item_count=%d, applied_count=%d", req.MsgType, len(items), len(results)),
