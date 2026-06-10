@@ -197,109 +197,7 @@ func (oc *OrderController) OrderCreate(c *gin.Context) {
 	c.Set("created_order_id", order.OrderID)
 	c.Set("created_order_user_id", req.UserID)
 
-	// 同步到聚水潭
-	token, err := jushuitan.GetToken()
-	if err != nil {
-		log.Printf("获取聚水潭token失败: %v", err)
-		c.JSON(http.StatusInternalServerError, msg.ErrResponseStr("同步到聚水潭失败"))
-		return
-	}
-
-	items := make([]jushuitan.OrderItem, 0, len(req.ProductList))
-	log.Printf("ProductList 长度: %d", len(req.ProductList))
-	for i, item := range req.ProductList {
-		log.Printf("处理商品[%d]: %+v", i, item)
-		var orderItem jushuitan.OrderItem
-		if productMap, ok := item.(map[string]interface{}); ok {
-			orderItem = jushuitan.OrderItem{
-				SkuID:     getStringValue(productMap, "commodity_id"),
-				ShopSkuID: getStringValue(productMap, "commodity_id"),
-				Name:      getStringValue(productMap, "product_name"),
-				Qty:       getIntValue(productMap, "qty", 1),
-			}
-			if amount, ok := productMap["price"].(float64); ok {
-				orderItem.Amount = amount
-				orderItem.BasePrice = amount
-			}
-		} else if commodityID, ok := item.(string); ok {
-			commodity, err := method.GetCommodityInfoByID(commodityID)
-			if err != nil {
-				log.Printf("查询商品信息失败: %s, err: %v", commodityID, err)
-				continue
-			}
-			orderItem = jushuitan.OrderItem{
-				SkuID:     commodityID,
-				ShopSkuID: commodityID,
-				Name:      commodity.Name,
-				Qty:       1,
-				Amount:    commodity.Price,
-				BasePrice: commodity.Price,
-			}
-		}
-		if orderItem.SkuID != "" {
-			orderItem.OuterOiID = fmt.Sprintf("%d", i+1)
-			orderItem.BatchID = "1"
-			orderItem.ProducedDate = time.Now().Format("2006-01-02")
-			log.Printf("构建 OrderItem: %+v", orderItem)
-			items = append(items, orderItem)
-		}
-	}
-	log.Printf("最终 items 长度: %d, items: %+v", len(items), items)
-
-	// 解析子订单号
-	var subOrderIDs []string
-	if order.SubOrderIDs != "" {
-		if err := json.Unmarshal([]byte(order.SubOrderIDs), &subOrderIDs); err != nil {
-			log.Printf("解析子订单号失败: %v", err)
-		}
-	}
-	log.Printf("子订单号列表: %+v", subOrderIDs)
-
-	// 将子订单号设置到 items 的 outer_oi_id
-	for i := range items {
-		if i < len(subOrderIDs) {
-			parts := strings.Split(subOrderIDs[i], ":")
-			if len(parts) > 0 {
-				items[i].OuterOiID = parts[0]
-			}
-		}
-	}
-	log.Printf("最终 items: %+v", items)
-
-	buyerID := strconv.Itoa(req.UserID)
-	paymentMethod := "其它"
-	paymentTime := order.OrderTime.In(time.FixedZone("CST", 8*3600)).Format("2006-01-02 15:04:05")
-
-	orderData := jushuitan.OrderData{
-		ShopID:           10395227,
-		SoID:             order.OrderID,
-		OrderDate:        order.OrderTime.In(time.FixedZone("CST", 8*3600)).Format("2006-01-02 15:04:05"),
-		ShopStatus:       "WAIT_SELLER_SEND_GOODS",
-		ShopBuyerID:      buyerID,
-		ReceiverState:    req.Province,
-		ReceiverCity:     req.City,
-		ReceiverDistrict: req.County,
-		ReceiverAddress:  fmt.Sprintf("%s_%s_%s_%s", req.Province, req.City, req.County, req.DetailedAddress),
-		ReceiverName:     req.ReceiverName,
-		ReceiverPhone:    receiverPhoneStr,
-		ReceiverZip:      "200000",
-		PayAmount:        req.OrderAmount,
-		Freight:          0,
-		Remark:           req.Remark,
-		BuyerMessage:     req.Remark,
-		ShopModified:     order.OrderTime.In(time.FixedZone("CST", 8*3600)).Format("2006-01-02 15:04:05"),
-		Items:            items,
-		Pay: jushuitan.PayInfo{
-			OuterPayID:    order.OrderID,
-			PayDate:       paymentTime,
-			Payment:       paymentMethod,
-			SellerAccount: "youlankids",
-			BuyerAccount:  buyerID,
-			Amount:        req.OrderAmount,
-		},
-	}
-
-	resp, err := jushuitan.SendOrder(token, orderData)
+	resp, err := syncCreatedOrderToJushuitan(order)
 	if err != nil {
 		log.Printf("上传订单到聚水潭失败: %v", err)
 		c.JSON(http.StatusInternalServerError, msg.ErrResponseStr("同步到聚水潭失败"))
@@ -332,6 +230,120 @@ func (oc *OrderController) OrderCreate(c *gin.Context) {
 	c.JSON(http.StatusOK, msg.SuccessResponse("success", &data))
 }
 
+func syncCreatedOrderToJushuitan(order *models.Order) (string, error) {
+	log.Printf("开始同步订单到聚水潭, order_id=%s, user_id=%d", order.OrderID, order.UserID)
+	token, err := jushuitan.GetToken()
+	if err != nil {
+		return "", err
+	}
+
+	var productList []interface{}
+	if order.ProductList != "" {
+		if err := json.Unmarshal([]byte(order.ProductList), &productList); err != nil {
+			return "", fmt.Errorf("解析订单商品列表失败: %w", err)
+		}
+	}
+
+	items := make([]jushuitan.OrderItem, 0, len(productList))
+	log.Printf("ProductList 长度: %d", len(productList))
+	for i, item := range productList {
+		log.Printf("处理商品[%d]: %+v", i, item)
+		var orderItem jushuitan.OrderItem
+		if productMap, ok := item.(map[string]interface{}); ok {
+			productName := getStringValue(productMap, "product_name")
+			if productName == "" {
+				productName = getStringValue(productMap, "name")
+			}
+			orderItem = jushuitan.OrderItem{
+				SkuID:     getStringValue(productMap, "commodity_id"),
+				ShopSkuID: getStringValue(productMap, "commodity_id"),
+				Name:      productName,
+				Qty:       getIntValue(productMap, "qty", 1),
+			}
+			if amount, ok := productMap["price"].(float64); ok {
+				orderItem.Amount = amount
+				orderItem.BasePrice = amount
+			}
+		} else if commodityID, ok := item.(string); ok {
+			commodity, err := method.GetCommodityInfoByID(commodityID)
+			if err != nil {
+				log.Printf("查询商品信息失败: %s, err: %v", commodityID, err)
+				continue
+			}
+			orderItem = jushuitan.OrderItem{
+				SkuID:     commodityID,
+				ShopSkuID: commodityID,
+				Name:      commodity.Name,
+				Qty:       1,
+				Amount:    commodity.Price,
+				BasePrice: commodity.Price,
+			}
+		}
+		if orderItem.SkuID != "" {
+			orderItem.OuterOiID = fmt.Sprintf("%d", i+1)
+			orderItem.BatchID = "1"
+			orderItem.ProducedDate = time.Now().Format("2006-01-02")
+			log.Printf("构建 OrderItem: %+v", orderItem)
+			items = append(items, orderItem)
+		}
+	}
+	log.Printf("最终 items 长度: %d, items: %+v", len(items), items)
+
+	var subOrderIDs []string
+	if order.SubOrderIDs != "" {
+		if err := json.Unmarshal([]byte(order.SubOrderIDs), &subOrderIDs); err != nil {
+			log.Printf("解析子订单号失败: %v", err)
+		}
+	}
+	log.Printf("子订单号列表: %+v", subOrderIDs)
+
+	// 将子订单号设置到 items 的 outer_oi_id
+	for i := range items {
+		if i < len(subOrderIDs) {
+			parts := strings.Split(subOrderIDs[i], ":")
+			if len(parts) > 0 {
+				items[i].OuterOiID = parts[0]
+			}
+		}
+	}
+	log.Printf("最终 items: %+v", items)
+
+	buyerID := strconv.Itoa(order.UserID)
+	paymentMethod := "其它"
+	paymentTime := order.OrderTime.In(time.FixedZone("CST", 8*3600)).Format("2006-01-02 15:04:05")
+
+	orderData := jushuitan.OrderData{
+		ShopID:           10395227,
+		SoID:             order.OrderID,
+		OrderDate:        order.OrderTime.In(time.FixedZone("CST", 8*3600)).Format("2006-01-02 15:04:05"),
+		ShopStatus:       "WAIT_SELLER_SEND_GOODS",
+		ShopBuyerID:      buyerID,
+		ReceiverState:    order.Province,
+		ReceiverCity:     order.City,
+		ReceiverDistrict: order.County,
+		ReceiverAddress:  fmt.Sprintf("%s_%s_%s_%s", order.Province, order.City, order.County, order.DetailedAddress),
+		ReceiverName:     order.ReceiverName,
+		ReceiverPhone:    order.ReceiverPhone,
+		ReceiverZip:      "200000",
+		PayAmount:        order.OrderAmount,
+		Freight:          0,
+		Remark:           order.Remarks,
+		BuyerMessage:     order.Remarks,
+		ShopModified:     order.OrderTime.In(time.FixedZone("CST", 8*3600)).Format("2006-01-02 15:04:05"),
+		Items:            items,
+		Pay: jushuitan.PayInfo{
+			OuterPayID:    order.OrderID,
+			PayDate:       paymentTime,
+			Payment:       paymentMethod,
+			SellerAccount: "youlankids",
+			BuyerAccount:  buyerID,
+			Amount:        order.OrderAmount,
+		},
+	}
+
+	return jushuitan.SendOrder(token, orderData)
+}
+
 func (oc *OrderController) BackendCreateOrder(c *gin.Context) {
 	operator, ok := requireBackendOperator(c)
 	if !ok {
@@ -347,6 +359,14 @@ func (oc *OrderController) BackendCreateOrder(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, msg.ErrResponseStr(err.Error()))
 		return
 	}
+	resp, err := syncCreatedOrderToJushuitan(order)
+	if err != nil {
+		log.Printf("后台代下单上传订单到聚水潭失败: %v", err)
+		c.JSON(http.StatusInternalServerError, msg.ErrResponseStr("同步到聚水潭失败"))
+		return
+	}
+	log.Printf("后台代下单上传订单到聚水潭成功: %s", resp)
+
 	data := method.ConvertOrderToMap(*order)
 	c.JSON(http.StatusOK, msg.SuccessResponse("success", &data))
 }
