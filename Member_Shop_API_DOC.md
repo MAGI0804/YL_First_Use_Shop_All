@@ -166,6 +166,8 @@ Base URL：`http://localhost:3088`
 | `POST /address/delete_address` | 删除地址 | `{ "address_id": 1, "user_id": 10001 }` |
 
 字段含义：`address_id` 地址 ID；`receiver_name` 收货人；`phone_number` 收货手机号；`is_default` 是否默认。  
+小程序微信地址同步：地址管理页通过用户点击按钮调用微信官方 `wx.chooseAddress`，将返回的 `userName`、`telNumber`、`provinceName`、`cityName`、`countyName`、`detailInfo` 分别映射为 `receiver_name`、`phone_number`、`province`、`city`、`county`、`detailed_address` 后调用 `/address/add_address`；用户第一条地址自动设置为默认地址。  
+官方文档：`https://developers.weixin.qq.com/miniprogram/dev/api/open-api/address/wx.chooseAddress.html`  
 成功示例：`{"code":200,"msg":"success","data":{"address_id":1}}`  
 失败示例：`{"code":201,"msg":"地址不存在","data":{},"Err":""}`
 ### 3.5 订单与售后

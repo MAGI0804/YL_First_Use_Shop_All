@@ -4,7 +4,8 @@
   background-color: #f5f5f5;
   min-height: 100vh;
   position: relative;
-  padding-bottom: 80rpx;
+  padding: 20rpx 20rpx 120rpx;
+  box-sizing: border-box;
 }
 
 /* 导航栏 */
@@ -28,10 +29,44 @@
   font-weight: 500;
 }
 
+.address-sync-panel {
+  margin-top: 88rpx;
+  background-color: #fff;
+  border-radius: 16rpx;
+  padding: 24rpx;
+}
+
+.wechat-address-btn {
+  width: 100%;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 44rpx;
+  background-color: #ff6b6b;
+  color: #fff;
+  font-size: 30rpx;
+}
+
+.wechat-address-btn::after {
+  border: none;
+}
+
+.wechat-address-btn[disabled] {
+  background-color: #f1a2a2;
+  color: #fff;
+}
+
+.wechat-address-tip {
+  display: block;
+  margin-top: 16rpx;
+  color: #999;
+  font-size: 24rpx;
+  line-height: 34rpx;
+  text-align: center;
+}
+
 /* 地址列表 */
 .address-list {
-  margin-top: 88rpx;
-  padding: 20rpx;
+  padding-top: 20rpx;
 }
 
 .address-item {
@@ -105,11 +140,11 @@
 
 /* 无地址提示 */
 .no-address {
-  margin-top: 88rpx;
+  margin-top: 40rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: 160rpx;
+  padding-top: 100rpx;
 }
 
 .no-address image {
@@ -130,6 +165,18 @@
   font-size: 32rpx;
   padding: 24rpx 80rpx;
   border-radius: 50rpx;
+}
+
+.empty-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28rpx;
+}
+
+.sync-address-link {
+  color: #ff6b6b;
+  font-size: 30rpx;
 }
 
 /* 固定添加按钮 */

@@ -1,5 +1,15 @@
 // pages/my/address/index.js
 const app = getApp();
+
+const getCurrentUserId = () => {
+  const globalUserInfo = app.globalData.userInfo || {};
+  return parseInt(globalUserInfo.user_id || app.globalData.user_id || wx.getStorageSync('user_id') || 0);
+};
+
+const getAddressErrorMessage = (err, fallback) => {
+  return (err && (err.message || err.msg || (err.data && (err.data.message || err.data.msg)))) || fallback;
+};
+
 // 页面顶部的userId声明现在移到getAddressList方法内部，确保每次都获取最新值
 Page({
 
@@ -7,7 +17,8 @@ Page({
    * 页面的初始数据
    */
   data: {
-    addressList: []
+    addressList: [],
+    syncingWechatAddress: false
   },
 
   /**
@@ -80,8 +91,7 @@ Page({
     });
     
     // 按照应用标准方式获取用户ID：先检查全局变量，再检查本地存储，确保为整数类型
-    const globalUserInfo = app.globalData.userInfo || {};
-    const userId = parseInt(globalUserInfo.user_id || app.globalData.user_id || wx.getStorageSync('user_id') || 0);
+    const userId = getCurrentUserId();
     
     // 确保user_id存在且不为0
     if (!userId || userId <= 0) {
@@ -184,6 +194,114 @@ Page({
       url: '/pages/my/address/add/index'
     });
   },
+
+  /**
+   * 从微信收货地址簿同步地址到商城地址
+   */
+  syncWechatAddress() {
+    if (this.data.syncingWechatAddress) {
+      return;
+    }
+
+    const userId = getCurrentUserId();
+    if (!userId || userId <= 0) {
+      wx.showToast({
+        title: '请先登录',
+        icon: 'none'
+      });
+      return;
+    }
+
+    if (typeof wx.chooseAddress !== 'function') {
+      wx.showModal({
+        title: '当前微信版本不支持',
+        content: '请升级微信后再同步微信收货地址。',
+        showCancel: false
+      });
+      return;
+    }
+
+    this.setData({ syncingWechatAddress: true });
+
+    wx.chooseAddress({
+      success: (wechatAddress) => {
+        const requestData = {
+          user_id: userId,
+          receiver_name: (wechatAddress.userName || '').trim(),
+          phone_number: (wechatAddress.telNumber || '').trim(),
+          province: (wechatAddress.provinceName || '').trim(),
+          city: (wechatAddress.cityName || '').trim(),
+          county: (wechatAddress.countyName || '').trim(),
+          detailed_address: (wechatAddress.detailInfo || '').trim(),
+          is_default: this.data.addressList.length === 0,
+          remark: '微信地址'
+        };
+
+        if (!requestData.receiver_name || !requestData.phone_number || !requestData.province || !requestData.city || !requestData.county || !requestData.detailed_address) {
+          this.setData({ syncingWechatAddress: false });
+          wx.showToast({
+            title: '微信地址信息不完整',
+            icon: 'none'
+          });
+          return;
+        }
+
+        wx.showLoading({
+          title: '保存中...',
+          mask: true
+        });
+
+        app.req.post('/address/add_address', requestData,
+          (res) => {
+            this.setData({ syncingWechatAddress: false });
+            if (res.code === 200) {
+              wx.showToast({
+                title: '同步成功',
+                icon: 'success'
+              });
+              this.getAddressList();
+              return;
+            }
+            wx.showToast({
+              title: getAddressErrorMessage(res, '同步失败'),
+              icon: 'none'
+            });
+          },
+          (err) => {
+            this.setData({ syncingWechatAddress: false });
+            wx.showToast({
+              title: getAddressErrorMessage(err, '网络错误，请重试'),
+              icon: 'none'
+            });
+          }
+        );
+      },
+      fail: (err) => {
+        this.setData({ syncingWechatAddress: false });
+        const errMsg = err && err.errMsg ? err.errMsg : '';
+        if (errMsg.includes('cancel')) {
+          return;
+        }
+        if (errMsg.includes('auth deny') || errMsg.includes('authorize')) {
+          wx.showModal({
+            title: '需要地址权限',
+            content: '请允许使用微信收货地址后再同步。',
+            confirmText: '去设置',
+            success: (modalRes) => {
+              if (modalRes.confirm) {
+                wx.openSetting();
+              }
+            }
+          });
+          return;
+        }
+        wx.showToast({
+          title: '未获取到微信地址',
+          icon: 'none'
+        });
+      }
+    });
+  },
   
   /**
    * 选择地址（从订单页面过来时使用）
@@ -247,8 +365,7 @@ Page({
       success: (res) => {
         if (res.confirm) {
           // 获取用户ID
-          const globalUserInfo = app.globalData.userInfo || {};
-          const userId = parseInt(globalUserInfo.user_id || app.globalData.user_id || wx.getStorageSync('user_id') || 0);
+          const userId = getCurrentUserId();
           
           if (!userId) {
             console.warn('用户ID不存在，无法删除地址');
@@ -305,8 +422,7 @@ Page({
     const addressId = e.currentTarget.dataset.id;
     
     // 动态获取最新的用户ID并转换为整数
-    const globalUserInfo = app.globalData.userInfo || {};
-    const userId = parseInt(globalUserInfo.user_id || app.globalData.user_id || wx.getStorageSync('user_id') || 0);
+    const userId = getCurrentUserId();
     
     if (!userId || userId <= 0) {
       console.warn('请先登录');
