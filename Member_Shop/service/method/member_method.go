@@ -17,6 +17,20 @@ type MemberDetailResult struct {
 	Tags   []models.MemberTag `json:"tags"`
 }
 
+type MemberListItem struct {
+	models.Member
+	Tags []models.MemberTag `json:"tags"`
+}
+
+type memberTagListRow struct {
+	MemberID  uint   `gorm:"column:member_id"`
+	ID        uint   `gorm:"column:id"`
+	Name      string `gorm:"column:name"`
+	Color     string `gorm:"column:color"`
+	Remarks   string `gorm:"column:remarks"`
+	CreatedBy uint   `gorm:"column:created_by"`
+}
+
 func CreateMember(req requestbody.MemberCreateRequest, operator BackendOperatorSnapshot, requestMeta OperationRequestMeta) (*models.Member, error) {
 	if err := validateMemberMobile(req.Mobile); err != nil {
 		return nil, err
@@ -127,7 +141,7 @@ func UpdateMember(req requestbody.MemberUpdateRequest, operator BackendOperatorS
 	return &updated, nil
 }
 
-func QueryMembers(req requestbody.MemberListRequest) ([]models.Member, int64, error) {
+func QueryMembers(req requestbody.MemberListRequest) ([]MemberListItem, int64, error) {
 	page, pageSize := normalizeBackendPage(req.Page, req.PageSize)
 	query := db.DB.Model(&models.Member{})
 	if strings.TrimSpace(req.Mobile) != "" {
@@ -162,7 +176,52 @@ func QueryMembers(req requestbody.MemberListRequest) ([]models.Member, int64, er
 	if err := query.Distinct("member_info.*").Order("created_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&members).Error; err != nil {
 		return nil, 0, err
 	}
-	return members, total, nil
+	items, err := attachTagsToMemberList(members)
+	if err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
+func attachTagsToMemberList(members []models.Member) ([]MemberListItem, error) {
+	items := make([]MemberListItem, 0, len(members))
+	if len(members) == 0 {
+		return items, nil
+	}
+
+	memberIDs := make([]uint, 0, len(members))
+	for _, member := range members {
+		memberIDs = append(memberIDs, member.ID)
+	}
+
+	var tagRows []memberTagListRow
+	if err := db.DB.Table("member_tag").
+		Select("member_tag_relation.member_id, member_tag.id, member_tag.name, member_tag.color, member_tag.remarks, member_tag.created_by").
+		Joins("JOIN member_tag_relation ON member_tag_relation.tag_id = member_tag.id").
+		Where("member_tag_relation.member_id IN ?", memberIDs).
+		Order("member_tag_relation.member_id ASC, member_tag.name ASC").
+		Scan(&tagRows).Error; err != nil {
+		return nil, err
+	}
+
+	tagsByMemberID := make(map[uint][]models.MemberTag, len(members))
+	for _, row := range tagRows {
+		tagsByMemberID[row.MemberID] = append(tagsByMemberID[row.MemberID], models.MemberTag{
+			ID:        row.ID,
+			Name:      row.Name,
+			Color:     row.Color,
+			Remarks:   row.Remarks,
+			CreatedBy: row.CreatedBy,
+		})
+	}
+
+	for _, member := range members {
+		items = append(items, MemberListItem{
+			Member: member,
+			Tags:   tagsByMemberID[member.ID],
+		})
+	}
+	return items, nil
 }
 
 func GetMemberDetail(req requestbody.MemberDetailRequest) (*MemberDetailResult, error) {

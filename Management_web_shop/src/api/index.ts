@@ -212,6 +212,7 @@ export interface MemberItem {
   remarks: string
   created_at: string
   updated_at: string
+  tags?: MemberTagItem[]
 }
 
 export interface MemberTagItem {

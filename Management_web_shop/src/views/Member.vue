@@ -22,13 +22,21 @@
     </div>
 
     <el-table v-loading="loading" :data="members" row-key="id" class="member-table">
-      <el-table-column label="会员" min-width="190">
+      <el-table-column label="会员名" min-width="130" show-overflow-tooltip>
         <template #default="{ row }">
-          <div class="member-main">
-            <span class="member-name">{{ row.nickname || '-' }}</span>
-            <span class="member-sub">{{ row.mobile }}</span>
-            <span class="member-sub">{{ row.member_no }}</span>
+          <span class="member-name">{{ row.nickname || '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="mobile" label="手机号" min-width="130" />
+      <el-table-column prop="member_no" label="会员号" min-width="170" show-overflow-tooltip />
+      <el-table-column label="标签" min-width="170">
+        <template #default="{ row }">
+          <div v-if="getMemberTags(row).length" class="member-tags">
+            <el-tag v-for="tag in getMemberTags(row)" :key="tag.id" size="small" effect="plain">
+              {{ tag.name }}
+            </el-tag>
           </div>
+          <span v-else class="member-sub">-</span>
         </template>
       </el-table-column>
       <el-table-column prop="manual_unique_code" label="唯一字段" min-width="130" show-overflow-tooltip />
@@ -472,6 +480,7 @@ const saveTags = async () => {
     await setMemberTags({ member_id: currentMember.value.id, tag_ids: selectedTagIds.value })
     ElMessage.success('标签已保存')
     tagDialogVisible.value = false
+    fetchMembers()
   } catch (error: any) {
     ElMessage.error(error.response?.data?.msg || '保存标签失败')
   } finally {
@@ -497,6 +506,8 @@ const toggleStatus = async (row: MemberItem) => {
 const viewDetail = (id: number) => {
   router.push(`/member/${id}`)
 }
+
+const getMemberTags = (row: MemberItem & { Tags?: MemberTagItem[] }) => row.tags || row.Tags || []
 
 const formatMoney = (value: number | string | undefined | null) => Number(value || 0).toFixed(2)
 
@@ -539,11 +550,16 @@ onMounted(async () => {
   margin-top: 18px;
 }
 
-.member-main,
 .amount-lines {
   display: flex;
   flex-direction: column;
   gap: 3px;
+}
+
+.member-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .member-name {
