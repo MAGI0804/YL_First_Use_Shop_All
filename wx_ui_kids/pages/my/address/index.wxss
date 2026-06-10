@@ -29,18 +29,19 @@
   font-weight: 500;
 }
 
-.address-sync-panel {
+.address-action-panel {
   margin-top: 88rpx;
   background-color: #fff;
-  border-radius: 16rpx;
   padding: 24rpx;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16rpx;
 }
 
 .wechat-address-btn {
   width: 100%;
   height: 88rpx;
   line-height: 88rpx;
-  border-radius: 44rpx;
   background-color: #ff6b6b;
   color: #fff;
   font-size: 30rpx;
@@ -55,15 +56,6 @@
   color: #fff;
 }
 
-.wechat-address-tip {
-  display: block;
-  margin-top: 16rpx;
-  color: #999;
-  font-size: 24rpx;
-  line-height: 34rpx;
-  text-align: center;
-}
-
 /* 地址列表 */
 .address-list {
   padding-top: 20rpx;
@@ -71,7 +63,6 @@
 
 .address-item {
   background-color: #fff;
-  border-radius: 16rpx;
   padding: 30rpx;
   margin-bottom: 20rpx;
   position: relative;
@@ -104,7 +95,6 @@
   color: #fff;
   font-size: 24rpx;
   padding: 6rpx 16rpx;
-  border-radius: 12rpx;
 }
 
 .address-detail {
@@ -138,65 +128,13 @@
   color: #ff6b6b;
 }
 
-/* 无地址提示 */
-.no-address {
-  margin-top: 40rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding-top: 100rpx;
-}
-
-.no-address image {
-  width: 240rpx;
-  height: 240rpx;
-  margin-bottom: 40rpx;
-}
-
-.no-address-text {
-  font-size: 32rpx;
-  color: #999;
-  margin-bottom: 60rpx;
-}
-
 .add-address-btn {
   background-color: #ff6b6b;
   color: #fff;
-  font-size: 32rpx;
-  padding: 24rpx 80rpx;
-  border-radius: 50rpx;
-}
-
-.empty-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 28rpx;
-}
-
-.sync-address-link {
-  color: #ff6b6b;
   font-size: 30rpx;
-}
-
-/* 固定添加按钮 */
-.add-address-fixed {
-  position: fixed;
-  bottom: 30rpx;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: #ff6b6b;
-  color: #fff;
-  font-size: 32rpx;
-  padding: 24rpx 80rpx;
-  border-radius: 50rpx;
+  height: 88rpx;
+  line-height: 88rpx;
   display: flex;
   align-items: center;
-  box-shadow: 0 4rpx 20rpx rgba(255, 107, 107, 0.3);
-}
-
-.add-address-icon {
-  font-size: 36rpx;
-  margin-right: 12rpx;
-  font-weight: bold;
+  justify-content: center;
 }

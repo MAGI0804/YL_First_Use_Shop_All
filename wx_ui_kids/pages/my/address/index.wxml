@@ -5,16 +5,16 @@
     <view class="nav-title">地址管理</view>
   </view> -->
 
-  <!-- 地址列表 -->
-  <view class="address-sync-panel">
+  <!-- 地址操作 -->
+  <view class="address-action-panel">
+    <view class="add-address-btn" bindtap="navigateToAddAddress">添加收货地址</view>
     <button class="wechat-address-btn" bindtap="syncWechatAddress" loading="{{syncingWechatAddress}}" disabled="{{syncingWechatAddress}}">
       同步微信地址
     </button>
-    <text class="wechat-address-tip">从微信收货地址簿选择后自动保存到商城地址</text>
   </view>
 
   <!-- 地址列表 -->
-  <view class="address-list" wx:if="{{addressList.length > 0}}">
+  <view class="address-list">
     <block wx:for="{{addressList}}" wx:key="id">
       <view class="address-item {{item.is_default ? 'default' : ''}}" bindtap="selectAddress" data-id="{{item.id}}">
         <view class="address-header">
@@ -34,21 +34,5 @@
         </view>
       </view>
     </block>
-  </view>
-
-  <!-- 无地址提示 -->
-  <view class="no-address" wx:else>
-    <image src="/images/home.png" mode="aspectFit"/>
-    <text class="no-address-text">暂无收货地址</text>
-    <view class="empty-actions">
-      <view class="add-address-btn" bindtap="navigateToAddAddress">添加收货地址</view>
-      <view class="sync-address-link" bindtap="syncWechatAddress">同步微信地址</view>
-    </view>
-  </view>
-
-  <!-- 添加地址按钮 -->
-  <view class="add-address-fixed" wx:if="{{addressList.length > 0}}" bindtap="navigateToAddAddress">
-    <text class="add-address-icon">+</text>
-    <text class="add-address-text">添加收货地址</text>
   </view>
 </view>
