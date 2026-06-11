@@ -117,8 +117,8 @@
     
     <!-- 右侧大按钮：感兴趣和下单 -->
     <view class="right-buttons">
-      <button class="cart-btn" bindtap="openSelectModal" data-type="cart">感兴趣</button>
-      <button class="buy-btn" bindtap="openSelectModal" data-type="buy">下单</button>
+      <button class="cart-btn" bindtap="openSelectModal" data-type="cart" disabled="{{stock <= 0}}">感兴趣</button>
+      <button class="buy-btn" bindtap="openSelectModal" data-type="buy" disabled="{{stock <= 0}}">下单</button>
     </view>
   </view>
 
@@ -147,7 +147,7 @@
                 <text class="qty-value">{{quantity}}</text>
                 <text class="qty-btn" bindtap="increaseQuantity">+</text>
               </view>
-              <view class="modal-stock-info" wx:if="{{selectedSize && currentItemStock > 0}}">
+              <view class="modal-stock-info" wx:if="{{selectedSize}}">
                 <text class="stock-text">库存：{{currentItemStock}}件</text>
               </view>
             </view>

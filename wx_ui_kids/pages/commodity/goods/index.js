@@ -199,6 +199,7 @@ Page({
             items: items,
             displayPicturesList: displayPicturesList // 保存display_pictures列表，用于下方纵向展示
           });
+          that.loadOpenInventory(goodsId);
         } else {
           that.setData({
             loading: false,
@@ -222,6 +223,61 @@ Page({
         });
       }
     );
+  },
+
+  loadOpenInventory(styleCode) {
+    if (!styleCode) {
+      return;
+    }
+    app.req.post('/open_inventory/query', {
+      style_code: styleCode
+    }, (res) => {
+      if (res && res.code === 200 && res.data) {
+        this.applyOpenInventory(res.data);
+      }
+    }, (err) => {
+      console.error('查询开放库存失败:', err);
+    });
+  },
+
+  applyOpenInventory(openInventory) {
+    const items = this.data.items || [];
+    const balances = openInventory.items || [];
+    const availableByCommodity = {};
+    balances.forEach((balance) => {
+      const commodityId = balance.commodity_id;
+      if (!commodityId) {
+        return;
+      }
+      availableByCommodity[commodityId] = (availableByCommodity[commodityId] || 0) + Number(balance.available_qty || 0);
+    });
+
+    const nextItems = items.map((colorItem) => ({
+      ...colorItem,
+      sizes: (colorItem.sizes || []).map((sizeItem) => {
+        const commodityId = sizeItem.commodity_id;
+        if (!commodityId || availableByCommodity[commodityId] === undefined) {
+          return sizeItem;
+        }
+        return {
+          ...sizeItem,
+          inventory: availableByCommodity[commodityId]
+        };
+      })
+    }));
+
+    const summary = openInventory.summary || {};
+    const selectedCommodityId = this.data.selectedCommodityId;
+    let currentItemStock = this.data.currentItemStock;
+    if (selectedCommodityId && availableByCommodity[selectedCommodityId] !== undefined) {
+      currentItemStock = availableByCommodity[selectedCommodityId];
+    }
+
+    this.setData({
+      stock: Number(summary.total_available_qty || 0),
+      currentItemStock,
+      items: nextItems
+    });
   },
 
   /**
@@ -276,6 +332,13 @@ Page({
     }
     
     const actionType = e.currentTarget.dataset.type;
+    if (this.data.stock <= 0) {
+      wx.showToast({
+        title: '当前商品暂无库存',
+        icon: 'none'
+      });
+      return;
+    }
     this.setData({
       showSelectModal: true,
       actionType: actionType
@@ -385,11 +448,25 @@ Page({
    * 确认选择
    */
   confirmSelect() {
-    const { selectedColor, selectedSize, selectedCommodityId, actionType, quantity } = this.data;
+    const { selectedColor, selectedSize, selectedCommodityId, actionType, quantity, currentItemStock } = this.data;
     
     if (!selectedColor || !selectedSize || !selectedCommodityId) {
       wx.showToast({
         title: '请选择完整的商品规格',
+        icon: 'none'
+      });
+      return;
+    }
+    if (currentItemStock <= 0) {
+      wx.showToast({
+        title: '该规格暂无库存',
+        icon: 'none'
+      });
+      return;
+    }
+    if (quantity > currentItemStock) {
+      wx.showToast({
+        title: '购买数量超过库存',
         icon: 'none'
       });
       return;
@@ -410,8 +487,8 @@ Page({
    * 增加购买数量
    */
   increaseQuantity() {
-    const { quantity, currentItemStock } = this.data;
-    const stock = currentItemStock > 0 ? currentItemStock : this.data.stock;
+    const { quantity, currentItemStock, selectedCommodityId } = this.data;
+    const stock = selectedCommodityId ? currentItemStock : this.data.stock;
     if (quantity < stock) {
       this.setData({
         quantity: quantity + 1
