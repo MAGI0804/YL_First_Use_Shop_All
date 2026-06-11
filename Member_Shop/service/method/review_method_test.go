@@ -42,6 +42,7 @@ func TestNormalizeReviewCreateInputRejectsInvalidContent(t *testing.T) {
 		{name: "too long", content: strings.Repeat("好", maxReviewContentLength+1)},
 		{name: "script", content: "<script>alert(1)</script>"},
 		{name: "javascript url", content: "javascript:alert(1)"},
+		{name: "sensitive word", content: "这是诈骗信息"},
 	}
 
 	for _, tt := range tests {

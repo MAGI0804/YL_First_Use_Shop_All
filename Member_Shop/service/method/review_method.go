@@ -38,6 +38,15 @@ var allowedReviewUploadExtensions = map[string]string{
 	".webp": "image/webp",
 }
 
+var reviewSensitiveWords = []string{
+	"诈骗",
+	"赌博",
+	"毒品",
+	"枪支",
+	"违禁品",
+	"色情",
+}
+
 // ReviewCreateInput 创建评价输入参数
 type ReviewCreateInput struct {
 	UserID      int      // 用户ID
@@ -692,6 +701,9 @@ func normalizeReviewCreateInput(input *ReviewCreateInput) error {
 	if containsUnsafeReviewContent(input.Content) {
 		return fmt.Errorf("content contains unsafe markup")
 	}
+	if containsSensitiveReviewContent(input.Content) {
+		return fmt.Errorf("content contains sensitive words")
+	}
 
 	images, err := normalizeReviewImages(input.Images)
 	if err != nil {
@@ -719,6 +731,16 @@ func containsUnsafeReviewContent(content string) bool {
 	}
 	for _, pattern := range unsafePatterns {
 		if strings.Contains(lowered, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsSensitiveReviewContent(content string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(content))
+	for _, word := range reviewSensitiveWords {
+		if word != "" && strings.Contains(normalized, strings.ToLower(word)) {
 			return true
 		}
 	}
