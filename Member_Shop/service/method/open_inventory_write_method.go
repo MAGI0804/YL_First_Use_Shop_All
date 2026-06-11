@@ -154,11 +154,23 @@ func setOpenInventoryAvailableTx(tx *gorm.DB, commodity models.Commodity, wareho
 		return nil, err
 	}
 
+	if err := createInventoryStockMovementTx(tx, commodity, warehouseCode, movementType, bizType, bizID, idempotencyKey, beforeQty, changeQty, afterQty, operatorID, remark); err != nil {
+		return nil, err
+	}
+
+	return &openInventoryChangeResult{
+		WarehouseCode: warehouseCode,
+		BeforeQty:     beforeQty,
+		AfterQty:      afterQty,
+	}, nil
+}
+
+func createInventoryStockMovementTx(tx *gorm.DB, commodity models.Commodity, warehouseCode, movementType, bizType, bizID, idempotencyKey string, beforeQty, changeQty, afterQty int, operatorID, remark string) error {
 	movement := models.InventoryStockMovement{
 		MovementNo:     openInventoryMovementNo(idempotencyKey),
 		CommodityID:    commodity.CommodityID,
 		StyleCode:      commodity.StyleCode,
-		WarehouseCode:  warehouseCode,
+		WarehouseCode:  normalizeOpenInventoryWarehouseCode(warehouseCode),
 		MovementType:   movementType,
 		BizType:        bizType,
 		BizID:          bizID,
@@ -172,27 +184,29 @@ func setOpenInventoryAvailableTx(tx *gorm.DB, commodity models.Commodity, wareho
 		OperatorID:     operatorID,
 		Remark:         remark,
 	}
-	if err := tx.Clauses(clause.OnConflict{
+	return tx.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "idempotency_key"}},
 		DoNothing: true,
-	}).Create(&movement).Error; err != nil {
-		return nil, err
-	}
-
-	return &openInventoryChangeResult{
-		WarehouseCode: warehouseCode,
-		BeforeQty:     beforeQty,
-		AfterQty:      afterQty,
-	}, nil
+	}).Create(&movement).Error
 }
 
 func ensureOpenInventoryWarehouseTx(tx *gorm.DB) error {
+	return ensureOpenInventoryWarehouseCodeTx(tx, models.DefaultInventoryWarehouseCode)
+}
+
+func ensureOpenInventoryWarehouseCodeTx(tx *gorm.DB, warehouseCode string) error {
 	now := time.Now()
+	warehouseCode = normalizeOpenInventoryWarehouseCode(warehouseCode)
+	warehouseName := warehouseCode
+	isDefault := warehouseCode == models.DefaultInventoryWarehouseCode
+	if isDefault {
+		warehouseName = "默认仓"
+	}
 	warehouse := models.InventoryWarehouse{
-		WarehouseCode: models.DefaultInventoryWarehouseCode,
-		WarehouseName: "默认仓",
+		WarehouseCode: warehouseCode,
+		WarehouseName: warehouseName,
 		Source:        models.InventorySourceLocal,
-		IsDefault:     true,
+		IsDefault:     isDefault,
 		Status:        models.InventoryWarehouseStatusActive,
 		CreatedAt:     now,
 		UpdatedAt:     now,
@@ -241,7 +255,7 @@ func ensureOpenInventorySKUTx(tx *gorm.DB, commodity models.Commodity) error {
 }
 
 func resolveOpenInventoryWarehouseCodeTx(tx *gorm.DB, commodityID, warehouseCode string) (string, error) {
-	warehouseCode = strings.TrimSpace(warehouseCode)
+	warehouseCode = normalizeOpenInventoryWarehouseCode(warehouseCode)
 	if warehouseCode == "" || warehouseCode == models.DefaultInventoryWarehouseCode {
 		return models.DefaultInventoryWarehouseCode, nil
 	}
@@ -259,6 +273,11 @@ func resolveOpenInventoryWarehouseCodeTx(tx *gorm.DB, commodityID, warehouseCode
 }
 
 func lockOpenInventoryBalanceTx(tx *gorm.DB, commodity models.Commodity, warehouseCode string) (models.InventoryStockBalance, error) {
+	return lockOrCreateOpenInventoryBalanceTx(tx, commodity, warehouseCode, nonNegativeOpenInventoryQty(commodity.Inventory))
+}
+
+func lockOrCreateOpenInventoryBalanceTx(tx *gorm.DB, commodity models.Commodity, warehouseCode string, initialQty int) (models.InventoryStockBalance, error) {
+	warehouseCode = normalizeOpenInventoryWarehouseCode(warehouseCode)
 	var balance models.InventoryStockBalance
 	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("commodity_id = ? AND warehouse_code = ?", commodity.CommodityID, warehouseCode).
@@ -270,7 +289,7 @@ func lockOpenInventoryBalanceTx(tx *gorm.DB, commodity models.Commodity, warehou
 		return balance, err
 	}
 
-	qty := nonNegativeOpenInventoryQty(commodity.Inventory)
+	qty := nonNegativeOpenInventoryQty(initialQty)
 	balance = models.InventoryStockBalance{
 		CommodityID:   commodity.CommodityID,
 		WarehouseCode: warehouseCode,
@@ -283,6 +302,44 @@ func lockOpenInventoryBalanceTx(tx *gorm.DB, commodity models.Commodity, warehou
 		return balance, err
 	}
 	return balance, nil
+}
+
+func updateOpenInventoryBalanceQtyTx(tx *gorm.DB, commodityID, warehouseCode string, afterQty int) error {
+	return tx.Model(&models.InventoryStockBalance{}).
+		Where("commodity_id = ? AND warehouse_code = ?", commodityID, normalizeOpenInventoryWarehouseCode(warehouseCode)).
+		Updates(map[string]any{
+			"on_hand_qty":   afterQty,
+			"available_qty": afterQty,
+			"locked_qty":    0,
+			"version":       gorm.Expr("version + 1"),
+		}).Error
+}
+
+func refreshLegacyInventoryFromOpenTx(tx *gorm.DB, commodityID, styleCode string) (int, error) {
+	var total int64
+	if err := tx.Model(&models.InventoryStockBalance{}).
+		Where("commodity_id = ?", commodityID).
+		Select("COALESCE(SUM(available_qty), 0)").
+		Scan(&total).Error; err != nil {
+		return 0, err
+	}
+	totalInventory := int(total)
+	if err := tx.Model(&models.Commodity{}).
+		Where("commodity_id = ?", commodityID).
+		Update("inventory", totalInventory).Error; err != nil {
+		return 0, err
+	}
+	if err := tx.Model(&models.CommoditySituation{}).
+		Where("commodity_id = ?", commodityID).
+		Update("inventory", totalInventory).Error; err != nil {
+		return 0, err
+	}
+	if styleCode != "" {
+		if err := refreshStyleCodeInventoryTx(tx, styleCode); err != nil {
+			return 0, err
+		}
+	}
+	return totalInventory, nil
 }
 
 func openInventoryIdempotencyKey(input ChangeInventoryInput) (string, bool) {
@@ -334,4 +391,12 @@ func nonNegativeOpenInventoryQty(qty int) int {
 		return 0
 	}
 	return qty
+}
+
+func normalizeOpenInventoryWarehouseCode(warehouseCode string) string {
+	warehouseCode = strings.TrimSpace(warehouseCode)
+	if warehouseCode == "" || strings.EqualFold(warehouseCode, models.DefaultInventoryWarehouseCode) {
+		return models.DefaultInventoryWarehouseCode
+	}
+	return warehouseCode
 }

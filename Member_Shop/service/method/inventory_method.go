@@ -188,20 +188,8 @@ func ApplyJushuitanInventorySync(input JushuitanInventorySyncInput) (*JushuitanI
 			return nil
 		}
 
-		if err := tx.Model(&models.Commodity{}).
-			Where("commodity_id = ?", commodity.CommodityID).
-			Update("inventory", afterQty).Error; err != nil {
+		if _, err := refreshLegacyInventoryFromOpenTx(tx, commodity.CommodityID, commodity.StyleCode); err != nil {
 			return err
-		}
-		if err := tx.Model(&models.CommoditySituation{}).
-			Where("commodity_id = ?", commodity.CommodityID).
-			Update("inventory", afterQty).Error; err != nil {
-			return err
-		}
-		if commodity.StyleCode != "" {
-			if err := refreshStyleCodeInventoryTx(tx, commodity.StyleCode); err != nil {
-				return err
-			}
 		}
 
 		log := models.InventoryLog{
@@ -336,24 +324,82 @@ func TransferInventory(input InventoryTransferInput) error {
 	}
 
 	return db.DB.Transaction(func(tx *gorm.DB) error {
-		if err := changeInventoryTx(tx, ChangeInventoryInput{
-			CommodityID:   input.CommodityID,
-			ChangeQty:     -input.Qty,
-			ChangeType:    InventoryChangeStockTransfer,
-			OperatorID:    input.OperatorID,
-			WarehouseCode: input.SourceWarehouseCode,
-			Remark:        remark + " out",
-		}); err != nil {
+		var commodity models.Commodity
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("commodity_id = ?", input.CommodityID).
+			First(&commodity).Error; err != nil {
 			return err
 		}
-		return changeInventoryTx(tx, ChangeInventoryInput{
+		if err := ensureOpenInventoryWarehouseCodeTx(tx, input.SourceWarehouseCode); err != nil {
+			return err
+		}
+		if err := ensureOpenInventoryWarehouseCodeTx(tx, input.TargetWarehouseCode); err != nil {
+			return err
+		}
+		if err := ensureOpenInventorySKUTx(tx, commodity); err != nil {
+			return err
+		}
+
+		sourceInitialQty := 0
+		if input.SourceWarehouseCode == models.DefaultInventoryWarehouseCode {
+			sourceInitialQty = commodity.Inventory
+		}
+		sourceBalance, err := lockOrCreateOpenInventoryBalanceTx(tx, commodity, input.SourceWarehouseCode, sourceInitialQty)
+		if err != nil {
+			return err
+		}
+		if sourceBalance.AvailableQty < input.Qty {
+			return fmt.Errorf("商品%s源仓库存不足，当前库存%d，需要%d", input.CommodityID, sourceBalance.AvailableQty, input.Qty)
+		}
+		targetBalance, err := lockOrCreateOpenInventoryBalanceTx(tx, commodity, input.TargetWarehouseCode, 0)
+		if err != nil {
+			return err
+		}
+
+		sourceAfter := sourceBalance.AvailableQty - input.Qty
+		targetAfter := targetBalance.AvailableQty + input.Qty
+		if err := updateOpenInventoryBalanceQtyTx(tx, input.CommodityID, input.SourceWarehouseCode, sourceAfter); err != nil {
+			return err
+		}
+		if err := updateOpenInventoryBalanceQtyTx(tx, input.CommodityID, input.TargetWarehouseCode, targetAfter); err != nil {
+			return err
+		}
+
+		transferKey := fmt.Sprintf("inventory:%s:%s:%s:%s:%d", InventoryChangeStockTransfer, input.CommodityID, input.SourceWarehouseCode, input.TargetWarehouseCode, time.Now().UnixNano())
+		if err := createInventoryStockMovementTx(tx, commodity, input.SourceWarehouseCode, InventoryChangeStockTransfer, "inventory", "transfer", transferKey+":out", sourceBalance.AvailableQty, -input.Qty, sourceAfter, input.OperatorID, remark+" out"); err != nil {
+			return err
+		}
+		if err := createInventoryStockMovementTx(tx, commodity, input.TargetWarehouseCode, InventoryChangeStockTransfer, "inventory", "transfer", transferKey+":in", targetBalance.AvailableQty, input.Qty, targetAfter, input.OperatorID, remark+" in"); err != nil {
+			return err
+		}
+
+		if _, err := refreshLegacyInventoryFromOpenTx(tx, input.CommodityID, commodity.StyleCode); err != nil {
+			return err
+		}
+		if err := tx.Create(&models.InventoryLog{
 			CommodityID:   input.CommodityID,
-			ChangeQty:     input.Qty,
+			StyleCode:     commodity.StyleCode,
+			WarehouseCode: input.SourceWarehouseCode,
+			BeforeQty:     sourceBalance.AvailableQty,
+			ChangeQty:     -input.Qty,
+			AfterQty:      sourceAfter,
 			ChangeType:    InventoryChangeStockTransfer,
 			OperatorID:    input.OperatorID,
+			Remark:        remark + " out",
+		}).Error; err != nil {
+			return err
+		}
+		return tx.Create(&models.InventoryLog{
+			CommodityID:   input.CommodityID,
+			StyleCode:     commodity.StyleCode,
 			WarehouseCode: input.TargetWarehouseCode,
+			BeforeQty:     targetBalance.AvailableQty,
+			ChangeQty:     input.Qty,
+			AfterQty:      targetAfter,
+			ChangeType:    InventoryChangeStockTransfer,
+			OperatorID:    input.OperatorID,
 			Remark:        remark + " in",
-		})
+		}).Error
 	})
 }
 
@@ -371,7 +417,22 @@ func StockCheckInventory(input InventoryStockCheckInput) (map[string]any, error)
 			return err
 		}
 
-		beforeQty := commodity.Inventory
+		if err := ensureOpenInventoryWarehouseCodeTx(tx, input.WarehouseCode); err != nil {
+			return err
+		}
+		if err := ensureOpenInventorySKUTx(tx, commodity); err != nil {
+			return err
+		}
+		initialQty := 0
+		if input.WarehouseCode == models.DefaultInventoryWarehouseCode {
+			initialQty = commodity.Inventory
+		}
+		balance, err := lockOrCreateOpenInventoryBalanceTx(tx, commodity, input.WarehouseCode, initialQty)
+		if err != nil {
+			return err
+		}
+
+		beforeQty := balance.AvailableQty
 		changeQty := input.ActualQty - beforeQty
 		result = map[string]any{
 			"commodity_id":    input.CommodityID,
@@ -389,14 +450,27 @@ func StockCheckInventory(input InventoryStockCheckInput) (map[string]any, error)
 		if remark == "" {
 			remark = "stock check adjustment"
 		}
-		return changeInventoryTx(tx, ChangeInventoryInput{
+		if err := updateOpenInventoryBalanceQtyTx(tx, input.CommodityID, input.WarehouseCode, input.ActualQty); err != nil {
+			return err
+		}
+		idempotencyKey := fmt.Sprintf("inventory:%s:%s:%s:%d", InventoryChangeStockCheck, input.CommodityID, input.WarehouseCode, time.Now().UnixNano())
+		if err := createInventoryStockMovementTx(tx, commodity, input.WarehouseCode, InventoryChangeStockCheck, "inventory", "stock_check", idempotencyKey, beforeQty, changeQty, input.ActualQty, input.OperatorID, remark); err != nil {
+			return err
+		}
+		if _, err := refreshLegacyInventoryFromOpenTx(tx, input.CommodityID, commodity.StyleCode); err != nil {
+			return err
+		}
+		return tx.Create(&models.InventoryLog{
 			CommodityID:   input.CommodityID,
+			StyleCode:     commodity.StyleCode,
+			WarehouseCode: input.WarehouseCode,
+			BeforeQty:     beforeQty,
 			ChangeQty:     changeQty,
+			AfterQty:      input.ActualQty,
 			ChangeType:    InventoryChangeStockCheck,
 			OperatorID:    input.OperatorID,
-			WarehouseCode: input.WarehouseCode,
 			Remark:        remark,
-		})
+		}).Error
 	})
 	return result, err
 }
@@ -414,6 +488,8 @@ func validateInventoryTransferInput(input *InventoryTransferInput) error {
 	if input.SourceWarehouseCode == "" || input.TargetWarehouseCode == "" {
 		return fmt.Errorf("源仓库和目标仓库不能为空")
 	}
+	input.SourceWarehouseCode = normalizeOpenInventoryWarehouseCode(input.SourceWarehouseCode)
+	input.TargetWarehouseCode = normalizeOpenInventoryWarehouseCode(input.TargetWarehouseCode)
 	if input.SourceWarehouseCode == input.TargetWarehouseCode {
 		return fmt.Errorf("源仓库和目标仓库不能相同")
 	}
@@ -428,7 +504,7 @@ func validateInventoryStockCheckInput(input *InventoryStockCheckInput) error {
 	if input.ActualQty < 0 {
 		return fmt.Errorf("实际库存不能小于0")
 	}
-	input.WarehouseCode = strings.TrimSpace(input.WarehouseCode)
+	input.WarehouseCode = normalizeOpenInventoryWarehouseCode(input.WarehouseCode)
 	return nil
 }
 
@@ -762,22 +838,8 @@ func changeInventoryTx(tx *gorm.DB, input ChangeInventoryInput) error {
 		return nil
 	}
 
-	if err := tx.Model(&models.Commodity{}).
-		Where("commodity_id = ?", input.CommodityID).
-		Update("inventory", openChange.AfterQty).Error; err != nil {
+	if _, err := refreshLegacyInventoryFromOpenTx(tx, input.CommodityID, commodity.StyleCode); err != nil {
 		return err
-	}
-
-	if err := tx.Model(&models.CommoditySituation{}).
-		Where("commodity_id = ?", input.CommodityID).
-		Update("inventory", openChange.AfterQty).Error; err != nil {
-		return err
-	}
-
-	if commodity.StyleCode != "" {
-		if err := refreshStyleCodeInventoryTx(tx, commodity.StyleCode); err != nil {
-			return err
-		}
 	}
 
 	log := models.InventoryLog{

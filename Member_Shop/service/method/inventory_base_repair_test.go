@@ -210,6 +210,20 @@ func TestNonNegativeOpenInventoryQty(t *testing.T) {
 	}
 }
 
+func TestNormalizeOpenInventoryWarehouseCode(t *testing.T) {
+	tests := map[string]string{
+		"":          "DEFAULT",
+		" default ": "DEFAULT",
+		"DEFAULT":   "DEFAULT",
+		"WH-A":      "WH-A",
+	}
+	for input, want := range tests {
+		if got := normalizeOpenInventoryWarehouseCode(input); got != want {
+			t.Fatalf("warehouse %q normalized to %q, want %q", input, got, want)
+		}
+	}
+}
+
 func TestBuildInventoryLogWhereClauses(t *testing.T) {
 	input := InventoryLogQueryInput{
 		CommodityID:       " SKU001 ",
