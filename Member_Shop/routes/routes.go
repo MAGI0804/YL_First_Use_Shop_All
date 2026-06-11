@@ -33,6 +33,7 @@ func InitRoutes(router *gin.Engine) {
 	// 初始化商品相关路由
 	InitCommodityRoutes(router)
 	InitInventoryRoutes(router)
+	InitOpenInventoryRoutes(router)
 	InitReviewRoutes(router)
 	InitAnalyticsRoutes(router)
 	InitDownloadCenterRoutes(router)

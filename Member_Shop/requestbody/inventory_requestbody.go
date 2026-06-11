@@ -7,6 +7,12 @@ type InventoryQueryRequest struct {
 	StyleCode   string `json:"style_code" form:"style_code"`     // 款式编码，可查询该款式下所有商品的库存汇总
 }
 
+type OpenInventoryQueryRequest struct {
+	CommodityID   string `json:"commodity_id" form:"commodity_id"`     // 商品ID，精确查询
+	StyleCode     string `json:"style_code" form:"style_code"`         // 款号，可查询该款式下所有SKU库存汇总
+	WarehouseCode string `json:"warehouse_code" form:"warehouse_code"` // 仓库编码，不传则查询全部仓库
+}
+
 // InventoryAdjustRequest 库存调整请求结构体
 // 用于手动调整商品库存数量，可增加或减少库存
 type InventoryAdjustRequest struct {
