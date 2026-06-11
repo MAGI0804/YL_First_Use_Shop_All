@@ -1,0 +1,36 @@
+<view class="reviews-page">
+  <view wx:if="{{reviews.length === 0 && !loading}}" class="empty-state">
+    <view class="empty-title">暂无评价</view>
+    <view class="empty-desc">已提交的评价会显示在这里</view>
+  </view>
+
+  <view wx:else class="review-list">
+    <view wx:for="{{reviews}}" wx:key="id" class="review-card">
+      <view class="review-header">
+        <view>
+          <view class="review-product">{{item.style_code || item.commodity_id || '订单商品'}}</view>
+          <view class="review-order">订单：{{item.order_id}}</view>
+        </view>
+        <text class="status status-{{item.status}}">{{item.statusText}}</text>
+      </view>
+
+      <view class="review-rating">{{item.displayRating}}</view>
+      <view class="review-content">{{item.content || '-'}}</view>
+
+      <view class="review-tags" wx:if="{{item.displayTags.length > 0}}">
+        <text wx:for="{{item.displayTags}}" wx:key="*this" wx:for-item="tag" class="review-tag">{{tag}}</text>
+      </view>
+
+      <view class="review-footer">
+        <text>{{item.created_at}}</text>
+        <view wx:if="{{item.status === 'pending'}}" class="actions">
+          <button class="action-btn" data-id="{{item.id}}" bindtap="editReview">修改</button>
+          <button class="action-btn danger" data-id="{{item.id}}" bindtap="deleteReview">删除</button>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="loading-text">加载中...</view>
+  <view wx:if="{{!loading && reviews.length > 0 && !hasMore}}" class="loading-text">没有更多了</view>
+</view>

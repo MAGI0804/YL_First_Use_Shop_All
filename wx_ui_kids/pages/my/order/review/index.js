@@ -12,6 +12,8 @@ Page({
     commodityId: '',
     styleCode: '',
     productName: '',
+    mode: 'create',
+    reviewId: 0,
     rating: 5,
     content: '',
     tagOptions: ['质量好', '尺码合适', '面料舒服', '颜色好看', '发货快'],
@@ -20,13 +22,33 @@ Page({
   },
 
   onLoad(options) {
+    const mode = options.mode === 'edit' ? 'edit' : 'create';
+    let selectedTags = [];
+    if (mode === 'edit' && options.tags) {
+      try {
+        const parsed = JSON.parse(decodeURIComponent(options.tags));
+        if (Array.isArray(parsed)) {
+          selectedTags = parsed.filter(Boolean).map((item) => String(item));
+        }
+      } catch (error) {
+        selectedTags = [];
+      }
+    }
     this.setData({
       orderId: options.orderId || '',
       subOrderId: options.subOrderId || '',
       commodityId: options.commodityId || '',
       styleCode: options.styleCode || '',
-      productName: decodeURIComponent(options.productName || '')
+      productName: decodeURIComponent(options.productName || ''),
+      mode,
+      reviewId: Number(options.reviewId || 0),
+      rating: mode === 'edit' ? Number(options.rating || 5) : 5,
+      content: mode === 'edit' ? decodeURIComponent(options.content || '') : '',
+      selectedTags
     });
+    if (mode === 'edit') {
+      wx.setNavigationBarTitle({ title: '修改评价' });
+    }
   },
 
   selectRating(e) {
@@ -54,7 +76,7 @@ Page({
 
   submitReview() {
     const userId = getUserId();
-    const { orderId, subOrderId, commodityId, styleCode, rating, content, selectedTags, submitting } = this.data;
+    const { orderId, subOrderId, commodityId, styleCode, mode, reviewId, rating, content, selectedTags, submitting } = this.data;
     if (submitting) {
       return;
     }
@@ -65,7 +87,7 @@ Page({
       });
       return;
     }
-    if (!orderId || !subOrderId || !commodityId) {
+    if (mode === 'create' && (!orderId || !subOrderId || !commodityId)) {
       wx.showToast({
         title: '评价信息缺失',
         icon: 'none'
@@ -80,24 +102,42 @@ Page({
       return;
     }
 
+    const payload = mode === 'edit'
+      ? {
+          review_id: reviewId,
+          user_id: userId,
+          rating,
+          content: content.trim(),
+          images: [],
+          tags: selectedTags
+        }
+      : {
+          user_id: userId,
+          order_id: orderId,
+          sub_order_id: subOrderId,
+          commodity_id: commodityId,
+          style_code: styleCode,
+          rating,
+          content: content.trim(),
+          images: [],
+          tags: selectedTags
+        };
+    if (mode === 'edit' && !reviewId) {
+      wx.showToast({
+        title: '评价信息缺失',
+        icon: 'none'
+      });
+      return;
+    }
+
     this.setData({ submitting: true });
     wx.showLoading({ title: '提交中...' });
-    app.req.post('/review/create', {
-      user_id: userId,
-      order_id: orderId,
-      sub_order_id: subOrderId,
-      commodity_id: commodityId,
-      style_code: styleCode,
-      rating,
-      content: content.trim(),
-      images: [],
-      tags: selectedTags
-    }, (res) => {
+    app.req.post(mode === 'edit' ? '/review/update' : '/review/create', payload, (res) => {
       wx.hideLoading();
       this.setData({ submitting: false });
       if (res && res.code === 200) {
         wx.showToast({
-          title: '评价已提交',
+          title: mode === 'edit' ? '评价已修改' : '评价已提交',
           icon: 'success'
         });
         setTimeout(() => {

@@ -43,6 +43,6 @@
   </view>
 
   <view class="submit-bar">
-    <button class="submit-button" loading="{{submitting}}" bindtap="submitReview">提交评价</button>
+    <button class="submit-button" loading="{{submitting}}" bindtap="submitReview">{{mode === 'edit' ? '保存修改' : '提交评价'}}</button>
   </view>
 </view>
