@@ -124,6 +124,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, Search } from '@element-plus/icons-vue'
 import {
   auditReview,
+  getStoredBackendUser,
   queryBackendReviews,
   queryReviewStatistics,
   replyReview,
@@ -180,6 +181,12 @@ const statusTag = (status: string) => {
     hidden: 'info'
   }
   return map[status] || ''
+}
+
+const currentOperatorID = () => {
+  const user = getStoredBackendUser()
+  if (!user) return 'unknown'
+  return user.operator_no || user.nickname || user.mobile || String(user.id || 'unknown')
 }
 
 const parseList = (value: string) => {
@@ -290,7 +297,7 @@ const reply = async (row: ReviewItem) => {
   try {
     await replyReview({
       review_id: row.id,
-      operator_id: 'admin',
+      operator_id: currentOperatorID(),
       content: result.value
     })
     ElMessage.success('已回复评价')
