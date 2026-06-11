@@ -13,6 +13,36 @@ type OpenInventoryQueryRequest struct {
 	WarehouseCode string `json:"warehouse_code" form:"warehouse_code"` // 仓库编码，不传则查询全部仓库
 }
 
+type OpenInventoryAvailabilityRequest struct {
+	Items []OpenInventoryAvailabilityItem `json:"items" binding:"required"`
+}
+
+type OpenInventoryAvailabilityItem struct {
+	CommodityID   string `json:"commodity_id" binding:"required"`
+	WarehouseCode string `json:"warehouse_code"`
+}
+
+type OpenInventoryBalancesRequest struct {
+	CommodityID           string `json:"commodity_id" form:"commodity_id"`
+	StyleCode             string `json:"style_code" form:"style_code"`
+	WarehouseCode         string `json:"warehouse_code" form:"warehouse_code"`
+	LowAvailableThreshold int    `json:"low_available_threshold" form:"low_available_threshold"`
+	Page                  int    `json:"page" form:"page"`
+	PageSize              int    `json:"page_size" form:"page_size"`
+}
+
+type OpenInventoryMovementsRequest struct {
+	CommodityID   string `json:"commodity_id" form:"commodity_id"`
+	StyleCode     string `json:"style_code" form:"style_code"`
+	WarehouseCode string `json:"warehouse_code" form:"warehouse_code"`
+	MovementType  string `json:"movement_type" form:"movement_type"`
+	BizType       string `json:"biz_type" form:"biz_type"`
+	BizID         string `json:"biz_id" form:"biz_id"`
+	BizItemID     string `json:"biz_item_id" form:"biz_item_id"`
+	Page          int    `json:"page" form:"page"`
+	PageSize      int    `json:"page_size" form:"page_size"`
+}
+
 // InventoryAdjustRequest 库存调整请求结构体
 // 用于手动调整商品库存数量，可增加或减少库存
 type InventoryAdjustRequest struct {

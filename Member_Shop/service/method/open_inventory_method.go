@@ -2,6 +2,7 @@ package method
 
 import (
 	"Member_shop/db"
+	"Member_shop/models"
 	"fmt"
 	"strings"
 	"time"
@@ -76,6 +77,7 @@ func QueryOpenInventory(input OpenInventoryQueryInput) (*OpenInventoryQueryResul
 		query = query.Where("s.style_code = ?", input.StyleCode)
 	}
 	if input.WarehouseCode != "" {
+		input.WarehouseCode = normalizeOpenInventoryWarehouseCode(input.WarehouseCode)
 		query = query.Where("b.warehouse_code = ?", input.WarehouseCode)
 	}
 
@@ -97,4 +99,56 @@ func QueryOpenInventory(input OpenInventoryQueryInput) (*OpenInventoryQueryResul
 	}
 
 	return result, nil
+}
+
+type OpenInventoryMovementQueryInput struct {
+	CommodityID   string
+	StyleCode     string
+	WarehouseCode string
+	MovementType  string
+	BizType       string
+	BizID         string
+	BizItemID     string
+	Page          int
+	PageSize      int
+}
+
+func QueryOpenInventoryMovements(input OpenInventoryMovementQueryInput) ([]models.InventoryStockMovement, int64, int, int, error) {
+	page, pageSize := normalizePage(input.Page, input.PageSize)
+	query := db.DB.Model(&models.InventoryStockMovement{})
+
+	if strings.TrimSpace(input.CommodityID) != "" {
+		query = query.Where("commodity_id = ?", strings.TrimSpace(input.CommodityID))
+	}
+	if strings.TrimSpace(input.StyleCode) != "" {
+		query = query.Where("style_code = ?", strings.TrimSpace(input.StyleCode))
+	}
+	if strings.TrimSpace(input.WarehouseCode) != "" {
+		query = query.Where("warehouse_code = ?", normalizeOpenInventoryWarehouseCode(input.WarehouseCode))
+	}
+	if strings.TrimSpace(input.MovementType) != "" {
+		query = query.Where("movement_type = ?", strings.TrimSpace(input.MovementType))
+	}
+	if strings.TrimSpace(input.BizType) != "" {
+		query = query.Where("biz_type = ?", strings.TrimSpace(input.BizType))
+	}
+	if strings.TrimSpace(input.BizItemID) != "" {
+		query = query.Where("biz_id = ?", strings.TrimSpace(input.BizItemID))
+	} else if strings.TrimSpace(input.BizID) != "" {
+		query = query.Where("biz_id = ?", strings.TrimSpace(input.BizID))
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, page, pageSize, err
+	}
+
+	var movements []models.InventoryStockMovement
+	if err := query.Order("created_at DESC, id DESC").
+		Limit(pageSize).
+		Offset((page - 1) * pageSize).
+		Find(&movements).Error; err != nil {
+		return nil, 0, page, pageSize, err
+	}
+	return movements, total, page, pageSize, nil
 }
