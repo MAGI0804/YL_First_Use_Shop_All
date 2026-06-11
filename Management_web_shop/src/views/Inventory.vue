@@ -36,6 +36,27 @@
               <template #default="{ row }">¥{{ formatMoney(row.price) }}</template>
             </el-table-column>
           </el-table>
+
+          <div v-if="openInventoryRows.length" class="sub-section">
+            <div class="sub-title">
+              <span>开放库存余额</span>
+              <span class="summary">
+                实物 {{ openInventorySummary?.total_on_hand_qty ?? 0 }} /
+                锁定 {{ openInventorySummary?.total_locked_qty ?? 0 }} /
+                可用 {{ openInventorySummary?.total_available_qty ?? 0 }}
+              </span>
+            </div>
+            <el-table :data="openInventoryRows" border height="260" empty-text="暂无开放库存余额">
+              <el-table-column prop="commodity_id" label="SKU" min-width="150" />
+              <el-table-column prop="style_code" label="款号" width="130" />
+              <el-table-column prop="warehouse_code" label="仓库" width="120" />
+              <el-table-column prop="on_hand_qty" label="实物库存" width="110" align="right" />
+              <el-table-column prop="locked_qty" label="锁定库存" width="110" align="right" />
+              <el-table-column prop="available_qty" label="可用库存" width="110" align="right" />
+              <el-table-column prop="version" label="版本" width="90" align="right" />
+              <el-table-column prop="updated_at" label="更新时间" width="180" />
+            </el-table>
+          </div>
         </section>
       </el-tab-pane>
 
@@ -241,7 +262,9 @@ import {
   transferInventory,
   createDownloadTask,
   type InventoryCommodity,
-  type InventoryLogItem
+  type InventoryLogItem,
+  type OpenInventoryBalanceItem,
+  type OpenInventorySummary
 } from '@/api'
 
 const activeTab = ref('query')
@@ -257,6 +280,8 @@ const queryForm = reactive({
 })
 const queryRows = ref<InventoryCommodity[]>([])
 const queryTotalInventory = ref<number | null>(null)
+const openInventoryRows = ref<OpenInventoryBalanceItem[]>([])
+const openInventorySummary = ref<OpenInventorySummary | null>(null)
 
 const warningParams = reactive({
   threshold: 5,
@@ -349,6 +374,8 @@ const handleInventoryQuery = async () => {
       queryRows.value = data.commodities || []
       queryTotalInventory.value = data.total_inventory ?? null
     }
+    openInventoryRows.value = data.open_inventory?.items || []
+    openInventorySummary.value = data.open_inventory?.summary || null
   } catch (error) {
     console.error('query inventory failed:', error)
     ElMessage.error('库存查询失败')
@@ -362,6 +389,8 @@ const resetInventoryQuery = () => {
   queryForm.style_code = ''
   queryRows.value = []
   queryTotalInventory.value = null
+  openInventoryRows.value = []
+  openInventorySummary.value = null
 }
 
 const loadWarnings = async () => {
@@ -530,6 +559,19 @@ onMounted(() => {
 .summary {
   color: #606266;
   font-size: 14px;
+}
+
+.sub-section {
+  margin-top: 16px;
+}
+
+.sub-title {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: #303133;
+  font-weight: 600;
+  margin-bottom: 10px;
 }
 
 .pagination {
