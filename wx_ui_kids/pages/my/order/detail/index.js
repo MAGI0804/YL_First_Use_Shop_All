@@ -24,6 +24,10 @@ function formatMoney(value) {
   return Number(value || 0).toFixed(2);
 }
 
+function isReviewableOrderStatus(status) {
+  return ['delivered', 'completed', 'signed', 'received'].includes((status || '').toString().trim().toLowerCase());
+}
+
 Page({
   /**
    * 页面的初始数据
@@ -407,7 +411,7 @@ Page({
         return {
           ...product,
           subOrderId: subOrder.sub_order_id,
-          reviewable: orderDetail.status === 'delivered' && subOrder.status === 'delivered'
+          reviewable: isReviewableOrderStatus(orderDetail.status) && isReviewableOrderStatus(subOrder.status)
         };
       });
 

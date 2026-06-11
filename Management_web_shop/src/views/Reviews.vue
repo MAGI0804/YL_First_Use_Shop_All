@@ -151,12 +151,13 @@ const pagination = reactive({
 
 const statistics = ref<ReviewStatisticsData>({
   total: 0,
+  pending_count: 0,
   average_rating: 0,
   good_rate: 0,
   rating_distribution: {}
 })
 
-const pendingCount = computed(() => rows.value.filter(row => row.status === 'pending').length)
+const pendingCount = computed(() => statistics.value.pending_count || 0)
 
 const formatNumber = (value: number) => Number(value || 0).toFixed(2)
 const formatPercent = (value: number) => `${(Number(value || 0) * 100).toFixed(2)}%`

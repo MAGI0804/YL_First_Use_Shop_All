@@ -46,12 +46,13 @@ type ReviewBackendQueryInput struct {
 
 // ReviewStatistics 评价统计数据结构
 type ReviewStatistics struct {
-	CommodityID        string        `json:"commodity_id,omitempty"`         // 商品ID
-	StyleCode          string        `json:"style_code,omitempty"`           // 款式编码
-	Total              int64         `json:"total"`                          // 评价总数
-	AverageRating      float64       `json:"average_rating"`                // 平均评分
-	GoodRate           float64       `json:"good_rate"`                      // 好评率（4-5分占比）
-	RatingDistribution map[int]int64 `json:"rating_distribution"`           // 评分分布，1-5分各等级数量
+	CommodityID        string        `json:"commodity_id,omitempty"` // 商品ID
+	StyleCode          string        `json:"style_code,omitempty"`   // 款式编码
+	Total              int64         `json:"total"`                  // 评价总数
+	PendingCount       int64         `json:"pending_count"`          // 待审核评价数
+	AverageRating      float64       `json:"average_rating"`         // 平均评分
+	GoodRate           float64       `json:"good_rate"`              // 好评率（4-5分占比）
+	RatingDistribution map[int]int64 `json:"rating_distribution"`    // 评分分布，1-5分各等级数量
 }
 
 // CreateReview 创建评价
@@ -218,9 +219,6 @@ func ReplyReview(reviewID uint, operatorID, content string) (*models.ReviewReply
 func GetReviewStatistics(commodityID, styleCode string) (*ReviewStatistics, error) {
 	commodityID = strings.TrimSpace(commodityID)
 	styleCode = strings.TrimSpace(styleCode)
-	if commodityID == "" && styleCode == "" {
-		return nil, fmt.Errorf("commodity_id or style_code is required")
-	}
 
 	stats := &ReviewStatistics{
 		CommodityID:        commodityID,
@@ -228,6 +226,9 @@ func GetReviewStatistics(commodityID, styleCode string) (*ReviewStatistics, erro
 		RatingDistribution: map[int]int64{1: 0, 2: 0, 3: 0, 4: 0, 5: 0},
 	}
 	if err := reviewStatisticsQuery(commodityID, styleCode).Count(&stats.Total).Error; err != nil {
+		return nil, err
+	}
+	if err := reviewStatisticsStatusQuery(commodityID, styleCode, models.ReviewStatusPending).Count(&stats.PendingCount).Error; err != nil {
 		return nil, err
 	}
 	if stats.Total == 0 {
@@ -382,7 +383,11 @@ func normalizeReviewStatus(status string) string {
 // reviewStatisticsQuery 构建评价统计查询（内部函数）
 // 仅统计已通过审核（approved）的评价
 func reviewStatisticsQuery(commodityID, styleCode string) *gorm.DB {
-	query := db.DB.Model(&models.ProductReview{}).Where("status = ?", models.ReviewStatusApproved)
+	return reviewStatisticsStatusQuery(commodityID, styleCode, models.ReviewStatusApproved)
+}
+
+func reviewStatisticsStatusQuery(commodityID, styleCode, status string) *gorm.DB {
+	query := db.DB.Model(&models.ProductReview{}).Where("status = ?", status)
 	if commodityID != "" {
 		query = query.Where("commodity_id = ?", commodityID)
 	}

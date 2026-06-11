@@ -745,6 +745,7 @@ export interface ReviewReplyParams {
 
 export interface ReviewStatisticsData {
   total: number
+  pending_count: number
   average_rating: number
   good_rate: number
   rating_distribution: Record<string, number>
