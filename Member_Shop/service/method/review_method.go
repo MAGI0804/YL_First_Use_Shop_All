@@ -5,11 +5,47 @@ import (
 	"Member_shop/models"
 	"encoding/json"
 	"fmt"
+	"mime/multipart"
+	"net/url"
+	"path/filepath"
 	"strings"
+	"unicode/utf8"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
+
+const (
+	maxReviewContentLength   = 500
+	maxReviewImageCount      = 9
+	maxReviewImageURLLen     = 500
+	maxReviewTagCount        = 5
+	MaxReviewUploadImageSize = 5 << 20
+)
+
+var allowedReviewTags = map[string]struct{}{
+	"质量好":  {},
+	"尺码合适": {},
+	"面料舒服": {},
+	"颜色好看": {},
+	"发货快":  {},
+}
+
+var allowedReviewUploadExtensions = map[string]string{
+	".jpg":  "image/jpeg",
+	".jpeg": "image/jpeg",
+	".png":  "image/png",
+	".webp": "image/webp",
+}
+
+var reviewSensitiveWords = []string{
+	"诈骗",
+	"赌博",
+	"毒品",
+	"枪支",
+	"违禁品",
+	"色情",
+}
 
 // ReviewCreateInput 创建评价输入参数
 type ReviewCreateInput struct {
@@ -44,14 +80,35 @@ type ReviewBackendQueryInput struct {
 	PageSize    int    // 每页数量
 }
 
+// ReviewMineQueryInput 我的评价列表查询输入参数
+type ReviewMineQueryInput struct {
+	UserID   int
+	Status   string
+	Page     int
+	PageSize int
+}
+
+// ReviewUpdateInput 修改待审核评价输入参数
+type ReviewUpdateInput struct {
+	ReviewID uint
+	UserID   int
+	Rating   int
+	Content  string
+	Images   []string
+	Tags     []string
+}
+
 // ReviewStatistics 评价统计数据结构
 type ReviewStatistics struct {
-	CommodityID        string        `json:"commodity_id,omitempty"`         // 商品ID
-	StyleCode          string        `json:"style_code,omitempty"`           // 款式编码
-	Total              int64         `json:"total"`                          // 评价总数
-	AverageRating      float64       `json:"average_rating"`                // 平均评分
-	GoodRate           float64       `json:"good_rate"`                      // 好评率（4-5分占比）
-	RatingDistribution map[int]int64 `json:"rating_distribution"`           // 评分分布，1-5分各等级数量
+	CommodityID        string           `json:"commodity_id,omitempty"` // 商品ID
+	StyleCode          string           `json:"style_code,omitempty"`   // 款式编码
+	Total              int64            `json:"total"`                  // 评价总数
+	PendingCount       int64            `json:"pending_count"`          // 待审核评价数
+	AverageRating      float64          `json:"average_rating"`         // 平均评分
+	GoodRate           float64          `json:"good_rate"`              // 好评率（4-5分占比）
+	RatingDistribution map[int]int64    `json:"rating_distribution"`    // 评分分布，1-5分各等级数量
+	ImageCount         int64            `json:"image_count"`            // 有图评价数
+	TagDistribution    map[string]int64 `json:"tag_distribution"`       // 标签分布
 }
 
 // CreateReview 创建评价
@@ -153,6 +210,151 @@ func QueryReviewsForBackend(input ReviewBackendQueryInput) ([]models.ProductRevi
 	return reviews, total, page, pageSize, nil
 }
 
+// QueryMyReviews 查询用户自己的评价列表
+// 默认不返回用户已软删除的 hidden 评价。
+func QueryMyReviews(input ReviewMineQueryInput) ([]models.ProductReview, int64, int, int, error) {
+	if input.UserID <= 0 {
+		return nil, 0, 0, 0, fmt.Errorf("user_id is required")
+	}
+	page, pageSize := normalizePage(input.Page, input.PageSize)
+	query := db.DB.Model(&models.ProductReview{}).
+		Preload("ReviewReplies").
+		Where("user_id = ?", input.UserID)
+	if strings.TrimSpace(input.Status) != "" {
+		status := normalizeReviewStatus(input.Status)
+		if !validReviewStatus(status) {
+			return nil, 0, page, pageSize, fmt.Errorf("invalid review status")
+		}
+		query = query.Where("status = ?", status)
+	} else {
+		query = query.Where("status <> ?", models.ReviewStatusHidden)
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, page, pageSize, err
+	}
+
+	reviews := make([]models.ProductReview, 0)
+	if err := query.Order("created_at DESC, id DESC").
+		Limit(pageSize).
+		Offset((page - 1) * pageSize).
+		Find(&reviews).Error; err != nil {
+		return nil, 0, page, pageSize, err
+	}
+	return reviews, total, page, pageSize, nil
+}
+
+// UpdatePendingReview 修改待审核评价
+// 仅允许评价本人修改 pending 状态评价。
+func UpdatePendingReview(input ReviewUpdateInput) (*models.ProductReview, error) {
+	if input.UserID <= 0 {
+		return nil, fmt.Errorf("user_id is required")
+	}
+	if input.ReviewID == 0 {
+		return nil, fmt.Errorf("review_id is required")
+	}
+	if input.Rating < 1 || input.Rating > 5 {
+		return nil, fmt.Errorf("rating must be between 1 and 5")
+	}
+	createInput := ReviewCreateInput{
+		Rating:  input.Rating,
+		Content: input.Content,
+		Images:  input.Images,
+		Tags:    input.Tags,
+	}
+	if err := normalizeReviewCreateInput(&createInput); err != nil {
+		return nil, err
+	}
+
+	var review models.ProductReview
+	err := db.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ?", input.ReviewID).
+			First(&review).Error; err != nil {
+			return err
+		}
+		if err := ensureReviewUserCanMutate(review, input.UserID); err != nil {
+			return err
+		}
+
+		images, err := marshalStringList(createInput.Images)
+		if err != nil {
+			return err
+		}
+		tags, err := marshalStringList(createInput.Tags)
+		if err != nil {
+			return err
+		}
+		review.Rating = input.Rating
+		review.Content = createInput.Content
+		review.Images = images
+		review.Tags = tags
+		review.AuditRemark = ""
+		return tx.Save(&review).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &review, nil
+}
+
+// DeletePendingReview 软删除待审核评价
+// 当前模型没有 deleted 字段，使用 hidden 状态作为软删除兼容状态。
+func DeletePendingReview(reviewID uint, userID int) (*models.ProductReview, error) {
+	if userID <= 0 {
+		return nil, fmt.Errorf("user_id is required")
+	}
+	if reviewID == 0 {
+		return nil, fmt.Errorf("review_id is required")
+	}
+
+	var review models.ProductReview
+	err := db.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ?", reviewID).
+			First(&review).Error; err != nil {
+			return err
+		}
+		if err := ensureReviewUserCanMutate(review, userID); err != nil {
+			return err
+		}
+		review.Status = models.ReviewStatusHidden
+		review.AuditRemark = "用户删除待审核评价"
+		return tx.Save(&review).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &review, nil
+}
+
+// ValidateReviewImageUpload 校验评价图片上传文件。
+// 仅允许常见静态图片格式，单文件最大 5MB。
+func ValidateReviewImageUpload(file *multipart.FileHeader) error {
+	if file == nil {
+		return fmt.Errorf("image is required")
+	}
+	if file.Size <= 0 {
+		return fmt.Errorf("image is empty")
+	}
+	if file.Size > MaxReviewUploadImageSize {
+		return fmt.Errorf("image size exceeds 5MB")
+	}
+	ext := strings.ToLower(filepath.Ext(file.Filename))
+	if _, ok := allowedReviewUploadExtensions[ext]; !ok {
+		return fmt.Errorf("unsupported image type")
+	}
+	contentType := strings.ToLower(strings.TrimSpace(file.Header.Get("Content-Type")))
+	if contentType == "" {
+		return nil
+	}
+	if contentType != allowedReviewUploadExtensions[ext] {
+		return fmt.Errorf("image content type does not match extension")
+	}
+	return nil
+}
+
 // AuditReview 审核评价
 // 后台管理员审核评价，可将评价状态设置为：approved（通过）、rejected（拒绝）、hidden（隐藏）
 // 使用行锁确保并发安全
@@ -218,16 +420,17 @@ func ReplyReview(reviewID uint, operatorID, content string) (*models.ReviewReply
 func GetReviewStatistics(commodityID, styleCode string) (*ReviewStatistics, error) {
 	commodityID = strings.TrimSpace(commodityID)
 	styleCode = strings.TrimSpace(styleCode)
-	if commodityID == "" && styleCode == "" {
-		return nil, fmt.Errorf("commodity_id or style_code is required")
-	}
 
 	stats := &ReviewStatistics{
 		CommodityID:        commodityID,
 		StyleCode:          styleCode,
 		RatingDistribution: map[int]int64{1: 0, 2: 0, 3: 0, 4: 0, 5: 0},
+		TagDistribution:    map[string]int64{},
 	}
 	if err := reviewStatisticsQuery(commodityID, styleCode).Count(&stats.Total).Error; err != nil {
+		return nil, err
+	}
+	if err := reviewStatisticsStatusQuery(commodityID, styleCode, models.ReviewStatusPending).Count(&stats.PendingCount).Error; err != nil {
 		return nil, err
 	}
 	if stats.Total == 0 {
@@ -264,6 +467,9 @@ func GetReviewStatistics(commodityID, styleCode string) (*ReviewStatistics, erro
 	for _, row := range rows {
 		stats.RatingDistribution[row.Rating] = row.Total
 	}
+	if err := fillReviewMediaAndTagStatistics(stats, commodityID, styleCode); err != nil {
+		return nil, err
+	}
 	return stats, nil
 }
 
@@ -277,7 +483,9 @@ func createReviewTx(tx *gorm.DB, input ReviewCreateInput) (*models.ProductReview
 	input.SubOrderID = strings.TrimSpace(input.SubOrderID)
 	input.CommodityID = strings.TrimSpace(input.CommodityID)
 	input.StyleCode = strings.TrimSpace(input.StyleCode)
-	input.Content = strings.TrimSpace(input.Content)
+	if err := normalizeReviewCreateInput(&input); err != nil {
+		return nil, err
+	}
 
 	if input.UserID <= 0 {
 		return nil, fmt.Errorf("user_id is required")
@@ -379,10 +587,24 @@ func normalizeReviewStatus(status string) string {
 	return strings.ToLower(strings.TrimSpace(status))
 }
 
+func ensureReviewUserCanMutate(review models.ProductReview, userID int) error {
+	if review.UserID != userID {
+		return fmt.Errorf("review does not belong to user")
+	}
+	if review.Status != models.ReviewStatusPending {
+		return fmt.Errorf("only pending review can be modified")
+	}
+	return nil
+}
+
 // reviewStatisticsQuery 构建评价统计查询（内部函数）
 // 仅统计已通过审核（approved）的评价
 func reviewStatisticsQuery(commodityID, styleCode string) *gorm.DB {
-	query := db.DB.Model(&models.ProductReview{}).Where("status = ?", models.ReviewStatusApproved)
+	return reviewStatisticsStatusQuery(commodityID, styleCode, models.ReviewStatusApproved)
+}
+
+func reviewStatisticsStatusQuery(commodityID, styleCode, status string) *gorm.DB {
+	query := db.DB.Model(&models.ProductReview{}).Where("status = ?", status)
 	if commodityID != "" {
 		query = query.Where("commodity_id = ?", commodityID)
 	}
@@ -390,6 +612,28 @@ func reviewStatisticsQuery(commodityID, styleCode string) *gorm.DB {
 		query = query.Where("style_code = ?", styleCode)
 	}
 	return query
+}
+
+func fillReviewMediaAndTagStatistics(stats *ReviewStatistics, commodityID, styleCode string) error {
+	type reviewMediaRow struct {
+		Images string
+		Tags   string
+	}
+	rows := make([]reviewMediaRow, 0)
+	if err := reviewStatisticsQuery(commodityID, styleCode).
+		Select("images, tags").
+		Scan(&rows).Error; err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if len(parseStoredReviewStringList(row.Images)) > 0 {
+			stats.ImageCount++
+		}
+		for _, tag := range parseStoredReviewStringList(row.Tags) {
+			stats.TagDistribution[tag]++
+		}
+	}
+	return nil
 }
 
 // reviewableSubOrderStatus 检查子订单状态是否可评价（内部函数）
@@ -421,4 +665,144 @@ func marshalStringList(values []string) (string, error) {
 		return "", fmt.Errorf("marshal string list: %w", err)
 	}
 	return string(bytes), nil
+}
+
+func parseStoredReviewStringList(value string) []string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return []string{}
+	}
+	var parsed []string
+	if err := json.Unmarshal([]byte(value), &parsed); err == nil {
+		return cleanStringList(parsed)
+	}
+	return cleanStringList(strings.Split(value, ","))
+}
+
+func cleanStringList(values []string) []string {
+	cleaned := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			cleaned = append(cleaned, value)
+		}
+	}
+	return cleaned
+}
+
+func normalizeReviewCreateInput(input *ReviewCreateInput) error {
+	input.Content = strings.TrimSpace(input.Content)
+	if input.Content == "" {
+		return fmt.Errorf("content is required")
+	}
+	if utf8.RuneCountInString(input.Content) > maxReviewContentLength {
+		return fmt.Errorf("content length exceeds %d characters", maxReviewContentLength)
+	}
+	if containsUnsafeReviewContent(input.Content) {
+		return fmt.Errorf("content contains unsafe markup")
+	}
+	if containsSensitiveReviewContent(input.Content) {
+		return fmt.Errorf("content contains sensitive words")
+	}
+
+	images, err := normalizeReviewImages(input.Images)
+	if err != nil {
+		return err
+	}
+	tags, err := normalizeReviewTags(input.Tags)
+	if err != nil {
+		return err
+	}
+	input.Images = images
+	input.Tags = tags
+	return nil
+}
+
+func containsUnsafeReviewContent(content string) bool {
+	lowered := strings.ToLower(content)
+	unsafePatterns := []string{
+		"<script",
+		"</script",
+		"javascript:",
+		"onerror=",
+		"onload=",
+		"<iframe",
+		"</iframe",
+	}
+	for _, pattern := range unsafePatterns {
+		if strings.Contains(lowered, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsSensitiveReviewContent(content string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(content))
+	for _, word := range reviewSensitiveWords {
+		if word != "" && strings.Contains(normalized, strings.ToLower(word)) {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeReviewImages(images []string) ([]string, error) {
+	if len(images) > maxReviewImageCount {
+		return nil, fmt.Errorf("images count exceeds %d", maxReviewImageCount)
+	}
+	cleaned := make([]string, 0, len(images))
+	for _, image := range images {
+		image = strings.TrimSpace(image)
+		if image == "" {
+			continue
+		}
+		if len(image) > maxReviewImageURLLen {
+			return nil, fmt.Errorf("image url is too long")
+		}
+		if !validReviewImageURL(image) {
+			return nil, fmt.Errorf("invalid image url")
+		}
+		cleaned = append(cleaned, image)
+	}
+	return cleaned, nil
+}
+
+func validReviewImageURL(image string) bool {
+	if strings.HasPrefix(image, "/media/") ||
+		strings.HasPrefix(image, "/static/") ||
+		strings.HasPrefix(image, "/staticfiles/") ||
+		strings.HasPrefix(image, "/uploads/") ||
+		strings.HasPrefix(image, "media/") ||
+		strings.HasPrefix(image, "commodities/") {
+		return true
+	}
+	parsed, err := url.Parse(image)
+	if err != nil {
+		return false
+	}
+	return (parsed.Scheme == "http" || parsed.Scheme == "https") && parsed.Host != ""
+}
+
+func normalizeReviewTags(tags []string) ([]string, error) {
+	if len(tags) > maxReviewTagCount {
+		return nil, fmt.Errorf("tags count exceeds %d", maxReviewTagCount)
+	}
+	cleaned := make([]string, 0, len(tags))
+	seen := map[string]struct{}{}
+	for _, tag := range tags {
+		tag = strings.TrimSpace(tag)
+		if tag == "" {
+			continue
+		}
+		if _, ok := allowedReviewTags[tag]; !ok {
+			return nil, fmt.Errorf("invalid review tag")
+		}
+		if _, ok := seen[tag]; ok {
+			continue
+		}
+		seen[tag] = struct{}{}
+		cleaned = append(cleaned, tag)
+	}
+	return cleaned, nil
 }

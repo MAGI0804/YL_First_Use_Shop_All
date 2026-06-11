@@ -745,9 +745,12 @@ export interface ReviewReplyParams {
 
 export interface ReviewStatisticsData {
   total: number
+  pending_count: number
   average_rating: number
   good_rate: number
   rating_distribution: Record<string, number>
+  image_count: number
+  tag_distribution: Record<string, number>
 }
 
 export interface ReviewStatisticsResponse {
@@ -1346,6 +1349,36 @@ export interface InventoryCommodity {
   color?: string
 }
 
+export interface OpenInventorySummary {
+  total_on_hand_qty: number
+  total_locked_qty: number
+  total_available_qty: number
+}
+
+export interface OpenInventoryBalanceItem {
+  commodity_id: string
+  style_code: string
+  spec_code: string
+  name: string
+  size: string
+  color: string
+  category: string
+  warehouse_code: string
+  on_hand_qty: number
+  locked_qty: number
+  available_qty: number
+  version: number
+  updated_at: string
+}
+
+export interface OpenInventoryData {
+  commodity_id?: string
+  style_code?: string
+  warehouse_code?: string
+  summary: OpenInventorySummary
+  items: OpenInventoryBalanceItem[]
+}
+
 export interface InventoryQueryResponse {
   code: number
   data: {
@@ -1353,6 +1386,7 @@ export interface InventoryQueryResponse {
     commodities?: InventoryCommodity[]
     total_inventory?: number
     style_code?: string
+    open_inventory?: OpenInventoryData
   }
   msg: string
 }
@@ -1376,7 +1410,10 @@ export interface InventoryWarningsResponse {
 }
 
 export interface InventoryLogItem {
-  id: number
+  id?: number
+  source_id?: number
+  source?: 'legacy' | 'open' | string
+  movement_no?: string
   commodity_id: string
   style_code: string
   warehouse_code: string
@@ -1390,6 +1427,9 @@ export interface InventoryLogItem {
   operator_id: string
   remark: string
   created_at: string
+  biz_type?: string
+  biz_id?: string
+  idempotency_key?: string
 }
 
 export interface InventoryLogsParams {

@@ -378,6 +378,63 @@ Page({
       })
       return
     }
+
+    this.validateOpenInventoryForOrder(() => {
+      this.createOrderAfterInventoryChecked()
+    })
+  },
+
+  validateOpenInventoryForOrder(onSuccess) {
+    const items = this.data.selectedItems || []
+    wx.showLoading({
+      title: '校验库存中...',
+    })
+
+    Promise.all(items.map(item => this.queryOpenInventoryAvailable(item.id)))
+      .then((availableList) => {
+        wx.hideLoading()
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i]
+          const available = availableList[i]
+          if (available < item.quantity) {
+            wx.showToast({
+              title: `${item.name || '商品'}库存不足`,
+              icon: 'none'
+            })
+            return
+          }
+        }
+        onSuccess()
+      })
+      .catch((err) => {
+        wx.hideLoading()
+        console.error('开放库存校验失败:', err)
+        wx.showToast({
+          title: '库存校验失败，请重试',
+          icon: 'none'
+        })
+      })
+  },
+
+  queryOpenInventoryAvailable(commodityId) {
+    return new Promise((resolve, reject) => {
+      if (!commodityId) {
+        reject(new Error('commodity_id不能为空'))
+        return
+      }
+      app.req.post('/open_inventory/query', {
+        commodity_id: commodityId
+      }, (res) => {
+        if (res && res.code === 200 && res.data && res.data.summary) {
+          resolve(Number(res.data.summary.total_available_qty || 0))
+          return
+        }
+        reject(new Error('开放库存响应格式不正确'))
+      }, reject)
+    })
+  },
+
+  createOrderAfterInventoryChecked() {
     
     // 构建订单数据
     const address = this.data.address;

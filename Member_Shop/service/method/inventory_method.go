@@ -8,6 +8,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -95,6 +96,7 @@ func ApplyJushuitanInventorySync(input JushuitanInventorySyncInput) (*JushuitanI
 	input.SkuID = strings.TrimSpace(input.SkuID)
 	input.IID = strings.TrimSpace(input.IID)
 	input.Modified = strings.TrimSpace(input.Modified)
+	input.WarehouseCode = strings.TrimSpace(input.WarehouseCode)
 	if input.SkuID == "" && input.IID == "" {
 		return nil, fmt.Errorf("sku_id或i_id不能为空")
 	}
@@ -135,8 +137,42 @@ func ApplyJushuitanInventorySync(input JushuitanInventorySyncInput) (*JushuitanI
 			}
 		}
 
-		beforeQty := commodity.Inventory
 		afterQty := calculateJushuitanAvailableQty(input.Qty, input.OrderLock, input.VirtualQty)
+		remark := fmt.Sprintf("聚水潭库存同步 sku_id=%s i_id=%s qty=%d order_lock=%d virtual_qty=%d pick_lock=%d modified=%s",
+			input.SkuID, input.IID, input.Qty, input.OrderLock, input.VirtualQty, input.PickLock, input.Modified)
+		idempotencyKey := ""
+		if input.Modified != "" {
+			idempotencyKey = fmt.Sprintf("inventory:%s:%s:modified:%s", InventoryChangeSyncJushuitan, commodity.CommodityID, input.Modified)
+		}
+		openChange, err := setOpenInventoryAvailableTx(
+			tx,
+			commodity,
+			input.WarehouseCode,
+			afterQty,
+			InventoryChangeSyncJushuitan,
+			"jushuitan",
+			input.Modified,
+			idempotencyKey,
+			"jushuitan",
+			remark,
+		)
+		if err != nil {
+			return err
+		}
+		if openChange == nil {
+			result = &JushuitanInventorySyncResult{
+				CommodityID: commodity.CommodityID,
+				SkuID:       input.SkuID,
+				BeforeQty:   commodity.Inventory,
+				AfterQty:    commodity.Inventory,
+				Modified:    input.Modified,
+				Skipped:     true,
+				SkipReason:  "duplicate_modified",
+			}
+			return nil
+		}
+		beforeQty := openChange.BeforeQty
+		afterQty = openChange.AfterQty
 		changeQty := afterQty - beforeQty
 		result = &JushuitanInventorySyncResult{
 			CommodityID: commodity.CommodityID,
@@ -152,28 +188,14 @@ func ApplyJushuitanInventorySync(input JushuitanInventorySyncInput) (*JushuitanI
 			return nil
 		}
 
-		if err := tx.Model(&models.Commodity{}).
-			Where("commodity_id = ?", commodity.CommodityID).
-			Update("inventory", afterQty).Error; err != nil {
+		if _, err := refreshLegacyInventoryFromOpenTx(tx, commodity.CommodityID, commodity.StyleCode); err != nil {
 			return err
-		}
-		if err := tx.Model(&models.CommoditySituation{}).
-			Where("commodity_id = ?", commodity.CommodityID).
-			Update("inventory", afterQty).Error; err != nil {
-			return err
-		}
-		if commodity.StyleCode != "" {
-			if err := refreshStyleCodeInventoryTx(tx, commodity.StyleCode); err != nil {
-				return err
-			}
 		}
 
-		remark := fmt.Sprintf("聚水潭库存同步 sku_id=%s i_id=%s qty=%d order_lock=%d virtual_qty=%d pick_lock=%d modified=%s",
-			input.SkuID, input.IID, input.Qty, input.OrderLock, input.VirtualQty, input.PickLock, input.Modified)
 		log := models.InventoryLog{
 			CommodityID:       commodity.CommodityID,
 			StyleCode:         commodity.StyleCode,
-			WarehouseCode:     input.WarehouseCode,
+			WarehouseCode:     openChange.WarehouseCode,
 			BeforeQty:         beforeQty,
 			ChangeQty:         changeQty,
 			AfterQty:          afterQty,
@@ -215,11 +237,24 @@ func QueryInventory(commodityID, styleCode string) (map[string]any, error) {
 		var situation models.CommoditySituation
 		_ = db.DB.Where("commodity_id = ?", commodityID).First(&situation).Error
 
+		openInventory, err := QueryOpenInventory(OpenInventoryQueryInput{CommodityID: commodityID})
+		if err != nil {
+			return nil, err
+		}
+		if len(openInventory.Items) > 0 {
+			commodity.Inventory = openInventory.Summary.TotalAvailableQty
+			situation.Inventory = openInventory.Summary.TotalAvailableQty
+		}
+
 		result["commodity"] = commodity
 		result["commodity_situation"] = situation
+		result["open_inventory"] = openInventory
 		if commodity.StyleCode != "" {
 			var styleCodeData models.StyleCodeData
 			if err := db.DB.Where("style_code = ?", commodity.StyleCode).First(&styleCodeData).Error; err == nil {
+				if styleOpenInventory, err := QueryOpenInventory(OpenInventoryQueryInput{StyleCode: commodity.StyleCode}); err == nil && len(styleOpenInventory.Items) > 0 {
+					styleCodeData.Inventory = styleOpenInventory.Summary.TotalAvailableQty
+				}
 				result["style_code_data"] = styleCodeData
 			}
 		}
@@ -234,15 +269,39 @@ func QueryInventory(commodityID, styleCode string) (map[string]any, error) {
 		return nil, err
 	}
 
+	openInventory, err := QueryOpenInventory(OpenInventoryQueryInput{StyleCode: styleCode})
+	if err != nil {
+		return nil, err
+	}
+	availableByCommodity := openInventoryAvailableByCommodity(openInventory.Items)
 	totalInventory := 0
-	for _, commodity := range commodities {
-		totalInventory += commodity.Inventory
+	if len(openInventory.Items) > 0 {
+		totalInventory = openInventory.Summary.TotalAvailableQty
+		styleCodeData.Inventory = totalInventory
+		for i := range commodities {
+			if availableQty, ok := availableByCommodity[commodities[i].CommodityID]; ok {
+				commodities[i].Inventory = availableQty
+			}
+		}
+	} else {
+		for _, commodity := range commodities {
+			totalInventory += commodity.Inventory
+		}
 	}
 	result["style_code"] = styleCode
 	result["style_code_data"] = styleCodeData
 	result["total_inventory"] = totalInventory
 	result["commodities"] = commodities
+	result["open_inventory"] = openInventory
 	return result, nil
+}
+
+func openInventoryAvailableByCommodity(items []OpenInventoryBalanceView) map[string]int {
+	availableByCommodity := make(map[string]int)
+	for _, item := range items {
+		availableByCommodity[item.CommodityID] += item.AvailableQty
+	}
+	return availableByCommodity
 }
 
 // AdjustInventory 手动调整库存
@@ -265,24 +324,82 @@ func TransferInventory(input InventoryTransferInput) error {
 	}
 
 	return db.DB.Transaction(func(tx *gorm.DB) error {
-		if err := changeInventoryTx(tx, ChangeInventoryInput{
-			CommodityID:   input.CommodityID,
-			ChangeQty:     -input.Qty,
-			ChangeType:    InventoryChangeStockTransfer,
-			OperatorID:    input.OperatorID,
-			WarehouseCode: input.SourceWarehouseCode,
-			Remark:        remark + " out",
-		}); err != nil {
+		var commodity models.Commodity
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("commodity_id = ?", input.CommodityID).
+			First(&commodity).Error; err != nil {
 			return err
 		}
-		return changeInventoryTx(tx, ChangeInventoryInput{
+		if err := ensureOpenInventoryWarehouseCodeTx(tx, input.SourceWarehouseCode); err != nil {
+			return err
+		}
+		if err := ensureOpenInventoryWarehouseCodeTx(tx, input.TargetWarehouseCode); err != nil {
+			return err
+		}
+		if err := ensureOpenInventorySKUTx(tx, commodity); err != nil {
+			return err
+		}
+
+		sourceInitialQty := 0
+		if input.SourceWarehouseCode == models.DefaultInventoryWarehouseCode {
+			sourceInitialQty = commodity.Inventory
+		}
+		sourceBalance, err := lockOrCreateOpenInventoryBalanceTx(tx, commodity, input.SourceWarehouseCode, sourceInitialQty)
+		if err != nil {
+			return err
+		}
+		if sourceBalance.AvailableQty < input.Qty {
+			return fmt.Errorf("商品%s源仓库存不足，当前库存%d，需要%d", input.CommodityID, sourceBalance.AvailableQty, input.Qty)
+		}
+		targetBalance, err := lockOrCreateOpenInventoryBalanceTx(tx, commodity, input.TargetWarehouseCode, 0)
+		if err != nil {
+			return err
+		}
+
+		sourceAfter := sourceBalance.AvailableQty - input.Qty
+		targetAfter := targetBalance.AvailableQty + input.Qty
+		if err := updateOpenInventoryBalanceQtyTx(tx, input.CommodityID, input.SourceWarehouseCode, sourceAfter); err != nil {
+			return err
+		}
+		if err := updateOpenInventoryBalanceQtyTx(tx, input.CommodityID, input.TargetWarehouseCode, targetAfter); err != nil {
+			return err
+		}
+
+		transferKey := fmt.Sprintf("inventory:%s:%s:%s:%s:%d", InventoryChangeStockTransfer, input.CommodityID, input.SourceWarehouseCode, input.TargetWarehouseCode, time.Now().UnixNano())
+		if err := createInventoryStockMovementTx(tx, commodity, input.SourceWarehouseCode, InventoryChangeStockTransfer, "inventory", "transfer", transferKey+":out", sourceBalance.AvailableQty, -input.Qty, sourceAfter, input.OperatorID, remark+" out"); err != nil {
+			return err
+		}
+		if err := createInventoryStockMovementTx(tx, commodity, input.TargetWarehouseCode, InventoryChangeStockTransfer, "inventory", "transfer", transferKey+":in", targetBalance.AvailableQty, input.Qty, targetAfter, input.OperatorID, remark+" in"); err != nil {
+			return err
+		}
+
+		if _, err := refreshLegacyInventoryFromOpenTx(tx, input.CommodityID, commodity.StyleCode); err != nil {
+			return err
+		}
+		if err := tx.Create(&models.InventoryLog{
 			CommodityID:   input.CommodityID,
-			ChangeQty:     input.Qty,
+			StyleCode:     commodity.StyleCode,
+			WarehouseCode: input.SourceWarehouseCode,
+			BeforeQty:     sourceBalance.AvailableQty,
+			ChangeQty:     -input.Qty,
+			AfterQty:      sourceAfter,
 			ChangeType:    InventoryChangeStockTransfer,
 			OperatorID:    input.OperatorID,
+			Remark:        remark + " out",
+		}).Error; err != nil {
+			return err
+		}
+		return tx.Create(&models.InventoryLog{
+			CommodityID:   input.CommodityID,
+			StyleCode:     commodity.StyleCode,
 			WarehouseCode: input.TargetWarehouseCode,
+			BeforeQty:     targetBalance.AvailableQty,
+			ChangeQty:     input.Qty,
+			AfterQty:      targetAfter,
+			ChangeType:    InventoryChangeStockTransfer,
+			OperatorID:    input.OperatorID,
 			Remark:        remark + " in",
-		})
+		}).Error
 	})
 }
 
@@ -300,7 +417,22 @@ func StockCheckInventory(input InventoryStockCheckInput) (map[string]any, error)
 			return err
 		}
 
-		beforeQty := commodity.Inventory
+		if err := ensureOpenInventoryWarehouseCodeTx(tx, input.WarehouseCode); err != nil {
+			return err
+		}
+		if err := ensureOpenInventorySKUTx(tx, commodity); err != nil {
+			return err
+		}
+		initialQty := 0
+		if input.WarehouseCode == models.DefaultInventoryWarehouseCode {
+			initialQty = commodity.Inventory
+		}
+		balance, err := lockOrCreateOpenInventoryBalanceTx(tx, commodity, input.WarehouseCode, initialQty)
+		if err != nil {
+			return err
+		}
+
+		beforeQty := balance.AvailableQty
 		changeQty := input.ActualQty - beforeQty
 		result = map[string]any{
 			"commodity_id":    input.CommodityID,
@@ -318,14 +450,27 @@ func StockCheckInventory(input InventoryStockCheckInput) (map[string]any, error)
 		if remark == "" {
 			remark = "stock check adjustment"
 		}
-		return changeInventoryTx(tx, ChangeInventoryInput{
+		if err := updateOpenInventoryBalanceQtyTx(tx, input.CommodityID, input.WarehouseCode, input.ActualQty); err != nil {
+			return err
+		}
+		idempotencyKey := fmt.Sprintf("inventory:%s:%s:%s:%d", InventoryChangeStockCheck, input.CommodityID, input.WarehouseCode, time.Now().UnixNano())
+		if err := createInventoryStockMovementTx(tx, commodity, input.WarehouseCode, InventoryChangeStockCheck, "inventory", "stock_check", idempotencyKey, beforeQty, changeQty, input.ActualQty, input.OperatorID, remark); err != nil {
+			return err
+		}
+		if _, err := refreshLegacyInventoryFromOpenTx(tx, input.CommodityID, commodity.StyleCode); err != nil {
+			return err
+		}
+		return tx.Create(&models.InventoryLog{
 			CommodityID:   input.CommodityID,
+			StyleCode:     commodity.StyleCode,
+			WarehouseCode: input.WarehouseCode,
+			BeforeQty:     beforeQty,
 			ChangeQty:     changeQty,
+			AfterQty:      input.ActualQty,
 			ChangeType:    InventoryChangeStockCheck,
 			OperatorID:    input.OperatorID,
-			WarehouseCode: input.WarehouseCode,
 			Remark:        remark,
-		})
+		}).Error
 	})
 	return result, err
 }
@@ -343,6 +488,8 @@ func validateInventoryTransferInput(input *InventoryTransferInput) error {
 	if input.SourceWarehouseCode == "" || input.TargetWarehouseCode == "" {
 		return fmt.Errorf("源仓库和目标仓库不能为空")
 	}
+	input.SourceWarehouseCode = normalizeOpenInventoryWarehouseCode(input.SourceWarehouseCode)
+	input.TargetWarehouseCode = normalizeOpenInventoryWarehouseCode(input.TargetWarehouseCode)
 	if input.SourceWarehouseCode == input.TargetWarehouseCode {
 		return fmt.Errorf("源仓库和目标仓库不能相同")
 	}
@@ -357,48 +504,148 @@ func validateInventoryStockCheckInput(input *InventoryStockCheckInput) error {
 	if input.ActualQty < 0 {
 		return fmt.Errorf("实际库存不能小于0")
 	}
-	input.WarehouseCode = strings.TrimSpace(input.WarehouseCode)
+	input.WarehouseCode = normalizeOpenInventoryWarehouseCode(input.WarehouseCode)
 	return nil
 }
 
 // QueryInventoryLogs 查询库存变更日志
 // 支持按商品ID、款式编码、变动类型、关联订单/子订单/退货单等条件筛选
 // 返回库存变动日志列表、总数量、当前页码、每页数量
-func QueryInventoryLogs(input InventoryLogQueryInput) ([]models.InventoryLog, int64, int, int, error) {
+func QueryInventoryLogs(input InventoryLogQueryInput) ([]InventoryLogView, int64, int, int, error) {
 	page, pageSize := normalizePage(input.Page, input.PageSize)
-	query := db.DB.Model(&models.InventoryLog{})
-	if input.CommodityID != "" {
-		query = query.Where("commodity_id = ?", strings.TrimSpace(input.CommodityID))
-	}
-	if input.StyleCode != "" {
-		query = query.Where("style_code = ?", strings.TrimSpace(input.StyleCode))
-	}
-	if input.ChangeType != "" {
-		query = query.Where("change_type = ?", strings.TrimSpace(input.ChangeType))
-	}
-	if input.RelatedOrderID != "" {
-		query = query.Where("related_order_id = ?", strings.TrimSpace(input.RelatedOrderID))
-	}
-	if input.RelatedSubOrderID != "" {
-		query = query.Where("related_sub_order_id = ?", strings.TrimSpace(input.RelatedSubOrderID))
-	}
-	if input.RelatedReturnID != "" {
-		query = query.Where("related_return_id = ?", strings.TrimSpace(input.RelatedReturnID))
-	}
-
+	legacyWhere, legacyArgs := buildLegacyInventoryLogWhere(input)
+	openWhere, openArgs := buildOpenInventoryMovementWhere(input)
+	unionSQL := inventoryLogUnionSQL(legacyWhere, openWhere)
+	countArgs := append(append([]any{}, legacyArgs...), openArgs...)
 	var total int64
-	if err := query.Count(&total).Error; err != nil {
+	if err := db.DB.Raw("SELECT COUNT(*) FROM ("+unionSQL+") AS inventory_logs", countArgs...).Scan(&total).Error; err != nil {
 		return nil, 0, page, pageSize, err
 	}
 
-	var logs []models.InventoryLog
-	if err := query.Order("created_at DESC, id DESC").
-		Limit(pageSize).
-		Offset((page - 1) * pageSize).
-		Find(&logs).Error; err != nil {
+	var logs []InventoryLogView
+	queryArgs := append(append([]any{}, countArgs...), pageSize, (page-1)*pageSize)
+	querySQL := "SELECT * FROM (" + unionSQL + ") AS inventory_logs ORDER BY created_at DESC, source_id DESC LIMIT ? OFFSET ?"
+	if err := db.DB.Raw(querySQL, queryArgs...).Scan(&logs).Error; err != nil {
 		return nil, 0, page, pageSize, err
 	}
 	return logs, total, page, pageSize, nil
+}
+
+func inventoryLogUnionSQL(legacyWhere, openWhere string) string {
+	legacySQL := `
+SELECT
+  id AS source_id,
+  'legacy' AS source,
+  '' AS movement_no,
+  commodity_id,
+  style_code,
+  warehouse_code,
+  before_qty,
+  change_qty,
+  after_qty,
+  change_type,
+  related_order_id,
+  related_sub_order_id,
+  related_return_id,
+  operator_id,
+  remark,
+  created_at,
+  '' AS biz_type,
+  '' AS biz_id,
+  '' AS idempotency_key
+FROM inventory_log` + legacyWhere
+
+	openSQL := `
+SELECT
+  id AS source_id,
+  'open' AS source,
+  movement_no,
+  commodity_id,
+  style_code,
+  warehouse_code,
+  before_qty,
+  change_qty,
+  after_qty,
+  movement_type AS change_type,
+  '' AS related_order_id,
+  CASE WHEN biz_type = 'order' THEN biz_id ELSE '' END AS related_sub_order_id,
+  CASE WHEN biz_type = 'return' THEN biz_id ELSE '' END AS related_return_id,
+  operator_id,
+  remark,
+  created_at,
+  biz_type,
+  biz_id,
+  idempotency_key
+FROM inventory_stock_movements` + openWhere
+
+	return legacySQL + " UNION ALL " + openSQL
+}
+
+func buildLegacyInventoryLogWhere(input InventoryLogQueryInput) (string, []any) {
+	clauses := []string{}
+	args := []any{}
+	if strings.TrimSpace(input.CommodityID) != "" {
+		clauses = append(clauses, "commodity_id = ?")
+		args = append(args, strings.TrimSpace(input.CommodityID))
+	}
+	if strings.TrimSpace(input.StyleCode) != "" {
+		clauses = append(clauses, "style_code = ?")
+		args = append(args, strings.TrimSpace(input.StyleCode))
+	}
+	if strings.TrimSpace(input.ChangeType) != "" {
+		clauses = append(clauses, "change_type = ?")
+		args = append(args, strings.TrimSpace(input.ChangeType))
+	}
+	if strings.TrimSpace(input.RelatedOrderID) != "" {
+		clauses = append(clauses, "related_order_id = ?")
+		args = append(args, strings.TrimSpace(input.RelatedOrderID))
+	}
+	if strings.TrimSpace(input.RelatedSubOrderID) != "" {
+		clauses = append(clauses, "related_sub_order_id = ?")
+		args = append(args, strings.TrimSpace(input.RelatedSubOrderID))
+	}
+	if strings.TrimSpace(input.RelatedReturnID) != "" {
+		clauses = append(clauses, "related_return_id = ?")
+		args = append(args, strings.TrimSpace(input.RelatedReturnID))
+	}
+	return inventoryLogWhereSQL(clauses), args
+}
+
+func buildOpenInventoryMovementWhere(input InventoryLogQueryInput) (string, []any) {
+	clauses := []string{}
+	args := []any{}
+	if strings.TrimSpace(input.CommodityID) != "" {
+		clauses = append(clauses, "commodity_id = ?")
+		args = append(args, strings.TrimSpace(input.CommodityID))
+	}
+	if strings.TrimSpace(input.StyleCode) != "" {
+		clauses = append(clauses, "style_code = ?")
+		args = append(args, strings.TrimSpace(input.StyleCode))
+	}
+	if strings.TrimSpace(input.ChangeType) != "" {
+		clauses = append(clauses, "movement_type = ?")
+		args = append(args, strings.TrimSpace(input.ChangeType))
+	}
+	if strings.TrimSpace(input.RelatedOrderID) != "" {
+		clauses = append(clauses, "biz_type = ? AND biz_id = ?")
+		args = append(args, "order", strings.TrimSpace(input.RelatedOrderID))
+	}
+	if strings.TrimSpace(input.RelatedSubOrderID) != "" {
+		clauses = append(clauses, "biz_type = ? AND biz_id = ?")
+		args = append(args, "order", strings.TrimSpace(input.RelatedSubOrderID))
+	}
+	if strings.TrimSpace(input.RelatedReturnID) != "" {
+		clauses = append(clauses, "biz_type = ? AND biz_id = ?")
+		args = append(args, "return", strings.TrimSpace(input.RelatedReturnID))
+	}
+	return inventoryLogWhereSQL(clauses), args
+}
+
+func inventoryLogWhereSQL(clauses []string) string {
+	if len(clauses) == 0 {
+		return ""
+	}
+	return " WHERE " + strings.Join(clauses, " AND ")
 }
 
 // QueryInventoryWarnings 查询库存预警商品
@@ -410,14 +657,38 @@ func QueryInventoryWarnings(threshold, page, pageSize int) ([]models.Commodity, 
 	}
 	page, pageSize = normalizePage(page, pageSize)
 
-	query := db.DB.Model(&models.Commodity{}).Where("inventory <= ?", threshold)
+	openBalanceSQL := `
+SELECT commodity_id, SUM(available_qty) AS available_qty
+FROM inventory_stock_balances
+GROUP BY commodity_id`
+	query := db.DB.Table("Commodity_data AS c").
+		Joins("LEFT JOIN ("+openBalanceSQL+") AS open_stock ON open_stock.commodity_id = c.commodity_id").
+		Where("COALESCE(open_stock.available_qty, c.inventory, 0) <= ?", threshold)
+
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, threshold, page, pageSize, err
 	}
 
 	var commodities []models.Commodity
-	if err := query.Order("inventory ASC, commodity_id ASC").
+	if err := query.Select(`
+c.commodity_id,
+c.name,
+c.style_code,
+c.category,
+c.category_detail,
+c.price,
+c.image,
+c.promo_image,
+c.size,
+c.color,
+c.height,
+c.spec_code,
+c.color_image,
+c.created_at,
+COALESCE(open_stock.available_qty, c.inventory, 0) AS inventory,
+c.notes`).
+		Order("COALESCE(open_stock.available_qty, c.inventory, 0) ASC, c.commodity_id ASC").
 		Limit(pageSize).
 		Offset((page - 1) * pageSize).
 		Find(&commodities).Error; err != nil {
@@ -436,6 +707,28 @@ type InventoryLogQueryInput struct {
 	RelatedReturnID   string // 关联退货单ID
 	Page              int    // 页码
 	PageSize          int    // 每页大小
+}
+
+type InventoryLogView struct {
+	SourceID          uint      `gorm:"column:source_id" json:"source_id"`
+	Source            string    `gorm:"column:source" json:"source"`
+	MovementNo        string    `gorm:"column:movement_no" json:"movement_no"`
+	CommodityID       string    `gorm:"column:commodity_id" json:"commodity_id"`
+	StyleCode         string    `gorm:"column:style_code" json:"style_code"`
+	WarehouseCode     string    `gorm:"column:warehouse_code" json:"warehouse_code"`
+	BeforeQty         int       `gorm:"column:before_qty" json:"before_qty"`
+	ChangeQty         int       `gorm:"column:change_qty" json:"change_qty"`
+	AfterQty          int       `gorm:"column:after_qty" json:"after_qty"`
+	ChangeType        string    `gorm:"column:change_type" json:"change_type"`
+	RelatedOrderID    string    `gorm:"column:related_order_id" json:"related_order_id"`
+	RelatedSubOrderID string    `gorm:"column:related_sub_order_id" json:"related_sub_order_id"`
+	RelatedReturnID   string    `gorm:"column:related_return_id" json:"related_return_id"`
+	OperatorID        string    `gorm:"column:operator_id" json:"operator_id"`
+	Remark            string    `gorm:"column:remark" json:"remark"`
+	CreatedAt         time.Time `gorm:"column:created_at" json:"created_at"`
+	BizType           string    `gorm:"column:biz_type" json:"biz_type"`
+	BizID             string    `gorm:"column:biz_id" json:"biz_id"`
+	IdempotencyKey    string    `gorm:"column:idempotency_key" json:"idempotency_key"`
 }
 
 // DeductInventoryForOrder 为订单扣减库存
@@ -561,37 +854,25 @@ func changeInventoryTx(tx *gorm.DB, input ChangeInventoryInput) error {
 		return err
 	}
 
-	beforeQty := commodity.Inventory
-	afterQty := beforeQty + input.ChangeQty
-	if afterQty < 0 {
-		return fmt.Errorf("商品%s库存不足，当前库存%d，需要%d", input.CommodityID, beforeQty, -input.ChangeQty)
-	}
-
-	if err := tx.Model(&models.Commodity{}).
-		Where("commodity_id = ?", input.CommodityID).
-		Update("inventory", afterQty).Error; err != nil {
+	openChange, err := applyOpenInventoryChangeTx(tx, input, commodity)
+	if err != nil {
 		return err
 	}
-
-	if err := tx.Model(&models.CommoditySituation{}).
-		Where("commodity_id = ?", input.CommodityID).
-		Update("inventory", afterQty).Error; err != nil {
-		return err
+	if openChange == nil {
+		return nil
 	}
 
-	if commodity.StyleCode != "" {
-		if err := refreshStyleCodeInventoryTx(tx, commodity.StyleCode); err != nil {
-			return err
-		}
+	if _, err := refreshLegacyInventoryFromOpenTx(tx, input.CommodityID, commodity.StyleCode); err != nil {
+		return err
 	}
 
 	log := models.InventoryLog{
 		CommodityID:       input.CommodityID,
 		StyleCode:         commodity.StyleCode,
-		WarehouseCode:     input.WarehouseCode,
-		BeforeQty:         beforeQty,
+		WarehouseCode:     openChange.WarehouseCode,
+		BeforeQty:         openChange.BeforeQty,
 		ChangeQty:         input.ChangeQty,
-		AfterQty:          afterQty,
+		AfterQty:          openChange.AfterQty,
 		ChangeType:        input.ChangeType,
 		RelatedOrderID:    input.RelatedOrderID,
 		RelatedSubOrderID: input.RelatedSubOrderID,

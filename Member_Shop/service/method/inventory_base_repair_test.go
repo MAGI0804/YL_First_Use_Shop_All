@@ -167,3 +167,107 @@ func TestValidateInventoryStockCheckInput(t *testing.T) {
 		})
 	}
 }
+
+func TestOpenInventoryIdempotencyKey(t *testing.T) {
+	input := ChangeInventoryInput{
+		CommodityID:       "SKU001",
+		ChangeType:        InventoryChangeOrderDeduct,
+		RelatedSubOrderID: "SUB001",
+	}
+
+	firstKey, firstStable := openInventoryIdempotencyKey(input)
+	secondKey, secondStable := openInventoryIdempotencyKey(input)
+	if !firstStable || !secondStable {
+		t.Fatalf("sub order inventory changes should use stable idempotency keys")
+	}
+	if firstKey != secondKey {
+		t.Fatalf("stable idempotency keys differ: %q != %q", firstKey, secondKey)
+	}
+	if openInventoryMovementNo(firstKey) != openInventoryMovementNo(secondKey) {
+		t.Fatalf("movement no should be deterministic for stable idempotency keys")
+	}
+}
+
+func TestOpenInventoryManualIdempotencyKeyIsNotStable(t *testing.T) {
+	key, stable := openInventoryIdempotencyKey(ChangeInventoryInput{
+		CommodityID: "SKU001",
+		ChangeType:  InventoryChangeManualAdjust,
+	})
+	if stable {
+		t.Fatalf("manual inventory change without business id should not be stable")
+	}
+	if key == "" {
+		t.Fatalf("manual inventory change still needs an idempotency key")
+	}
+}
+
+func TestNonNegativeOpenInventoryQty(t *testing.T) {
+	if got := nonNegativeOpenInventoryQty(-3); got != 0 {
+		t.Fatalf("negative qty normalized to %d, want 0", got)
+	}
+	if got := nonNegativeOpenInventoryQty(5); got != 5 {
+		t.Fatalf("positive qty normalized to %d, want 5", got)
+	}
+}
+
+func TestNormalizeOpenInventoryWarehouseCode(t *testing.T) {
+	tests := map[string]string{
+		"":          "DEFAULT",
+		" default ": "DEFAULT",
+		"DEFAULT":   "DEFAULT",
+		"WH-A":      "WH-A",
+	}
+	for input, want := range tests {
+		if got := normalizeOpenInventoryWarehouseCode(input); got != want {
+			t.Fatalf("warehouse %q normalized to %q, want %q", input, got, want)
+		}
+	}
+}
+
+func TestBuildInventoryLogWhereClauses(t *testing.T) {
+	input := InventoryLogQueryInput{
+		CommodityID:       " SKU001 ",
+		StyleCode:         " ST001 ",
+		ChangeType:        InventoryChangeOrderDeduct,
+		RelatedSubOrderID: " SUB001 ",
+	}
+
+	legacyWhere, legacyArgs := buildLegacyInventoryLogWhere(input)
+	if legacyWhere != " WHERE commodity_id = ? AND style_code = ? AND change_type = ? AND related_sub_order_id = ?" {
+		t.Fatalf("legacy where = %q", legacyWhere)
+	}
+	wantLegacyArgs := []any{"SKU001", "ST001", InventoryChangeOrderDeduct, "SUB001"}
+	if !sameInventoryLogArgs(legacyArgs, wantLegacyArgs) {
+		t.Fatalf("legacy args = %#v, want %#v", legacyArgs, wantLegacyArgs)
+	}
+
+	openWhere, openArgs := buildOpenInventoryMovementWhere(input)
+	if openWhere != " WHERE commodity_id = ? AND style_code = ? AND movement_type = ? AND biz_type = ? AND biz_id = ?" {
+		t.Fatalf("open where = %q", openWhere)
+	}
+	wantOpenArgs := []any{"SKU001", "ST001", InventoryChangeOrderDeduct, "order", "SUB001"}
+	if !sameInventoryLogArgs(openArgs, wantOpenArgs) {
+		t.Fatalf("open args = %#v, want %#v", openArgs, wantOpenArgs)
+	}
+}
+
+func TestInventoryLogWhereSQL(t *testing.T) {
+	if got := inventoryLogWhereSQL(nil); got != "" {
+		t.Fatalf("empty where = %q, want empty", got)
+	}
+	if got := inventoryLogWhereSQL([]string{"a = ?", "b = ?"}); got != " WHERE a = ? AND b = ?" {
+		t.Fatalf("where = %q", got)
+	}
+}
+
+func sameInventoryLogArgs(got, want []any) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			return false
+		}
+	}
+	return true
+}

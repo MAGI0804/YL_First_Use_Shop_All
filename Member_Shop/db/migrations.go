@@ -36,6 +36,10 @@ func RunMigrations() {
 		&models.Message{},
 		&models.SubOrder{},
 		&models.InventoryLog{},
+		&models.InventoryWarehouse{},
+		&models.InventorySKU{},
+		&models.InventoryStockBalance{},
+		&models.InventoryStockMovement{},
 		&models.ProductReview{},
 		&models.ReviewReply{},
 		&models.JushuitanPushRawData{},
@@ -56,5 +60,6 @@ func RunMigrations() {
 	}
 
 	log.Println("database migrations completed")
+	seedOpenInventorySnapshot()
 	seedDefaultDownloadTemplates()
 }

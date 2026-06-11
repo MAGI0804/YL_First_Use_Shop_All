@@ -69,6 +69,7 @@
           <text>{{reviewStats.averageRating}} 分</text>
           <text>好评率 {{reviewStats.goodRate}}%</text>
           <text>{{reviewStats.total}} 条评价</text>
+          <text wx:if="{{reviewStats.imageCount > 0}}">有图 {{reviewStats.imageCount}}</text>
         </view>
       </view>
     </view>
@@ -83,6 +84,9 @@
         <view class="review-content">{{item.content || '用户未填写评价内容'}}</view>
         <view class="review-tags" wx:if="{{item.displayTags.length > 0}}">
           <text wx:for="{{item.displayTags}}" wx:key="*this" wx:for-item="tag" class="review-tag">{{tag}}</text>
+        </view>
+        <view class="review-images" wx:if="{{item.displayImages.length > 0}}">
+          <image wx:for="{{item.displayImages}}" wx:key="*this" wx:for-item="image" src="{{image}}" mode="aspectFill"></image>
         </view>
         <view class="review-reply" wx:for="{{item.displayReplies}}" wx:key="id" wx:for-item="reply">
           <text>商家回复：{{reply.content}}</text>
@@ -117,8 +121,8 @@
     
     <!-- 右侧大按钮：感兴趣和下单 -->
     <view class="right-buttons">
-      <button class="cart-btn" bindtap="openSelectModal" data-type="cart">感兴趣</button>
-      <button class="buy-btn" bindtap="openSelectModal" data-type="buy">下单</button>
+      <button class="cart-btn" bindtap="openSelectModal" data-type="cart" disabled="{{stock <= 0}}">感兴趣</button>
+      <button class="buy-btn" bindtap="openSelectModal" data-type="buy" disabled="{{stock <= 0}}">下单</button>
     </view>
   </view>
 
@@ -147,7 +151,7 @@
                 <text class="qty-value">{{quantity}}</text>
                 <text class="qty-btn" bindtap="increaseQuantity">+</text>
               </view>
-              <view class="modal-stock-info" wx:if="{{selectedSize && currentItemStock > 0}}">
+              <view class="modal-stock-info" wx:if="{{selectedSize}}">
                 <text class="stock-text">库存：{{currentItemStock}}件</text>
               </view>
             </view>

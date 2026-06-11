@@ -208,6 +208,15 @@ Page({
   },
 
   /**
+   * 跳转到我的评价页面
+   */
+  navigateToReviews() {
+    wx.navigateTo({
+      url: '/pages/my/reviews/index'
+    })
+  },
+
+  /**
    * 跳转到联系客服页面
    */
   navigateToCustomerService() {

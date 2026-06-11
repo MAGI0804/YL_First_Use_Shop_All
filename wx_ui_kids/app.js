@@ -52,6 +52,8 @@ App({
     post: (url, data, response, error) => request.http('POST', url, data, response, error),
     put: (url, data, response, error) => request.http('PUT', url, data, response, error),
     delete: (url, data, response, error) => request.http('DELETE', url, data, response, error),
+    getHost: () => request.getHost(),
+    getAccessToken: (success, fail) => request.getAccessToken(success, fail),
   },
   parseTime(time, cFormat) {
     if (arguments.length === 0) {

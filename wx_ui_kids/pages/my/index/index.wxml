@@ -74,6 +74,10 @@
       <text class="item-text">我的消息</text>
       <icon class="arrow-icon" type="arrowright" size="14"></icon>
     </view>
+    <view class="function-item" bindtap="navigateToReviews">
+      <text class="item-text">我的评价</text>
+      <icon class="arrow-icon" type="arrowright" size="14"></icon>
+    </view>
     <view class="function-item" bindtap="navigateToCustomerService">
       <text class="item-text">联系客服</text>
       <icon class="arrow-icon" type="arrowright" size="14"></icon>

@@ -36,6 +36,27 @@
               <template #default="{ row }">¥{{ formatMoney(row.price) }}</template>
             </el-table-column>
           </el-table>
+
+          <div v-if="openInventoryRows.length" class="sub-section">
+            <div class="sub-title">
+              <span>开放库存余额</span>
+              <span class="summary">
+                实物 {{ openInventorySummary?.total_on_hand_qty ?? 0 }} /
+                锁定 {{ openInventorySummary?.total_locked_qty ?? 0 }} /
+                可用 {{ openInventorySummary?.total_available_qty ?? 0 }}
+              </span>
+            </div>
+            <el-table :data="openInventoryRows" border height="260" empty-text="暂无开放库存余额">
+              <el-table-column prop="commodity_id" label="SKU" min-width="150" />
+              <el-table-column prop="style_code" label="款号" width="130" />
+              <el-table-column prop="warehouse_code" label="仓库" width="120" />
+              <el-table-column prop="on_hand_qty" label="实物库存" width="110" align="right" />
+              <el-table-column prop="locked_qty" label="锁定库存" width="110" align="right" />
+              <el-table-column prop="available_qty" label="可用库存" width="110" align="right" />
+              <el-table-column prop="version" label="版本" width="90" align="right" />
+              <el-table-column prop="updated_at" label="更新时间" width="180" />
+            </el-table>
+          </div>
         </section>
       </el-tab-pane>
 
@@ -98,6 +119,14 @@
 
           <el-table :data="logRows" border height="520" empty-text="暂无库存日志">
             <el-table-column prop="created_at" label="时间" width="180" />
+            <el-table-column prop="source" label="来源" width="90">
+              <template #default="{ row }">
+                <el-tag :type="row.source === 'open' ? 'success' : 'info'" size="small">
+                  {{ logSourceText(row.source) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="movement_no" label="开放流水号" min-width="190" show-overflow-tooltip />
             <el-table-column prop="commodity_id" label="SKU" min-width="150" />
             <el-table-column prop="style_code" label="款号" width="130" />
             <el-table-column prop="warehouse_code" label="仓库" width="120" />
@@ -108,6 +137,9 @@
             <el-table-column prop="change_qty" label="变动" width="90" align="right" />
             <el-table-column prop="after_qty" label="后库存" width="90" align="right" />
             <el-table-column prop="related_order_id" label="订单" width="150" />
+            <el-table-column label="业务号" width="160">
+              <template #default="{ row }">{{ inventoryBizNo(row) }}</template>
+            </el-table-column>
             <el-table-column prop="operator_id" label="操作人" width="110" />
             <el-table-column prop="remark" label="备注" min-width="220" show-overflow-tooltip />
           </el-table>
@@ -230,7 +262,9 @@ import {
   transferInventory,
   createDownloadTask,
   type InventoryCommodity,
-  type InventoryLogItem
+  type InventoryLogItem,
+  type OpenInventoryBalanceItem,
+  type OpenInventorySummary
 } from '@/api'
 
 const activeTab = ref('query')
@@ -246,6 +280,8 @@ const queryForm = reactive({
 })
 const queryRows = ref<InventoryCommodity[]>([])
 const queryTotalInventory = ref<number | null>(null)
+const openInventoryRows = ref<OpenInventoryBalanceItem[]>([])
+const openInventorySummary = ref<OpenInventorySummary | null>(null)
 
 const warningParams = reactive({
   threshold: 5,
@@ -293,6 +329,16 @@ const stockCheckForm = reactive({
 
 const formatMoney = (value: number) => Number(value || 0).toFixed(2)
 
+const logSourceText = (source?: string) => {
+  if (source === 'open') return '开放'
+  if (source === 'legacy') return '旧'
+  return source || '-'
+}
+
+const inventoryBizNo = (row: InventoryLogItem) => {
+  return row.biz_id || row.related_sub_order_id || row.related_return_id || row.related_order_id || '-'
+}
+
 const changeTypeText = (type: string) => {
   const map: Record<string, string> = {
     order_create_deduct: '下单扣减',
@@ -328,6 +374,8 @@ const handleInventoryQuery = async () => {
       queryRows.value = data.commodities || []
       queryTotalInventory.value = data.total_inventory ?? null
     }
+    openInventoryRows.value = data.open_inventory?.items || []
+    openInventorySummary.value = data.open_inventory?.summary || null
   } catch (error) {
     console.error('query inventory failed:', error)
     ElMessage.error('库存查询失败')
@@ -341,6 +389,8 @@ const resetInventoryQuery = () => {
   queryForm.style_code = ''
   queryRows.value = []
   queryTotalInventory.value = null
+  openInventoryRows.value = []
+  openInventorySummary.value = null
 }
 
 const loadWarnings = async () => {
@@ -509,6 +559,19 @@ onMounted(() => {
 .summary {
   color: #606266;
   font-size: 14px;
+}
+
+.sub-section {
+  margin-top: 16px;
+}
+
+.sub-title {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: #303133;
+  font-weight: 600;
+  margin-bottom: 10px;
 }
 
 .pagination {
