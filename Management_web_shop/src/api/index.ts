@@ -934,6 +934,7 @@ export interface GoodsQueryItem {
   price: number
   promo_image_url: string
   style_code: string
+  inventory: number
   created_at: string
   online_status: string
   online_time: string
@@ -970,6 +971,8 @@ export interface StyleCodeCommodityImage {
 export interface StyleCodeCommoditySize {
   commodity_id: string
   inventory: number
+  legacy_inventory?: number
+  open_available_inventory?: number
   size: string
 }
 
@@ -995,6 +998,7 @@ export interface StyleCodeCommodityData {
   display_pictures: any
   images: StyleCodeCommodityImage[]
   inventory: number
+  open_inventory?: OpenInventoryData
   items: StyleCodeCommodityItem[]
   labels: StyleCodeCommodityLabels
   main_image: StyleCodeCommodityImage

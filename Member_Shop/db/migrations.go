@@ -1,6 +1,7 @@
 package db
 
 import (
+	"Member_shop/config"
 	"Member_shop/models"
 	"fmt"
 	"log"
@@ -60,6 +61,10 @@ func RunMigrations() {
 	}
 
 	log.Println("database migrations completed")
-	seedOpenInventorySnapshot()
+	if config.LoadConfig().ServerConfig.OpenInventorySeedOnStartup {
+		seedOpenInventorySnapshot()
+	} else {
+		log.Println("skip open inventory snapshot seed; set OPEN_INVENTORY_SEED_ON_STARTUP=true to enable")
+	}
 	seedDefaultDownloadTemplates()
 }

@@ -272,6 +272,7 @@ func buildCommodityListResult(commodities []models.Commodity, demand string, c *
 	if includeStyleStatus {
 		styleSituations = loadStyleSituations(commodities)
 	}
+	styleInventory := loadStyleOpenInventory(commodities)
 	commodityImages := loadCommodityImages(commodities)
 
 	for _, commodity := range commodities {
@@ -282,6 +283,11 @@ func buildCommodityListResult(commodities []models.Commodity, demand string, c *
 			goodsData["price"] = commodity.Price
 			goodsData["name"] = commodity.Name
 			goodsData["style_code"] = commodity.StyleCode
+			if inventory, ok := styleInventory[commodity.StyleCode]; ok {
+				goodsData["inventory"] = inventory
+			} else {
+				goodsData["inventory"] = commodity.Inventory
+			}
 			if includeStyleStatus {
 				setStyleSituationFields(goodsData, styleSituations[commodity.StyleCode])
 				goodsData["created_at"] = commodity.CreatedAt.Format("2006-01-02 15:04:05")
@@ -305,6 +311,63 @@ func buildCommodityListResult(commodities []models.Commodity, demand string, c *
 		result = append(result, goodsData)
 	}
 
+	return result
+}
+
+func loadStyleOpenInventory(commodities []models.Commodity) map[string]int {
+	styleCodes := make([]string, 0, len(commodities))
+	seen := make(map[string]bool, len(commodities))
+	for _, commodity := range commodities {
+		if commodity.StyleCode == "" {
+			continue
+		}
+		if !seen[commodity.StyleCode] {
+			seen[commodity.StyleCode] = true
+			styleCodes = append(styleCodes, commodity.StyleCode)
+		}
+	}
+	if len(styleCodes) == 0 {
+		return map[string]int{}
+	}
+
+	type row struct {
+		StyleCode string `gorm:"column:style_code"`
+		Inventory int    `gorm:"column:inventory"`
+	}
+
+	legacyInventory := make(map[string]int, len(styleCodes))
+	var legacyRows []row
+	if err := db.DB.Model(&models.Commodity{}).
+		Select("style_code, COALESCE(SUM(inventory), 0) AS inventory").
+		Where("style_code IN ?", styleCodes).
+		Group("style_code").
+		Scan(&legacyRows).Error; err != nil {
+		log.Printf("load style legacy inventory failed: %v", err)
+	} else {
+		for _, row := range legacyRows {
+			legacyInventory[row.StyleCode] = row.Inventory
+		}
+	}
+
+	var rows []row
+	err := db.DB.Table("inventory_stock_balances AS b").
+		Select("s.style_code, COALESCE(SUM(b.available_qty), 0) AS inventory").
+		Joins("JOIN inventory_skus AS s ON s.commodity_id = b.commodity_id").
+		Where("s.style_code IN ?", styleCodes).
+		Group("s.style_code").
+		Scan(&rows).Error
+	if err != nil {
+		log.Printf("load style open inventory failed: %v", err)
+		return legacyInventory
+	}
+
+	result := make(map[string]int, len(legacyInventory))
+	for styleCode, inventory := range legacyInventory {
+		result[styleCode] = inventory
+	}
+	for _, row := range rows {
+		result[row.StyleCode] = row.Inventory
+	}
 	return result
 }
 
@@ -621,7 +684,7 @@ func GetCommodityList(demand, styleCode string, category interface{}, status str
 	var total int64
 	var totalPages int64
 
-	query := db.DB.Model(&models.Commodity{}).Where("price > ?", 0).Where("inventory > ?", 0)
+	query := db.DB.Model(&models.Commodity{}).Where("price > ?", 0)
 	query, _ = applyCommoditySituationFilters(query, category, status, labelOne, labelTwo, labelThree, labelFour, labelSeven)
 
 	if beginTime != "" {

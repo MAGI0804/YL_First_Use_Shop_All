@@ -80,6 +80,14 @@
               <span class="label">总库存：</span>
               <span>{{ productData.inventory }}</span>
             </div>
+            <div v-if="productData.open_inventory" class="info-item">
+              <span class="label">开放库存：</span>
+              <span>
+                可用 {{ productData.open_inventory.summary.total_available_qty }} /
+                实物 {{ productData.open_inventory.summary.total_on_hand_qty }} /
+                锁定 {{ productData.open_inventory.summary.total_locked_qty }}
+              </span>
+            </div>
           </div>
         </div>
       </el-card>
@@ -213,7 +221,10 @@
             <el-table :data="item.sizes" style="width: 100%;">
               <el-table-column prop="size" label="尺码" />
               <el-table-column prop="commodity_id" label="商品ID" />
-              <el-table-column prop="inventory" label="库存" />
+              <el-table-column prop="inventory" label="可用库存" />
+              <el-table-column prop="legacy_inventory" label="旧库存">
+                <template #default="{ row }">{{ row.legacy_inventory ?? '-' }}</template>
+              </el-table-column>
             </el-table>
           </el-collapse-item>
         </el-collapse>

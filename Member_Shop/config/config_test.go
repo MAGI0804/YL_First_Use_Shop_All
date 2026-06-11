@@ -32,6 +32,9 @@ func TestLoadConfigUsesNonSensitiveLocalDefaults(t *testing.T) {
 	if cfg.WechatConfig.AppID != "" || cfg.WechatConfig.AppSecret != "" {
 		t.Fatalf("expected empty WeChat credentials by default")
 	}
+	if cfg.ServerConfig.OpenInventorySeedOnStartup {
+		t.Fatalf("expected open inventory seed to be disabled by default")
+	}
 }
 
 func TestLoadConfigReadsEnvironmentOverrides(t *testing.T) {
@@ -39,6 +42,7 @@ func TestLoadConfigReadsEnvironmentOverrides(t *testing.T) {
 	t.Setenv("APP_PORT", "3099")
 	t.Setenv("LOG_DIR", "./tmp-logs")
 	t.Setenv("CORS_ALLOW_ORIGINS", "https://admin.example.com,https://ops.example.com")
+	t.Setenv("OPEN_INVENTORY_SEED_ON_STARTUP", "true")
 	t.Setenv("DB_HOST", "db.internal")
 	t.Setenv("DB_PASSWORD", "from-env")
 	t.Setenv("REDIS_ADDR", "redis.internal:6379")
@@ -64,6 +68,9 @@ func TestLoadConfigReadsEnvironmentOverrides(t *testing.T) {
 	}
 	if len(cfg.ServerConfig.CORSAllowOrigins) != 2 {
 		t.Fatalf("expected two CORS origins, got %#v", cfg.ServerConfig.CORSAllowOrigins)
+	}
+	if !cfg.ServerConfig.OpenInventorySeedOnStartup {
+		t.Fatalf("expected open inventory seed startup override")
 	}
 	if cfg.DBConfig.Host != "db.internal" || cfg.DBConfig.Password != "from-env" {
 		t.Fatalf("expected DB env overrides, got host=%q password=%q", cfg.DBConfig.Host, cfg.DBConfig.Password)

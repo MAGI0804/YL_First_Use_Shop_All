@@ -17,10 +17,11 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Environment      string
-	Port             string
-	LogDir           string
-	CORSAllowOrigins []string
+	Environment                string
+	Port                       string
+	LogDir                     string
+	CORSAllowOrigins           []string
+	OpenInventorySeedOnStartup bool
 }
 
 type DBConfig struct {
@@ -98,10 +99,11 @@ func LoadConfig() Config {
 
 	return Config{
 		ServerConfig: ServerConfig{
-			Environment:      getEnv("APP_ENV", "development"),
-			Port:             getEnv("APP_PORT", "3088"),
-			LogDir:           getEnv("LOG_DIR", "./logs"),
-			CORSAllowOrigins: splitCSV(getEnv("CORS_ALLOW_ORIGINS", "*")),
+			Environment:                getEnv("APP_ENV", "development"),
+			Port:                       getEnv("APP_PORT", "3088"),
+			LogDir:                     getEnv("LOG_DIR", "./logs"),
+			CORSAllowOrigins:           splitCSV(getEnv("CORS_ALLOW_ORIGINS", "*")),
+			OpenInventorySeedOnStartup: getEnvBool("OPEN_INVENTORY_SEED_ON_STARTUP", false),
 		},
 		DBConfig: DBConfig{
 			Driver:      getEnv("DB_ENGINE", "mysql"),
@@ -185,6 +187,21 @@ func getEnvInt(key string, defaultValue int) int {
 		return defaultValue
 	}
 	return parsed
+}
+
+func getEnvBool(key string, defaultValue bool) bool {
+	value := strings.TrimSpace(strings.ToLower(os.Getenv(key)))
+	if value == "" {
+		return defaultValue
+	}
+	switch value {
+	case "1", "true", "yes", "y", "on":
+		return true
+	case "0", "false", "no", "n", "off":
+		return false
+	default:
+		return defaultValue
+	}
 }
 
 func splitCSV(value string) []string {

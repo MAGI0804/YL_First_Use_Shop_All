@@ -1087,9 +1087,9 @@ func (cc *CommodityController) GetCommoditiesByStyleCode(c *gin.Context) {
 		return
 	}
 
-	// 查询该style_code下的所有商品，库存大于0
+	// 查询该style_code下的所有商品；展示库存优先使用开放库存余额，不能再用旧库存字段过滤。
 	var commodities []models.Commodity
-	if err := db.DB.Where("style_code = ? AND inventory > 0", requestData.StyleCode).Find(&commodities).Error; err != nil {
+	if err := db.DB.Where("style_code = ?", requestData.StyleCode).Find(&commodities).Error; err != nil {
 		log.Printf("根据款式代码获取商品失败: %v", err)
 		c.JSON(http.StatusInternalServerError, msg.ErrResponseStr("服务器错误"))
 		return
@@ -1155,6 +1155,20 @@ func (cc *CommodityController) GetCommoditiesByStyleCode(c *gin.Context) {
 	for _, commodity := range commodities {
 		totalInventory += commodity.Inventory
 	}
+
+	availableByCommodity := map[string]int{}
+	openInventory, err := method.QueryOpenInventory(method.OpenInventoryQueryInput{StyleCode: requestData.StyleCode})
+	if err != nil {
+		log.Printf("查询开放库存失败 style_code=%s: %v", requestData.StyleCode, err)
+	} else {
+		result["open_inventory"] = openInventory
+		if len(openInventory.Items) > 0 {
+			totalInventory = openInventory.Summary.TotalAvailableQty
+			for _, item := range openInventory.Items {
+				availableByCommodity[item.CommodityID] += item.AvailableQty
+			}
+		}
+	}
 	result["inventory"] = totalInventory
 
 	// 处理主图
@@ -1211,10 +1225,16 @@ func (cc *CommodityController) GetCommoditiesByStyleCode(c *gin.Context) {
 		}
 
 		// 添加尺码信息到颜色组
+		displayInventory := commodity.Inventory
+		if availableQty, ok := availableByCommodity[commodity.CommodityID]; ok {
+			displayInventory = availableQty
+		}
 		colorGroups[color]["sizes"] = append(colorGroups[color]["sizes"].([]map[string]interface{}), map[string]interface{}{
-			"commodity_id": commodity.CommodityID,
-			"size":         commodity.Size,
-			"inventory":    commodity.Inventory,
+			"commodity_id":             commodity.CommodityID,
+			"size":                     commodity.Size,
+			"inventory":                displayInventory,
+			"open_available_inventory": displayInventory,
+			"legacy_inventory":         commodity.Inventory,
 		})
 	}
 

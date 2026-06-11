@@ -87,6 +87,7 @@
             ¥{{ row.price }}
           </template>
         </el-table-column>
+        <el-table-column prop="inventory" label="库存" width="100" align="right" />
         <el-table-column prop="online_status" label="编码状态" width="100">
           <template #default="{ row }">
             <el-tag :type="row.online_status === 'online' ? 'success' : 'info'" size="small">
@@ -138,7 +139,7 @@ const total = ref(0)
 const dateRange = ref<[string, string] | null>(null)
 const searchCode = ref('')
 
-const CACHE_KEY = 'product_first_page_cache'
+const CACHE_KEY = 'product_first_page_cache_v2_inventory'
 const CACHE_EXPIRE = 5 * 60 * 1000 // 5分钟缓存
 
 const loadFromCache = () => {
