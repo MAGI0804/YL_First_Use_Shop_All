@@ -215,11 +215,24 @@ func QueryInventory(commodityID, styleCode string) (map[string]any, error) {
 		var situation models.CommoditySituation
 		_ = db.DB.Where("commodity_id = ?", commodityID).First(&situation).Error
 
+		openInventory, err := QueryOpenInventory(OpenInventoryQueryInput{CommodityID: commodityID})
+		if err != nil {
+			return nil, err
+		}
+		if len(openInventory.Items) > 0 {
+			commodity.Inventory = openInventory.Summary.TotalAvailableQty
+			situation.Inventory = openInventory.Summary.TotalAvailableQty
+		}
+
 		result["commodity"] = commodity
 		result["commodity_situation"] = situation
+		result["open_inventory"] = openInventory
 		if commodity.StyleCode != "" {
 			var styleCodeData models.StyleCodeData
 			if err := db.DB.Where("style_code = ?", commodity.StyleCode).First(&styleCodeData).Error; err == nil {
+				if styleOpenInventory, err := QueryOpenInventory(OpenInventoryQueryInput{StyleCode: commodity.StyleCode}); err == nil && len(styleOpenInventory.Items) > 0 {
+					styleCodeData.Inventory = styleOpenInventory.Summary.TotalAvailableQty
+				}
 				result["style_code_data"] = styleCodeData
 			}
 		}
@@ -234,15 +247,39 @@ func QueryInventory(commodityID, styleCode string) (map[string]any, error) {
 		return nil, err
 	}
 
+	openInventory, err := QueryOpenInventory(OpenInventoryQueryInput{StyleCode: styleCode})
+	if err != nil {
+		return nil, err
+	}
+	availableByCommodity := openInventoryAvailableByCommodity(openInventory.Items)
 	totalInventory := 0
-	for _, commodity := range commodities {
-		totalInventory += commodity.Inventory
+	if len(openInventory.Items) > 0 {
+		totalInventory = openInventory.Summary.TotalAvailableQty
+		styleCodeData.Inventory = totalInventory
+		for i := range commodities {
+			if availableQty, ok := availableByCommodity[commodities[i].CommodityID]; ok {
+				commodities[i].Inventory = availableQty
+			}
+		}
+	} else {
+		for _, commodity := range commodities {
+			totalInventory += commodity.Inventory
+		}
 	}
 	result["style_code"] = styleCode
 	result["style_code_data"] = styleCodeData
 	result["total_inventory"] = totalInventory
 	result["commodities"] = commodities
+	result["open_inventory"] = openInventory
 	return result, nil
+}
+
+func openInventoryAvailableByCommodity(items []OpenInventoryBalanceView) map[string]int {
+	availableByCommodity := make(map[string]int)
+	for _, item := range items {
+		availableByCommodity[item.CommodityID] += item.AvailableQty
+	}
+	return availableByCommodity
 }
 
 // AdjustInventory 手动调整库存
