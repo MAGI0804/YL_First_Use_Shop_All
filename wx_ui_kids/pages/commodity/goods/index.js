@@ -668,7 +668,8 @@ Page({
           reviewStats: {
             total: stats.total || 0,
             averageRating: Number(stats.average_rating || 0).toFixed(2),
-            goodRate: (Number(stats.good_rate || 0) * 100).toFixed(2)
+            goodRate: (Number(stats.good_rate || 0) * 100).toFixed(2),
+            imageCount: stats.image_count || 0
           }
         });
       }

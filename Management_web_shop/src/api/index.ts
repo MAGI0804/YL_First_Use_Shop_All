@@ -749,6 +749,8 @@ export interface ReviewStatisticsData {
   average_rating: number
   good_rate: number
   rating_distribution: Record<string, number>
+  image_count: number
+  tag_distribution: Record<string, number>
 }
 
 export interface ReviewStatisticsResponse {

@@ -63,13 +63,15 @@ type ReviewBackendQueryInput struct {
 
 // ReviewStatistics 评价统计数据结构
 type ReviewStatistics struct {
-	CommodityID        string        `json:"commodity_id,omitempty"` // 商品ID
-	StyleCode          string        `json:"style_code,omitempty"`   // 款式编码
-	Total              int64         `json:"total"`                  // 评价总数
-	PendingCount       int64         `json:"pending_count"`          // 待审核评价数
-	AverageRating      float64       `json:"average_rating"`         // 平均评分
-	GoodRate           float64       `json:"good_rate"`              // 好评率（4-5分占比）
-	RatingDistribution map[int]int64 `json:"rating_distribution"`    // 评分分布，1-5分各等级数量
+	CommodityID        string           `json:"commodity_id,omitempty"` // 商品ID
+	StyleCode          string           `json:"style_code,omitempty"`   // 款式编码
+	Total              int64            `json:"total"`                  // 评价总数
+	PendingCount       int64            `json:"pending_count"`          // 待审核评价数
+	AverageRating      float64          `json:"average_rating"`         // 平均评分
+	GoodRate           float64          `json:"good_rate"`              // 好评率（4-5分占比）
+	RatingDistribution map[int]int64    `json:"rating_distribution"`    // 评分分布，1-5分各等级数量
+	ImageCount         int64            `json:"image_count"`            // 有图评价数
+	TagDistribution    map[string]int64 `json:"tag_distribution"`       // 标签分布
 }
 
 // CreateReview 创建评价
@@ -241,6 +243,7 @@ func GetReviewStatistics(commodityID, styleCode string) (*ReviewStatistics, erro
 		CommodityID:        commodityID,
 		StyleCode:          styleCode,
 		RatingDistribution: map[int]int64{1: 0, 2: 0, 3: 0, 4: 0, 5: 0},
+		TagDistribution:    map[string]int64{},
 	}
 	if err := reviewStatisticsQuery(commodityID, styleCode).Count(&stats.Total).Error; err != nil {
 		return nil, err
@@ -281,6 +284,9 @@ func GetReviewStatistics(commodityID, styleCode string) (*ReviewStatistics, erro
 	}
 	for _, row := range rows {
 		stats.RatingDistribution[row.Rating] = row.Total
+	}
+	if err := fillReviewMediaAndTagStatistics(stats, commodityID, styleCode); err != nil {
+		return nil, err
 	}
 	return stats, nil
 }
@@ -416,6 +422,28 @@ func reviewStatisticsStatusQuery(commodityID, styleCode, status string) *gorm.DB
 	return query
 }
 
+func fillReviewMediaAndTagStatistics(stats *ReviewStatistics, commodityID, styleCode string) error {
+	type reviewMediaRow struct {
+		Images string
+		Tags   string
+	}
+	rows := make([]reviewMediaRow, 0)
+	if err := reviewStatisticsQuery(commodityID, styleCode).
+		Select("images, tags").
+		Scan(&rows).Error; err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if len(parseStoredReviewStringList(row.Images)) > 0 {
+			stats.ImageCount++
+		}
+		for _, tag := range parseStoredReviewStringList(row.Tags) {
+			stats.TagDistribution[tag]++
+		}
+	}
+	return nil
+}
+
 // reviewableSubOrderStatus 检查子订单状态是否可评价（内部函数）
 // 只有已发货/已完成/已签收/已收货状态可以评价
 func reviewableSubOrderStatus(status string) bool {
@@ -445,6 +473,29 @@ func marshalStringList(values []string) (string, error) {
 		return "", fmt.Errorf("marshal string list: %w", err)
 	}
 	return string(bytes), nil
+}
+
+func parseStoredReviewStringList(value string) []string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return []string{}
+	}
+	var parsed []string
+	if err := json.Unmarshal([]byte(value), &parsed); err == nil {
+		return cleanStringList(parsed)
+	}
+	return cleanStringList(strings.Split(value, ","))
+}
+
+func cleanStringList(values []string) []string {
+	cleaned := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			cleaned = append(cleaned, value)
+		}
+	}
+	return cleaned
 }
 
 func normalizeReviewCreateInput(input *ReviewCreateInput) error {

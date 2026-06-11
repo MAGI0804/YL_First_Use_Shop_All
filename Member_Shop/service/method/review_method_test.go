@@ -76,3 +76,29 @@ func TestNormalizeReviewTagsRejectsUnknownTag(t *testing.T) {
 		t.Fatalf("expected error")
 	}
 }
+
+func TestParseStoredReviewStringList(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  []string
+	}{
+		{name: "json array", value: `["质量好"," 发货快 ",""]`, want: []string{"质量好", "发货快"}},
+		{name: "comma separated", value: "质量好, 发货快, ", want: []string{"质量好", "发货快"}},
+		{name: "empty", value: "   ", want: []string{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseStoredReviewStringList(tt.value)
+			if len(got) != len(tt.want) {
+				t.Fatalf("len = %d, want %d: %#v", len(got), len(tt.want), got)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Fatalf("item %d = %q, want %q", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}

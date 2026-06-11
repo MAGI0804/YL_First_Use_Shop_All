@@ -69,6 +69,7 @@
           <text>{{reviewStats.averageRating}} 分</text>
           <text>好评率 {{reviewStats.goodRate}}%</text>
           <text>{{reviewStats.total}} 条评价</text>
+          <text wx:if="{{reviewStats.imageCount > 0}}">有图 {{reviewStats.imageCount}}</text>
         </view>
       </view>
     </view>

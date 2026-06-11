@@ -17,6 +17,14 @@
         <span>待审核</span>
         <strong>{{ pendingCount }}</strong>
       </div>
+      <div class="summary-item">
+        <span>有图评价</span>
+        <strong>{{ statistics.image_count || 0 }}</strong>
+      </div>
+      <div class="summary-item">
+        <span>热门标签</span>
+        <strong class="tag-summary">{{ topTagSummary }}</strong>
+      </div>
     </section>
 
     <section class="panel">
@@ -155,10 +163,20 @@ const statistics = ref<ReviewStatisticsData>({
   pending_count: 0,
   average_rating: 0,
   good_rate: 0,
-  rating_distribution: {}
+  rating_distribution: {},
+  image_count: 0,
+  tag_distribution: {}
 })
 
 const pendingCount = computed(() => statistics.value.pending_count || 0)
+const topTagSummary = computed(() => {
+  const entries = Object.entries(statistics.value.tag_distribution || {})
+    .filter(([, count]) => Number(count) > 0)
+    .sort((a, b) => Number(b[1]) - Number(a[1]))
+    .slice(0, 2)
+  if (entries.length === 0) return '-'
+  return entries.map(([tag, count]) => `${tag} ${count}`).join(' / ')
+})
 
 const formatNumber = (value: number) => Number(value || 0).toFixed(2)
 const formatPercent = (value: number) => `${(Number(value || 0) * 100).toFixed(2)}%`
@@ -325,7 +343,7 @@ onMounted(() => {
 
 .summary-band {
   display: grid;
-  grid-template-columns: repeat(4, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 12px;
   margin-bottom: 16px;
 }
@@ -348,6 +366,11 @@ onMounted(() => {
 .summary-item strong {
   color: #1f2937;
   font-size: 22px;
+}
+
+.summary-item .tag-summary {
+  font-size: 16px;
+  line-height: 1.5;
 }
 
 .panel {
