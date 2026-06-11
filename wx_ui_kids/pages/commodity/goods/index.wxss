@@ -410,6 +410,20 @@
   font-size: 22rpx;
 }
 
+.review-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 14rpx;
+}
+
+.review-images image {
+  width: 126rpx;
+  height: 126rpx;
+  border-radius: 8rpx;
+  background: #f5f5f5;
+}
+
 .review-reply {
   margin-top: 14rpx;
   padding: 14rpx;

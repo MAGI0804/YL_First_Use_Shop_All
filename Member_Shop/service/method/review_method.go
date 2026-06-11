@@ -5,7 +5,9 @@ import (
 	"Member_shop/models"
 	"encoding/json"
 	"fmt"
+	"mime/multipart"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"unicode/utf8"
 
@@ -14,10 +16,11 @@ import (
 )
 
 const (
-	maxReviewContentLength = 500
-	maxReviewImageCount    = 9
-	maxReviewImageURLLen   = 500
-	maxReviewTagCount      = 5
+	maxReviewContentLength   = 500
+	maxReviewImageCount      = 9
+	maxReviewImageURLLen     = 500
+	maxReviewTagCount        = 5
+	MaxReviewUploadImageSize = 5 << 20
 )
 
 var allowedReviewTags = map[string]struct{}{
@@ -26,6 +29,13 @@ var allowedReviewTags = map[string]struct{}{
 	"面料舒服": {},
 	"颜色好看": {},
 	"发货快":  {},
+}
+
+var allowedReviewUploadExtensions = map[string]string{
+	".jpg":  "image/jpeg",
+	".jpeg": "image/jpeg",
+	".png":  "image/png",
+	".webp": "image/webp",
 }
 
 // ReviewCreateInput 创建评价输入参数
@@ -308,6 +318,32 @@ func DeletePendingReview(reviewID uint, userID int) (*models.ProductReview, erro
 		return nil, err
 	}
 	return &review, nil
+}
+
+// ValidateReviewImageUpload 校验评价图片上传文件。
+// 仅允许常见静态图片格式，单文件最大 5MB。
+func ValidateReviewImageUpload(file *multipart.FileHeader) error {
+	if file == nil {
+		return fmt.Errorf("image is required")
+	}
+	if file.Size <= 0 {
+		return fmt.Errorf("image is empty")
+	}
+	if file.Size > MaxReviewUploadImageSize {
+		return fmt.Errorf("image size exceeds 5MB")
+	}
+	ext := strings.ToLower(filepath.Ext(file.Filename))
+	if _, ok := allowedReviewUploadExtensions[ext]; !ok {
+		return fmt.Errorf("unsupported image type")
+	}
+	contentType := strings.ToLower(strings.TrimSpace(file.Header.Get("Content-Type")))
+	if contentType == "" {
+		return nil
+	}
+	if contentType != allowedReviewUploadExtensions[ext] {
+		return fmt.Errorf("image content type does not match extension")
+	}
+	return nil
 }
 
 // AuditReview 审核评价

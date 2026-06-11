@@ -1,4 +1,5 @@
 const app = getApp();
+const MAX_REVIEW_IMAGES = 9;
 
 function getUserId() {
   const globalUserInfo = app.globalData.userInfo || {};
@@ -16,6 +17,8 @@ Page({
     reviewId: 0,
     rating: 5,
     content: '',
+    uploadedImages: [],
+    uploadingImage: false,
     tagOptions: ['质量好', '尺码合适', '面料舒服', '颜色好看', '发货快'],
     selectedTags: [],
     submitting: false
@@ -34,6 +37,17 @@ Page({
         selectedTags = [];
       }
     }
+    let uploadedImages = [];
+    if (mode === 'edit' && options.images) {
+      try {
+        const parsed = JSON.parse(decodeURIComponent(options.images));
+        if (Array.isArray(parsed)) {
+          uploadedImages = parsed.filter(Boolean).map((item) => String(item));
+        }
+      } catch (error) {
+        uploadedImages = [];
+      }
+    }
     this.setData({
       orderId: options.orderId || '',
       subOrderId: options.subOrderId || '',
@@ -44,6 +58,7 @@ Page({
       reviewId: Number(options.reviewId || 0),
       rating: mode === 'edit' ? Number(options.rating || 5) : 5,
       content: mode === 'edit' ? decodeURIComponent(options.content || '') : '',
+      uploadedImages,
       selectedTags
     });
     if (mode === 'edit') {
@@ -74,10 +89,113 @@ Page({
     this.setData({ selectedTags });
   },
 
+  chooseImages() {
+    const remain = MAX_REVIEW_IMAGES - this.data.uploadedImages.length;
+    if (remain <= 0 || this.data.uploadingImage) {
+      return;
+    }
+    wx.chooseMedia({
+      count: remain,
+      mediaType: ['image'],
+      sourceType: ['album', 'camera'],
+      sizeType: ['compressed'],
+      success: (res) => {
+        const files = Array.isArray(res.tempFiles) ? res.tempFiles : [];
+        if (files.length === 0) return;
+        this.uploadReviewImages(files.map(item => item.tempFilePath).filter(Boolean));
+      }
+    });
+  },
+
+  uploadReviewImages(paths) {
+    const userId = getUserId();
+    if (!userId) {
+      wx.showToast({
+        title: '请先登录',
+        icon: 'none'
+      });
+      return;
+    }
+    this.setData({ uploadingImage: true });
+    wx.showLoading({ title: '上传中...' });
+    Promise.all(paths.map(path => this.uploadReviewImage(path, userId)))
+      .then((urls) => {
+        const uploadedImages = this.data.uploadedImages.concat(urls.filter(Boolean)).slice(0, MAX_REVIEW_IMAGES);
+        this.setData({ uploadedImages });
+      })
+      .catch((err) => {
+        console.error('上传评价图片失败:', err);
+        wx.showToast({
+          title: err && err.message ? err.message : '图片上传失败',
+          icon: 'none'
+        });
+      })
+      .finally(() => {
+        wx.hideLoading();
+        this.setData({ uploadingImage: false });
+      });
+  },
+
+  uploadReviewImage(filePath, userId) {
+    return new Promise((resolve, reject) => {
+      app.req.getAccessToken((token) => {
+        wx.uploadFile({
+          url: `${app.req.getHost()}/review/upload_image?access_token=${encodeURIComponent(token)}`,
+          filePath,
+          name: 'image',
+          formData: {
+            user_id: String(userId)
+          },
+          success: (res) => {
+            let body = {};
+            try {
+              body = JSON.parse(res.data || '{}');
+            } catch (error) {
+              reject(new Error('图片上传响应异常'));
+              return;
+            }
+            if (res.statusCode >= 200 && res.statusCode < 300 && body.code === 200 && body.data && body.data.url) {
+              resolve(body.data.url);
+              return;
+            }
+            reject(new Error(body.msg || body.message || '图片上传失败'));
+          },
+          fail: reject
+        });
+      }, (err) => {
+        reject(new Error(err && err.message ? err.message : '获取上传凭证失败'));
+      });
+    });
+  },
+
+  removeImage(e) {
+    const index = Number(e.currentTarget.dataset.index);
+    const uploadedImages = this.data.uploadedImages.slice();
+    if (index >= 0 && index < uploadedImages.length) {
+      uploadedImages.splice(index, 1);
+      this.setData({ uploadedImages });
+    }
+  },
+
+  previewImage(e) {
+    const current = e.currentTarget.dataset.url;
+    wx.previewImage({
+      current,
+      urls: this.data.uploadedImages
+    });
+  },
+
   submitReview() {
     const userId = getUserId();
-    const { orderId, subOrderId, commodityId, styleCode, mode, reviewId, rating, content, selectedTags, submitting } = this.data;
+    const { orderId, subOrderId, commodityId, styleCode, mode, reviewId, rating, content, uploadedImages, selectedTags, submitting, uploadingImage } = this.data;
     if (submitting) {
+      return;
+    }
+    if (uploadingImage) {
+      wx.showToast({
+        title: '图片上传中',
+        icon: 'none'
+      });
       return;
     }
     if (!userId) {
@@ -108,7 +226,7 @@ Page({
           user_id: userId,
           rating,
           content: content.trim(),
-          images: [],
+          images: uploadedImages,
           tags: selectedTags
         }
       : {
@@ -119,7 +237,7 @@ Page({
           style_code: styleCode,
           rating,
           content: content.trim(),
-          images: [],
+          images: uploadedImages,
           tags: selectedTags
         };
     if (mode === 'edit' && !reviewId) {

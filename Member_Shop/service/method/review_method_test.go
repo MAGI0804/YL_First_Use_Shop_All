@@ -2,6 +2,8 @@ package method
 
 import (
 	"Member_shop/models"
+	"mime/multipart"
+	"net/textproto"
 	"strings"
 	"testing"
 )
@@ -147,5 +149,71 @@ func TestEnsureReviewUserCanMutate(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 		})
+	}
+}
+
+func TestValidateReviewImageUpload(t *testing.T) {
+	tests := []struct {
+		name    string
+		file    *multipart.FileHeader
+		wantErr bool
+	}{
+		{
+			name: "valid jpeg",
+			file: reviewUploadFileHeader("review.jpg", "image/jpeg", 1024),
+		},
+		{
+			name: "valid png",
+			file: reviewUploadFileHeader("review.png", "image/png", 1024),
+		},
+		{
+			name:    "nil file",
+			file:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "empty file",
+			file:    reviewUploadFileHeader("review.jpg", "image/jpeg", 0),
+			wantErr: true,
+		},
+		{
+			name:    "too large",
+			file:    reviewUploadFileHeader("review.jpg", "image/jpeg", MaxReviewUploadImageSize+1),
+			wantErr: true,
+		},
+		{
+			name:    "unsupported extension",
+			file:    reviewUploadFileHeader("review.svg", "image/svg+xml", 1024),
+			wantErr: true,
+		},
+		{
+			name:    "content type mismatch",
+			file:    reviewUploadFileHeader("review.jpg", "image/png", 1024),
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateReviewImageUpload(tt.file)
+			if tt.wantErr && err == nil {
+				t.Fatalf("expected error")
+			}
+			if !tt.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func reviewUploadFileHeader(filename, contentType string, size int64) *multipart.FileHeader {
+	header := textproto.MIMEHeader{}
+	if contentType != "" {
+		header.Set("Content-Type", contentType)
+	}
+	return &multipart.FileHeader{
+		Filename: filename,
+		Header:   header,
+		Size:     size,
 	}
 }

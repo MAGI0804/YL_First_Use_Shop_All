@@ -1,10 +1,16 @@
 package controllers
 
 import (
+	"Member_shop/db"
+	"Member_shop/models"
 	"Member_shop/requestbody"
 	"Member_shop/service/method"
 	"Member_shop/service/msg"
+	"Member_shop/utils"
 	"net/http"
+	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -172,6 +178,42 @@ func (rc *ReviewController) DeleteReview(c *gin.Context) {
 	}
 
 	data := map[string]any{"review": review}
+	c.JSON(http.StatusOK, msg.SuccessResponse("success", &data))
+}
+
+// UploadReviewImage 处理评价图片上传请求
+func (rc *ReviewController) UploadReviewImage(c *gin.Context) {
+	userID, err := strconv.Atoi(strings.TrimSpace(c.PostForm("user_id")))
+	if err != nil || userID <= 0 {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr("user_id is required"))
+		return
+	}
+	var user models.User
+	if err := db.DB.Where("user_id = ?", userID).First(&user).Error; err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr("user not found"))
+		return
+	}
+
+	file, err := c.FormFile("image")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr("image is required"))
+		return
+	}
+	if err := method.ValidateReviewImageUpload(file); err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr(err.Error()))
+		return
+	}
+
+	savePath, _, err := utils.SaveFileWithPerms(c, file, "reviews", "review_")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, msg.ErrResponseStr(err.Error()))
+		return
+	}
+	imagePath := "/media/" + filepath.ToSlash(savePath)
+	data := map[string]any{
+		"url":  imagePath,
+		"path": savePath,
+	}
 	c.JSON(http.StatusOK, msg.SuccessResponse("success", &data))
 }
 

@@ -691,6 +691,7 @@ Page({
           ...review,
           displayRating: '★★★★★'.slice(0, Number(review.rating || 0)),
           displayTags: this.parseReviewList(review.tags),
+          displayImages: this.parseReviewList(review.images),
           displayReplies: Array.isArray(review.replies) ? review.replies : []
         }))
       });

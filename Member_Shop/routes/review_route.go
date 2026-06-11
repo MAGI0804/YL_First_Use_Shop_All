@@ -20,6 +20,7 @@ func InitReviewRoutes(router *gin.Engine) {
 		reviewGroup.POST("query_mine", reviewController.QueryMine)            // 我的评价列表
 		reviewGroup.POST("update", reviewController.UpdateReview)             // 修改待审核评价
 		reviewGroup.POST("delete", reviewController.DeleteReview)             // 软删除待审核评价
+		reviewGroup.POST("upload_image", reviewController.UploadReviewImage)  // 评价图片上传
 		reviewGroup.POST("audit", reviewController.AuditReview)               // 审核评价
 		reviewGroup.POST("reply", reviewController.ReplyReview)               // 回复评价
 		reviewGroup.POST("statistics", reviewController.ReviewStatistics)     // 评价统计

@@ -85,6 +85,9 @@
         <view class="review-tags" wx:if="{{item.displayTags.length > 0}}">
           <text wx:for="{{item.displayTags}}" wx:key="*this" wx:for-item="tag" class="review-tag">{{tag}}</text>
         </view>
+        <view class="review-images" wx:if="{{item.displayImages.length > 0}}">
+          <image wx:for="{{item.displayImages}}" wx:key="*this" wx:for-item="image" src="{{image}}" mode="aspectFill"></image>
+        </view>
         <view class="review-reply" wx:for="{{item.displayReplies}}" wx:key="id" wx:for-item="reply">
           <text>商家回复：{{reply.content}}</text>
         </view>
