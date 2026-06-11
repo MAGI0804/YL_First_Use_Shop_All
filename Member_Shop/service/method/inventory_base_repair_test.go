@@ -167,3 +167,45 @@ func TestValidateInventoryStockCheckInput(t *testing.T) {
 		})
 	}
 }
+
+func TestOpenInventoryIdempotencyKey(t *testing.T) {
+	input := ChangeInventoryInput{
+		CommodityID:       "SKU001",
+		ChangeType:        InventoryChangeOrderDeduct,
+		RelatedSubOrderID: "SUB001",
+	}
+
+	firstKey, firstStable := openInventoryIdempotencyKey(input)
+	secondKey, secondStable := openInventoryIdempotencyKey(input)
+	if !firstStable || !secondStable {
+		t.Fatalf("sub order inventory changes should use stable idempotency keys")
+	}
+	if firstKey != secondKey {
+		t.Fatalf("stable idempotency keys differ: %q != %q", firstKey, secondKey)
+	}
+	if openInventoryMovementNo(firstKey) != openInventoryMovementNo(secondKey) {
+		t.Fatalf("movement no should be deterministic for stable idempotency keys")
+	}
+}
+
+func TestOpenInventoryManualIdempotencyKeyIsNotStable(t *testing.T) {
+	key, stable := openInventoryIdempotencyKey(ChangeInventoryInput{
+		CommodityID: "SKU001",
+		ChangeType:  InventoryChangeManualAdjust,
+	})
+	if stable {
+		t.Fatalf("manual inventory change without business id should not be stable")
+	}
+	if key == "" {
+		t.Fatalf("manual inventory change still needs an idempotency key")
+	}
+}
+
+func TestNonNegativeOpenInventoryQty(t *testing.T) {
+	if got := nonNegativeOpenInventoryQty(-3); got != 0 {
+		t.Fatalf("negative qty normalized to %d, want 0", got)
+	}
+	if got := nonNegativeOpenInventoryQty(5); got != 5 {
+		t.Fatalf("positive qty normalized to %d, want 5", got)
+	}
+}

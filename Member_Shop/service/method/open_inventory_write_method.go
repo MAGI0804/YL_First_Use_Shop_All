@@ -1,0 +1,250 @@
+package method
+
+import (
+	"Member_shop/models"
+	"crypto/sha1"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+)
+
+type openInventoryChangeResult struct {
+	WarehouseCode string
+	BeforeQty     int
+	AfterQty      int
+}
+
+func applyOpenInventoryChangeTx(tx *gorm.DB, input ChangeInventoryInput, commodity models.Commodity) (*openInventoryChangeResult, error) {
+	if err := ensureOpenInventoryWarehouseTx(tx); err != nil {
+		return nil, err
+	}
+	if err := ensureOpenInventorySKUTx(tx, commodity); err != nil {
+		return nil, err
+	}
+
+	warehouseCode, err := resolveOpenInventoryWarehouseCodeTx(tx, input.CommodityID, input.WarehouseCode)
+	if err != nil {
+		return nil, err
+	}
+
+	idempotencyKey, stableID := openInventoryIdempotencyKey(input)
+	if stableID {
+		var count int64
+		if err := tx.Model(&models.InventoryStockMovement{}).
+			Where("idempotency_key = ?", idempotencyKey).
+			Count(&count).Error; err != nil {
+			return nil, err
+		}
+		if count > 0 {
+			return nil, nil
+		}
+	}
+
+	balance, err := lockOpenInventoryBalanceTx(tx, commodity, warehouseCode)
+	if err != nil {
+		return nil, err
+	}
+
+	beforeQty := balance.AvailableQty
+	afterQty := beforeQty + input.ChangeQty
+	if afterQty < 0 {
+		return nil, fmt.Errorf("商品%s库存不足，当前库存%d，需要%d", input.CommodityID, beforeQty, -input.ChangeQty)
+	}
+
+	if err := tx.Model(&models.InventoryStockBalance{}).
+		Where("commodity_id = ? AND warehouse_code = ?", input.CommodityID, warehouseCode).
+		Updates(map[string]any{
+			"on_hand_qty":   afterQty,
+			"available_qty": afterQty,
+			"locked_qty":    0,
+			"version":       gorm.Expr("version + 1"),
+		}).Error; err != nil {
+		return nil, err
+	}
+
+	movement := models.InventoryStockMovement{
+		MovementNo:     openInventoryMovementNo(idempotencyKey),
+		CommodityID:    input.CommodityID,
+		StyleCode:      commodity.StyleCode,
+		WarehouseCode:  warehouseCode,
+		MovementType:   input.ChangeType,
+		BizType:        openInventoryBizType(input),
+		BizID:          openInventoryBizID(input),
+		IdempotencyKey: idempotencyKey,
+		BeforeQty:      beforeQty,
+		ChangeQty:      input.ChangeQty,
+		AfterQty:       afterQty,
+		OnHandDelta:    input.ChangeQty,
+		LockedDelta:    0,
+		AvailableDelta: input.ChangeQty,
+		OperatorID:     input.OperatorID,
+		Remark:         input.Remark,
+	}
+	if err := tx.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "idempotency_key"}},
+		DoNothing: true,
+	}).Create(&movement).Error; err != nil {
+		return nil, err
+	}
+
+	return &openInventoryChangeResult{
+		WarehouseCode: warehouseCode,
+		BeforeQty:     beforeQty,
+		AfterQty:      afterQty,
+	}, nil
+}
+
+func ensureOpenInventoryWarehouseTx(tx *gorm.DB) error {
+	now := time.Now()
+	warehouse := models.InventoryWarehouse{
+		WarehouseCode: models.DefaultInventoryWarehouseCode,
+		WarehouseName: "默认仓",
+		Source:        models.InventorySourceLocal,
+		IsDefault:     true,
+		Status:        models.InventoryWarehouseStatusActive,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+
+	return tx.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "warehouse_code"}},
+		DoUpdates: clause.Assignments(map[string]any{
+			"warehouse_name": warehouse.WarehouseName,
+			"source":         warehouse.Source,
+			"is_default":     warehouse.IsDefault,
+			"status":         warehouse.Status,
+			"updated_at":     now,
+		}),
+	}).Create(&warehouse).Error
+}
+
+func ensureOpenInventorySKUTx(tx *gorm.DB, commodity models.Commodity) error {
+	now := time.Now()
+	sku := models.InventorySKU{
+		CommodityID: commodity.CommodityID,
+		StyleCode:   commodity.StyleCode,
+		SpecCode:    commodity.SpecCode,
+		Name:        commodity.Name,
+		Size:        commodity.Size,
+		Color:       commodity.Color,
+		Category:    commodity.Category,
+		Status:      models.InventorySKUStatusActive,
+		CreatedAt:   commodity.CreatedAt,
+		UpdatedAt:   now,
+	}
+
+	return tx.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "commodity_id"}},
+		DoUpdates: clause.Assignments(map[string]any{
+			"style_code": sku.StyleCode,
+			"spec_code":  sku.SpecCode,
+			"name":       sku.Name,
+			"size":       sku.Size,
+			"color":      sku.Color,
+			"category":   sku.Category,
+			"status":     sku.Status,
+			"updated_at": now,
+		}),
+	}).Create(&sku).Error
+}
+
+func resolveOpenInventoryWarehouseCodeTx(tx *gorm.DB, commodityID, warehouseCode string) (string, error) {
+	warehouseCode = strings.TrimSpace(warehouseCode)
+	if warehouseCode == "" || warehouseCode == models.DefaultInventoryWarehouseCode {
+		return models.DefaultInventoryWarehouseCode, nil
+	}
+
+	var count int64
+	if err := tx.Model(&models.InventoryStockBalance{}).
+		Where("commodity_id = ? AND warehouse_code = ?", commodityID, warehouseCode).
+		Count(&count).Error; err != nil {
+		return "", err
+	}
+	if count == 0 {
+		return models.DefaultInventoryWarehouseCode, nil
+	}
+	return warehouseCode, nil
+}
+
+func lockOpenInventoryBalanceTx(tx *gorm.DB, commodity models.Commodity, warehouseCode string) (models.InventoryStockBalance, error) {
+	var balance models.InventoryStockBalance
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("commodity_id = ? AND warehouse_code = ?", commodity.CommodityID, warehouseCode).
+		First(&balance).Error
+	if err == nil {
+		return balance, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return balance, err
+	}
+
+	qty := nonNegativeOpenInventoryQty(commodity.Inventory)
+	balance = models.InventoryStockBalance{
+		CommodityID:   commodity.CommodityID,
+		WarehouseCode: warehouseCode,
+		OnHandQty:     qty,
+		LockedQty:     0,
+		AvailableQty:  qty,
+		Version:       1,
+	}
+	if err := tx.Create(&balance).Error; err != nil {
+		return balance, err
+	}
+	return balance, nil
+}
+
+func openInventoryIdempotencyKey(input ChangeInventoryInput) (string, bool) {
+	parts := []string{"inventory", input.ChangeType, input.CommodityID}
+	switch {
+	case input.RelatedSubOrderID != "":
+		parts = append(parts, "sub_order", input.RelatedSubOrderID)
+	case input.RelatedReturnID != "":
+		parts = append(parts, "return", input.RelatedReturnID)
+	case input.RelatedOrderID != "":
+		parts = append(parts, "order", input.RelatedOrderID)
+	default:
+		parts = append(parts, "manual", fmt.Sprintf("%d", time.Now().UnixNano()))
+		return strings.Join(parts, ":"), false
+	}
+	return strings.Join(parts, ":"), true
+}
+
+func openInventoryMovementNo(idempotencyKey string) string {
+	sum := sha1.Sum([]byte(idempotencyKey))
+	return "MV:" + hex.EncodeToString(sum[:])
+}
+
+func openInventoryBizType(input ChangeInventoryInput) string {
+	if input.RelatedReturnID != "" {
+		return "return"
+	}
+	if input.RelatedOrderID != "" || input.RelatedSubOrderID != "" {
+		return "order"
+	}
+	return "inventory"
+}
+
+func openInventoryBizID(input ChangeInventoryInput) string {
+	if input.RelatedReturnID != "" {
+		return input.RelatedReturnID
+	}
+	if input.RelatedSubOrderID != "" {
+		return input.RelatedSubOrderID
+	}
+	if input.RelatedOrderID != "" {
+		return input.RelatedOrderID
+	}
+	return input.ChangeType
+}
+
+func nonNegativeOpenInventoryQty(qty int) int {
+	if qty < 0 {
+		return 0
+	}
+	return qty
+}

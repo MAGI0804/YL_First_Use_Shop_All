@@ -598,21 +598,23 @@ func changeInventoryTx(tx *gorm.DB, input ChangeInventoryInput) error {
 		return err
 	}
 
-	beforeQty := commodity.Inventory
-	afterQty := beforeQty + input.ChangeQty
-	if afterQty < 0 {
-		return fmt.Errorf("商品%s库存不足，当前库存%d，需要%d", input.CommodityID, beforeQty, -input.ChangeQty)
+	openChange, err := applyOpenInventoryChangeTx(tx, input, commodity)
+	if err != nil {
+		return err
+	}
+	if openChange == nil {
+		return nil
 	}
 
 	if err := tx.Model(&models.Commodity{}).
 		Where("commodity_id = ?", input.CommodityID).
-		Update("inventory", afterQty).Error; err != nil {
+		Update("inventory", openChange.AfterQty).Error; err != nil {
 		return err
 	}
 
 	if err := tx.Model(&models.CommoditySituation{}).
 		Where("commodity_id = ?", input.CommodityID).
-		Update("inventory", afterQty).Error; err != nil {
+		Update("inventory", openChange.AfterQty).Error; err != nil {
 		return err
 	}
 
@@ -625,10 +627,10 @@ func changeInventoryTx(tx *gorm.DB, input ChangeInventoryInput) error {
 	log := models.InventoryLog{
 		CommodityID:       input.CommodityID,
 		StyleCode:         commodity.StyleCode,
-		WarehouseCode:     input.WarehouseCode,
-		BeforeQty:         beforeQty,
+		WarehouseCode:     openChange.WarehouseCode,
+		BeforeQty:         openChange.BeforeQty,
 		ChangeQty:         input.ChangeQty,
-		AfterQty:          afterQty,
+		AfterQty:          openChange.AfterQty,
 		ChangeType:        input.ChangeType,
 		RelatedOrderID:    input.RelatedOrderID,
 		RelatedSubOrderID: input.RelatedSubOrderID,
