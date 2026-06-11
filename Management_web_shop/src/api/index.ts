@@ -1376,7 +1376,10 @@ export interface InventoryWarningsResponse {
 }
 
 export interface InventoryLogItem {
-  id: number
+  id?: number
+  source_id?: number
+  source?: 'legacy' | 'open' | string
+  movement_no?: string
   commodity_id: string
   style_code: string
   warehouse_code: string
@@ -1390,6 +1393,9 @@ export interface InventoryLogItem {
   operator_id: string
   remark: string
   created_at: string
+  biz_type?: string
+  biz_id?: string
+  idempotency_key?: string
 }
 
 export interface InventoryLogsParams {

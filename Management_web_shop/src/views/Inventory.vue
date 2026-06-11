@@ -98,6 +98,14 @@
 
           <el-table :data="logRows" border height="520" empty-text="暂无库存日志">
             <el-table-column prop="created_at" label="时间" width="180" />
+            <el-table-column prop="source" label="来源" width="90">
+              <template #default="{ row }">
+                <el-tag :type="row.source === 'open' ? 'success' : 'info'" size="small">
+                  {{ logSourceText(row.source) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="movement_no" label="开放流水号" min-width="190" show-overflow-tooltip />
             <el-table-column prop="commodity_id" label="SKU" min-width="150" />
             <el-table-column prop="style_code" label="款号" width="130" />
             <el-table-column prop="warehouse_code" label="仓库" width="120" />
@@ -108,6 +116,9 @@
             <el-table-column prop="change_qty" label="变动" width="90" align="right" />
             <el-table-column prop="after_qty" label="后库存" width="90" align="right" />
             <el-table-column prop="related_order_id" label="订单" width="150" />
+            <el-table-column label="业务号" width="160">
+              <template #default="{ row }">{{ inventoryBizNo(row) }}</template>
+            </el-table-column>
             <el-table-column prop="operator_id" label="操作人" width="110" />
             <el-table-column prop="remark" label="备注" min-width="220" show-overflow-tooltip />
           </el-table>
@@ -292,6 +303,16 @@ const stockCheckForm = reactive({
 })
 
 const formatMoney = (value: number) => Number(value || 0).toFixed(2)
+
+const logSourceText = (source?: string) => {
+  if (source === 'open') return '开放'
+  if (source === 'legacy') return '旧'
+  return source || '-'
+}
+
+const inventoryBizNo = (row: InventoryLogItem) => {
+  return row.biz_id || row.related_sub_order_id || row.related_return_id || row.related_order_id || '-'
+}
 
 const changeTypeText = (type: string) => {
   const map: Record<string, string> = {
