@@ -5,11 +5,28 @@ import (
 	"Member_shop/models"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
+	"unicode/utf8"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
+
+const (
+	maxReviewContentLength = 500
+	maxReviewImageCount    = 9
+	maxReviewImageURLLen   = 500
+	maxReviewTagCount      = 5
+)
+
+var allowedReviewTags = map[string]struct{}{
+	"质量好":  {},
+	"尺码合适": {},
+	"面料舒服": {},
+	"颜色好看": {},
+	"发货快":  {},
+}
 
 // ReviewCreateInput 创建评价输入参数
 type ReviewCreateInput struct {
@@ -278,7 +295,9 @@ func createReviewTx(tx *gorm.DB, input ReviewCreateInput) (*models.ProductReview
 	input.SubOrderID = strings.TrimSpace(input.SubOrderID)
 	input.CommodityID = strings.TrimSpace(input.CommodityID)
 	input.StyleCode = strings.TrimSpace(input.StyleCode)
-	input.Content = strings.TrimSpace(input.Content)
+	if err := normalizeReviewCreateInput(&input); err != nil {
+		return nil, err
+	}
 
 	if input.UserID <= 0 {
 		return nil, fmt.Errorf("user_id is required")
@@ -426,4 +445,108 @@ func marshalStringList(values []string) (string, error) {
 		return "", fmt.Errorf("marshal string list: %w", err)
 	}
 	return string(bytes), nil
+}
+
+func normalizeReviewCreateInput(input *ReviewCreateInput) error {
+	input.Content = strings.TrimSpace(input.Content)
+	if input.Content == "" {
+		return fmt.Errorf("content is required")
+	}
+	if utf8.RuneCountInString(input.Content) > maxReviewContentLength {
+		return fmt.Errorf("content length exceeds %d characters", maxReviewContentLength)
+	}
+	if containsUnsafeReviewContent(input.Content) {
+		return fmt.Errorf("content contains unsafe markup")
+	}
+
+	images, err := normalizeReviewImages(input.Images)
+	if err != nil {
+		return err
+	}
+	tags, err := normalizeReviewTags(input.Tags)
+	if err != nil {
+		return err
+	}
+	input.Images = images
+	input.Tags = tags
+	return nil
+}
+
+func containsUnsafeReviewContent(content string) bool {
+	lowered := strings.ToLower(content)
+	unsafePatterns := []string{
+		"<script",
+		"</script",
+		"javascript:",
+		"onerror=",
+		"onload=",
+		"<iframe",
+		"</iframe",
+	}
+	for _, pattern := range unsafePatterns {
+		if strings.Contains(lowered, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeReviewImages(images []string) ([]string, error) {
+	if len(images) > maxReviewImageCount {
+		return nil, fmt.Errorf("images count exceeds %d", maxReviewImageCount)
+	}
+	cleaned := make([]string, 0, len(images))
+	for _, image := range images {
+		image = strings.TrimSpace(image)
+		if image == "" {
+			continue
+		}
+		if len(image) > maxReviewImageURLLen {
+			return nil, fmt.Errorf("image url is too long")
+		}
+		if !validReviewImageURL(image) {
+			return nil, fmt.Errorf("invalid image url")
+		}
+		cleaned = append(cleaned, image)
+	}
+	return cleaned, nil
+}
+
+func validReviewImageURL(image string) bool {
+	if strings.HasPrefix(image, "/media/") ||
+		strings.HasPrefix(image, "/static/") ||
+		strings.HasPrefix(image, "/staticfiles/") ||
+		strings.HasPrefix(image, "/uploads/") ||
+		strings.HasPrefix(image, "media/") ||
+		strings.HasPrefix(image, "commodities/") {
+		return true
+	}
+	parsed, err := url.Parse(image)
+	if err != nil {
+		return false
+	}
+	return (parsed.Scheme == "http" || parsed.Scheme == "https") && parsed.Host != ""
+}
+
+func normalizeReviewTags(tags []string) ([]string, error) {
+	if len(tags) > maxReviewTagCount {
+		return nil, fmt.Errorf("tags count exceeds %d", maxReviewTagCount)
+	}
+	cleaned := make([]string, 0, len(tags))
+	seen := map[string]struct{}{}
+	for _, tag := range tags {
+		tag = strings.TrimSpace(tag)
+		if tag == "" {
+			continue
+		}
+		if _, ok := allowedReviewTags[tag]; !ok {
+			return nil, fmt.Errorf("invalid review tag")
+		}
+		if _, ok := seen[tag]; ok {
+			continue
+		}
+		seen[tag] = struct{}{}
+		cleaned = append(cleaned, tag)
+	}
+	return cleaned, nil
 }
