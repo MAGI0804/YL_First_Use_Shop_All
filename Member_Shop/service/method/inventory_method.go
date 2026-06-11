@@ -657,14 +657,38 @@ func QueryInventoryWarnings(threshold, page, pageSize int) ([]models.Commodity, 
 	}
 	page, pageSize = normalizePage(page, pageSize)
 
-	query := db.DB.Model(&models.Commodity{}).Where("inventory <= ?", threshold)
+	openBalanceSQL := `
+SELECT commodity_id, SUM(available_qty) AS available_qty
+FROM inventory_stock_balances
+GROUP BY commodity_id`
+	query := db.DB.Table("Commodity_data AS c").
+		Joins("LEFT JOIN ("+openBalanceSQL+") AS open_stock ON open_stock.commodity_id = c.commodity_id").
+		Where("COALESCE(open_stock.available_qty, c.inventory, 0) <= ?", threshold)
+
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, threshold, page, pageSize, err
 	}
 
 	var commodities []models.Commodity
-	if err := query.Order("inventory ASC, commodity_id ASC").
+	if err := query.Select(`
+c.commodity_id,
+c.name,
+c.style_code,
+c.category,
+c.category_detail,
+c.price,
+c.image,
+c.promo_image,
+c.size,
+c.color,
+c.height,
+c.spec_code,
+c.color_image,
+c.created_at,
+COALESCE(open_stock.available_qty, c.inventory, 0) AS inventory,
+c.notes`).
+		Order("COALESCE(open_stock.available_qty, c.inventory, 0) ASC, c.commodity_id ASC").
 		Limit(pageSize).
 		Offset((page - 1) * pageSize).
 		Find(&commodities).Error; err != nil {
