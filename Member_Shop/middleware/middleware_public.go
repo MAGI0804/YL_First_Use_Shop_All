@@ -270,15 +270,32 @@ func CORSMiddleware() gin.HandlerFunc {
 	cfg := config.LoadConfig()
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
-		allowOrigin := cfg.ServerConfig.CORSAllowOrigins[0]
+		allowOrigin := ""
 		for _, allowed := range cfg.ServerConfig.CORSAllowOrigins {
-			if allowed == "*" || allowed == origin {
+			allowed = strings.TrimSpace(allowed)
+			if allowed == "" {
+				continue
+			}
+			if allowed == "*" {
+				if origin != "" {
+					allowOrigin = origin
+				} else {
+					allowOrigin = "*"
+				}
+				break
+			}
+			if allowed == origin {
 				allowOrigin = allowed
 				break
 			}
 		}
-		c.Writer.Header().Set("Access-Control-Allow-Origin", allowOrigin)
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		if allowOrigin != "" {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", allowOrigin)
+			c.Writer.Header().Set("Vary", "Origin")
+		}
+		if allowOrigin != "*" {
+			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		}
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
 
