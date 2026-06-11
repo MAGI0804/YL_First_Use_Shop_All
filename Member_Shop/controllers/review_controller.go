@@ -104,6 +104,77 @@ func (rc *ReviewController) QueryBackend(c *gin.Context) {
 	c.JSON(http.StatusOK, msg.SuccessResponse("success", &data))
 }
 
+// QueryMine 处理用户本人评价查询请求
+func (rc *ReviewController) QueryMine(c *gin.Context) {
+	var req requestbody.ReviewMineQueryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponse("invalid request", err))
+		return
+	}
+
+	reviews, total, page, pageSize, err := method.QueryMyReviews(method.ReviewMineQueryInput{
+		UserID:   req.UserID,
+		Status:   req.Status,
+		Page:     req.Page,
+		PageSize: req.PageSize,
+	})
+	if err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr(err.Error()))
+		return
+	}
+
+	data := map[string]any{
+		"data":      reviews,
+		"total":     total,
+		"page":      page,
+		"page_size": pageSize,
+	}
+	c.JSON(http.StatusOK, msg.SuccessResponse("success", &data))
+}
+
+// UpdateReview 处理用户修改待审核评价请求
+func (rc *ReviewController) UpdateReview(c *gin.Context) {
+	var req requestbody.ReviewUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponse("invalid request", err))
+		return
+	}
+
+	review, err := method.UpdatePendingReview(method.ReviewUpdateInput{
+		ReviewID: req.ReviewID,
+		UserID:   req.UserID,
+		Rating:   req.Rating,
+		Content:  req.Content,
+		Images:   req.Images,
+		Tags:     req.Tags,
+	})
+	if err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr(err.Error()))
+		return
+	}
+
+	data := map[string]any{"review": review}
+	c.JSON(http.StatusOK, msg.SuccessResponse("success", &data))
+}
+
+// DeleteReview 处理用户软删除待审核评价请求
+func (rc *ReviewController) DeleteReview(c *gin.Context) {
+	var req requestbody.ReviewDeleteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponse("invalid request", err))
+		return
+	}
+
+	review, err := method.DeletePendingReview(req.ReviewID, req.UserID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, msg.ErrResponseStr(err.Error()))
+		return
+	}
+
+	data := map[string]any{"review": review}
+	c.JSON(http.StatusOK, msg.SuccessResponse("success", &data))
+}
+
 // AuditReview 处理评价审核请求
 // 后台管理员审核用户提交的评价，可通过或拒绝评价
 func (rc *ReviewController) AuditReview(c *gin.Context) {

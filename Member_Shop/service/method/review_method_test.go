@@ -1,6 +1,7 @@
 package method
 
 import (
+	"Member_shop/models"
 	"strings"
 	"testing"
 )
@@ -98,6 +99,52 @@ func TestParseStoredReviewStringList(t *testing.T) {
 				if got[i] != tt.want[i] {
 					t.Fatalf("item %d = %q, want %q", i, got[i], tt.want[i])
 				}
+			}
+		})
+	}
+}
+
+func TestEnsureReviewUserCanMutate(t *testing.T) {
+	tests := []struct {
+		name    string
+		review  models.ProductReview
+		userID  int
+		wantErr bool
+	}{
+		{
+			name:    "owner can mutate pending review",
+			review:  models.ProductReview{UserID: 7, Status: models.ReviewStatusPending},
+			userID:  7,
+			wantErr: false,
+		},
+		{
+			name:    "rejects other user",
+			review:  models.ProductReview{UserID: 7, Status: models.ReviewStatusPending},
+			userID:  8,
+			wantErr: true,
+		},
+		{
+			name:    "rejects approved review",
+			review:  models.ProductReview{UserID: 7, Status: models.ReviewStatusApproved},
+			userID:  7,
+			wantErr: true,
+		},
+		{
+			name:    "rejects hidden review",
+			review:  models.ProductReview{UserID: 7, Status: models.ReviewStatusHidden},
+			userID:  7,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ensureReviewUserCanMutate(tt.review, tt.userID)
+			if tt.wantErr && err == nil {
+				t.Fatalf("expected error")
+			}
+			if !tt.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
 			}
 		})
 	}

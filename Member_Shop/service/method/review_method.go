@@ -61,6 +61,24 @@ type ReviewBackendQueryInput struct {
 	PageSize    int    // 每页数量
 }
 
+// ReviewMineQueryInput 我的评价列表查询输入参数
+type ReviewMineQueryInput struct {
+	UserID   int
+	Status   string
+	Page     int
+	PageSize int
+}
+
+// ReviewUpdateInput 修改待审核评价输入参数
+type ReviewUpdateInput struct {
+	ReviewID uint
+	UserID   int
+	Rating   int
+	Content  string
+	Images   []string
+	Tags     []string
+}
+
 // ReviewStatistics 评价统计数据结构
 type ReviewStatistics struct {
 	CommodityID        string           `json:"commodity_id,omitempty"` // 商品ID
@@ -171,6 +189,125 @@ func QueryReviewsForBackend(input ReviewBackendQueryInput) ([]models.ProductRevi
 		return nil, 0, page, pageSize, err
 	}
 	return reviews, total, page, pageSize, nil
+}
+
+// QueryMyReviews 查询用户自己的评价列表
+// 默认不返回用户已软删除的 hidden 评价。
+func QueryMyReviews(input ReviewMineQueryInput) ([]models.ProductReview, int64, int, int, error) {
+	if input.UserID <= 0 {
+		return nil, 0, 0, 0, fmt.Errorf("user_id is required")
+	}
+	page, pageSize := normalizePage(input.Page, input.PageSize)
+	query := db.DB.Model(&models.ProductReview{}).
+		Preload("ReviewReplies").
+		Where("user_id = ?", input.UserID)
+	if strings.TrimSpace(input.Status) != "" {
+		status := normalizeReviewStatus(input.Status)
+		if !validReviewStatus(status) {
+			return nil, 0, page, pageSize, fmt.Errorf("invalid review status")
+		}
+		query = query.Where("status = ?", status)
+	} else {
+		query = query.Where("status <> ?", models.ReviewStatusHidden)
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, page, pageSize, err
+	}
+
+	reviews := make([]models.ProductReview, 0)
+	if err := query.Order("created_at DESC, id DESC").
+		Limit(pageSize).
+		Offset((page - 1) * pageSize).
+		Find(&reviews).Error; err != nil {
+		return nil, 0, page, pageSize, err
+	}
+	return reviews, total, page, pageSize, nil
+}
+
+// UpdatePendingReview 修改待审核评价
+// 仅允许评价本人修改 pending 状态评价。
+func UpdatePendingReview(input ReviewUpdateInput) (*models.ProductReview, error) {
+	if input.UserID <= 0 {
+		return nil, fmt.Errorf("user_id is required")
+	}
+	if input.ReviewID == 0 {
+		return nil, fmt.Errorf("review_id is required")
+	}
+	if input.Rating < 1 || input.Rating > 5 {
+		return nil, fmt.Errorf("rating must be between 1 and 5")
+	}
+	createInput := ReviewCreateInput{
+		Rating:  input.Rating,
+		Content: input.Content,
+		Images:  input.Images,
+		Tags:    input.Tags,
+	}
+	if err := normalizeReviewCreateInput(&createInput); err != nil {
+		return nil, err
+	}
+
+	var review models.ProductReview
+	err := db.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ?", input.ReviewID).
+			First(&review).Error; err != nil {
+			return err
+		}
+		if err := ensureReviewUserCanMutate(review, input.UserID); err != nil {
+			return err
+		}
+
+		images, err := marshalStringList(createInput.Images)
+		if err != nil {
+			return err
+		}
+		tags, err := marshalStringList(createInput.Tags)
+		if err != nil {
+			return err
+		}
+		review.Rating = input.Rating
+		review.Content = createInput.Content
+		review.Images = images
+		review.Tags = tags
+		review.AuditRemark = ""
+		return tx.Save(&review).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &review, nil
+}
+
+// DeletePendingReview 软删除待审核评价
+// 当前模型没有 deleted 字段，使用 hidden 状态作为软删除兼容状态。
+func DeletePendingReview(reviewID uint, userID int) (*models.ProductReview, error) {
+	if userID <= 0 {
+		return nil, fmt.Errorf("user_id is required")
+	}
+	if reviewID == 0 {
+		return nil, fmt.Errorf("review_id is required")
+	}
+
+	var review models.ProductReview
+	err := db.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ?", reviewID).
+			First(&review).Error; err != nil {
+			return err
+		}
+		if err := ensureReviewUserCanMutate(review, userID); err != nil {
+			return err
+		}
+		review.Status = models.ReviewStatusHidden
+		review.AuditRemark = "用户删除待审核评价"
+		return tx.Save(&review).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &review, nil
 }
 
 // AuditReview 审核评价
@@ -403,6 +540,16 @@ func validReviewStatus(status string) bool {
 // 统一转为小写并去除空格
 func normalizeReviewStatus(status string) string {
 	return strings.ToLower(strings.TrimSpace(status))
+}
+
+func ensureReviewUserCanMutate(review models.ProductReview, userID int) error {
+	if review.UserID != userID {
+		return fmt.Errorf("review does not belong to user")
+	}
+	if review.Status != models.ReviewStatusPending {
+		return fmt.Errorf("only pending review can be modified")
+	}
+	return nil
 }
 
 // reviewStatisticsQuery 构建评价统计查询（内部函数）
