@@ -8,6 +8,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -434,41 +435,141 @@ func validateInventoryStockCheckInput(input *InventoryStockCheckInput) error {
 // QueryInventoryLogs 查询库存变更日志
 // 支持按商品ID、款式编码、变动类型、关联订单/子订单/退货单等条件筛选
 // 返回库存变动日志列表、总数量、当前页码、每页数量
-func QueryInventoryLogs(input InventoryLogQueryInput) ([]models.InventoryLog, int64, int, int, error) {
+func QueryInventoryLogs(input InventoryLogQueryInput) ([]InventoryLogView, int64, int, int, error) {
 	page, pageSize := normalizePage(input.Page, input.PageSize)
-	query := db.DB.Model(&models.InventoryLog{})
-	if input.CommodityID != "" {
-		query = query.Where("commodity_id = ?", strings.TrimSpace(input.CommodityID))
-	}
-	if input.StyleCode != "" {
-		query = query.Where("style_code = ?", strings.TrimSpace(input.StyleCode))
-	}
-	if input.ChangeType != "" {
-		query = query.Where("change_type = ?", strings.TrimSpace(input.ChangeType))
-	}
-	if input.RelatedOrderID != "" {
-		query = query.Where("related_order_id = ?", strings.TrimSpace(input.RelatedOrderID))
-	}
-	if input.RelatedSubOrderID != "" {
-		query = query.Where("related_sub_order_id = ?", strings.TrimSpace(input.RelatedSubOrderID))
-	}
-	if input.RelatedReturnID != "" {
-		query = query.Where("related_return_id = ?", strings.TrimSpace(input.RelatedReturnID))
-	}
-
+	legacyWhere, legacyArgs := buildLegacyInventoryLogWhere(input)
+	openWhere, openArgs := buildOpenInventoryMovementWhere(input)
+	unionSQL := inventoryLogUnionSQL(legacyWhere, openWhere)
+	countArgs := append(append([]any{}, legacyArgs...), openArgs...)
 	var total int64
-	if err := query.Count(&total).Error; err != nil {
+	if err := db.DB.Raw("SELECT COUNT(*) FROM ("+unionSQL+") AS inventory_logs", countArgs...).Scan(&total).Error; err != nil {
 		return nil, 0, page, pageSize, err
 	}
 
-	var logs []models.InventoryLog
-	if err := query.Order("created_at DESC, id DESC").
-		Limit(pageSize).
-		Offset((page - 1) * pageSize).
-		Find(&logs).Error; err != nil {
+	var logs []InventoryLogView
+	queryArgs := append(append([]any{}, countArgs...), pageSize, (page-1)*pageSize)
+	querySQL := "SELECT * FROM (" + unionSQL + ") AS inventory_logs ORDER BY created_at DESC, source_id DESC LIMIT ? OFFSET ?"
+	if err := db.DB.Raw(querySQL, queryArgs...).Scan(&logs).Error; err != nil {
 		return nil, 0, page, pageSize, err
 	}
 	return logs, total, page, pageSize, nil
+}
+
+func inventoryLogUnionSQL(legacyWhere, openWhere string) string {
+	legacySQL := `
+SELECT
+  id AS source_id,
+  'legacy' AS source,
+  '' AS movement_no,
+  commodity_id,
+  style_code,
+  warehouse_code,
+  before_qty,
+  change_qty,
+  after_qty,
+  change_type,
+  related_order_id,
+  related_sub_order_id,
+  related_return_id,
+  operator_id,
+  remark,
+  created_at,
+  '' AS biz_type,
+  '' AS biz_id,
+  '' AS idempotency_key
+FROM inventory_log` + legacyWhere
+
+	openSQL := `
+SELECT
+  id AS source_id,
+  'open' AS source,
+  movement_no,
+  commodity_id,
+  style_code,
+  warehouse_code,
+  before_qty,
+  change_qty,
+  after_qty,
+  movement_type AS change_type,
+  '' AS related_order_id,
+  CASE WHEN biz_type = 'order' THEN biz_id ELSE '' END AS related_sub_order_id,
+  CASE WHEN biz_type = 'return' THEN biz_id ELSE '' END AS related_return_id,
+  operator_id,
+  remark,
+  created_at,
+  biz_type,
+  biz_id,
+  idempotency_key
+FROM inventory_stock_movements` + openWhere
+
+	return legacySQL + " UNION ALL " + openSQL
+}
+
+func buildLegacyInventoryLogWhere(input InventoryLogQueryInput) (string, []any) {
+	clauses := []string{}
+	args := []any{}
+	if strings.TrimSpace(input.CommodityID) != "" {
+		clauses = append(clauses, "commodity_id = ?")
+		args = append(args, strings.TrimSpace(input.CommodityID))
+	}
+	if strings.TrimSpace(input.StyleCode) != "" {
+		clauses = append(clauses, "style_code = ?")
+		args = append(args, strings.TrimSpace(input.StyleCode))
+	}
+	if strings.TrimSpace(input.ChangeType) != "" {
+		clauses = append(clauses, "change_type = ?")
+		args = append(args, strings.TrimSpace(input.ChangeType))
+	}
+	if strings.TrimSpace(input.RelatedOrderID) != "" {
+		clauses = append(clauses, "related_order_id = ?")
+		args = append(args, strings.TrimSpace(input.RelatedOrderID))
+	}
+	if strings.TrimSpace(input.RelatedSubOrderID) != "" {
+		clauses = append(clauses, "related_sub_order_id = ?")
+		args = append(args, strings.TrimSpace(input.RelatedSubOrderID))
+	}
+	if strings.TrimSpace(input.RelatedReturnID) != "" {
+		clauses = append(clauses, "related_return_id = ?")
+		args = append(args, strings.TrimSpace(input.RelatedReturnID))
+	}
+	return inventoryLogWhereSQL(clauses), args
+}
+
+func buildOpenInventoryMovementWhere(input InventoryLogQueryInput) (string, []any) {
+	clauses := []string{}
+	args := []any{}
+	if strings.TrimSpace(input.CommodityID) != "" {
+		clauses = append(clauses, "commodity_id = ?")
+		args = append(args, strings.TrimSpace(input.CommodityID))
+	}
+	if strings.TrimSpace(input.StyleCode) != "" {
+		clauses = append(clauses, "style_code = ?")
+		args = append(args, strings.TrimSpace(input.StyleCode))
+	}
+	if strings.TrimSpace(input.ChangeType) != "" {
+		clauses = append(clauses, "movement_type = ?")
+		args = append(args, strings.TrimSpace(input.ChangeType))
+	}
+	if strings.TrimSpace(input.RelatedOrderID) != "" {
+		clauses = append(clauses, "biz_type = ? AND biz_id = ?")
+		args = append(args, "order", strings.TrimSpace(input.RelatedOrderID))
+	}
+	if strings.TrimSpace(input.RelatedSubOrderID) != "" {
+		clauses = append(clauses, "biz_type = ? AND biz_id = ?")
+		args = append(args, "order", strings.TrimSpace(input.RelatedSubOrderID))
+	}
+	if strings.TrimSpace(input.RelatedReturnID) != "" {
+		clauses = append(clauses, "biz_type = ? AND biz_id = ?")
+		args = append(args, "return", strings.TrimSpace(input.RelatedReturnID))
+	}
+	return inventoryLogWhereSQL(clauses), args
+}
+
+func inventoryLogWhereSQL(clauses []string) string {
+	if len(clauses) == 0 {
+		return ""
+	}
+	return " WHERE " + strings.Join(clauses, " AND ")
 }
 
 // QueryInventoryWarnings 查询库存预警商品
@@ -506,6 +607,28 @@ type InventoryLogQueryInput struct {
 	RelatedReturnID   string // 关联退货单ID
 	Page              int    // 页码
 	PageSize          int    // 每页大小
+}
+
+type InventoryLogView struct {
+	SourceID          uint      `gorm:"column:source_id" json:"source_id"`
+	Source            string    `gorm:"column:source" json:"source"`
+	MovementNo        string    `gorm:"column:movement_no" json:"movement_no"`
+	CommodityID       string    `gorm:"column:commodity_id" json:"commodity_id"`
+	StyleCode         string    `gorm:"column:style_code" json:"style_code"`
+	WarehouseCode     string    `gorm:"column:warehouse_code" json:"warehouse_code"`
+	BeforeQty         int       `gorm:"column:before_qty" json:"before_qty"`
+	ChangeQty         int       `gorm:"column:change_qty" json:"change_qty"`
+	AfterQty          int       `gorm:"column:after_qty" json:"after_qty"`
+	ChangeType        string    `gorm:"column:change_type" json:"change_type"`
+	RelatedOrderID    string    `gorm:"column:related_order_id" json:"related_order_id"`
+	RelatedSubOrderID string    `gorm:"column:related_sub_order_id" json:"related_sub_order_id"`
+	RelatedReturnID   string    `gorm:"column:related_return_id" json:"related_return_id"`
+	OperatorID        string    `gorm:"column:operator_id" json:"operator_id"`
+	Remark            string    `gorm:"column:remark" json:"remark"`
+	CreatedAt         time.Time `gorm:"column:created_at" json:"created_at"`
+	BizType           string    `gorm:"column:biz_type" json:"biz_type"`
+	BizID             string    `gorm:"column:biz_id" json:"biz_id"`
+	IdempotencyKey    string    `gorm:"column:idempotency_key" json:"idempotency_key"`
 }
 
 // DeductInventoryForOrder 为订单扣减库存
