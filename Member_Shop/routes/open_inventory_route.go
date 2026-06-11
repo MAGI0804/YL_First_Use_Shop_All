@@ -12,5 +12,8 @@ func InitOpenInventoryRoutes(router *gin.Engine) {
 	openInventoryGroup := router.Group("/open_inventory/")
 	{
 		openInventoryGroup.POST("query", openInventoryController.QueryInventory)
+		openInventoryGroup.POST("adjust", openInventoryController.AdjustInventory)
+		openInventoryGroup.POST("transfer", openInventoryController.TransferInventory)
+		openInventoryGroup.POST("stock_check", openInventoryController.StockCheckInventory)
 	}
 }
