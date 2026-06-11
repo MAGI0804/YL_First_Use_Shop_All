@@ -95,6 +95,7 @@ func ApplyJushuitanInventorySync(input JushuitanInventorySyncInput) (*JushuitanI
 	input.SkuID = strings.TrimSpace(input.SkuID)
 	input.IID = strings.TrimSpace(input.IID)
 	input.Modified = strings.TrimSpace(input.Modified)
+	input.WarehouseCode = strings.TrimSpace(input.WarehouseCode)
 	if input.SkuID == "" && input.IID == "" {
 		return nil, fmt.Errorf("sku_id或i_id不能为空")
 	}
@@ -135,8 +136,42 @@ func ApplyJushuitanInventorySync(input JushuitanInventorySyncInput) (*JushuitanI
 			}
 		}
 
-		beforeQty := commodity.Inventory
 		afterQty := calculateJushuitanAvailableQty(input.Qty, input.OrderLock, input.VirtualQty)
+		remark := fmt.Sprintf("聚水潭库存同步 sku_id=%s i_id=%s qty=%d order_lock=%d virtual_qty=%d pick_lock=%d modified=%s",
+			input.SkuID, input.IID, input.Qty, input.OrderLock, input.VirtualQty, input.PickLock, input.Modified)
+		idempotencyKey := ""
+		if input.Modified != "" {
+			idempotencyKey = fmt.Sprintf("inventory:%s:%s:modified:%s", InventoryChangeSyncJushuitan, commodity.CommodityID, input.Modified)
+		}
+		openChange, err := setOpenInventoryAvailableTx(
+			tx,
+			commodity,
+			input.WarehouseCode,
+			afterQty,
+			InventoryChangeSyncJushuitan,
+			"jushuitan",
+			input.Modified,
+			idempotencyKey,
+			"jushuitan",
+			remark,
+		)
+		if err != nil {
+			return err
+		}
+		if openChange == nil {
+			result = &JushuitanInventorySyncResult{
+				CommodityID: commodity.CommodityID,
+				SkuID:       input.SkuID,
+				BeforeQty:   commodity.Inventory,
+				AfterQty:    commodity.Inventory,
+				Modified:    input.Modified,
+				Skipped:     true,
+				SkipReason:  "duplicate_modified",
+			}
+			return nil
+		}
+		beforeQty := openChange.BeforeQty
+		afterQty = openChange.AfterQty
 		changeQty := afterQty - beforeQty
 		result = &JushuitanInventorySyncResult{
 			CommodityID: commodity.CommodityID,
@@ -168,12 +203,10 @@ func ApplyJushuitanInventorySync(input JushuitanInventorySyncInput) (*JushuitanI
 			}
 		}
 
-		remark := fmt.Sprintf("聚水潭库存同步 sku_id=%s i_id=%s qty=%d order_lock=%d virtual_qty=%d pick_lock=%d modified=%s",
-			input.SkuID, input.IID, input.Qty, input.OrderLock, input.VirtualQty, input.PickLock, input.Modified)
 		log := models.InventoryLog{
 			CommodityID:       commodity.CommodityID,
 			StyleCode:         commodity.StyleCode,
-			WarehouseCode:     input.WarehouseCode,
+			WarehouseCode:     openChange.WarehouseCode,
 			BeforeQty:         beforeQty,
 			ChangeQty:         changeQty,
 			AfterQty:          afterQty,

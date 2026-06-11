@@ -99,6 +99,93 @@ func applyOpenInventoryChangeTx(tx *gorm.DB, input ChangeInventoryInput, commodi
 	}, nil
 }
 
+func setOpenInventoryAvailableTx(tx *gorm.DB, commodity models.Commodity, warehouseCode string, afterQty int, movementType, bizType, bizID, idempotencyKey, operatorID, remark string) (*openInventoryChangeResult, error) {
+	if afterQty < 0 {
+		return nil, fmt.Errorf("库存不能小于0")
+	}
+	if err := ensureOpenInventoryWarehouseTx(tx); err != nil {
+		return nil, err
+	}
+	if err := ensureOpenInventorySKUTx(tx, commodity); err != nil {
+		return nil, err
+	}
+
+	warehouseCode, err := resolveOpenInventoryWarehouseCodeTx(tx, commodity.CommodityID, warehouseCode)
+	if err != nil {
+		return nil, err
+	}
+	if idempotencyKey != "" {
+		var count int64
+		if err := tx.Model(&models.InventoryStockMovement{}).
+			Where("idempotency_key = ?", idempotencyKey).
+			Count(&count).Error; err != nil {
+			return nil, err
+		}
+		if count > 0 {
+			return nil, nil
+		}
+	} else {
+		idempotencyKey = fmt.Sprintf("inventory:%s:%s:%s:%d", movementType, commodity.CommodityID, warehouseCode, time.Now().UnixNano())
+	}
+
+	balance, err := lockOpenInventoryBalanceTx(tx, commodity, warehouseCode)
+	if err != nil {
+		return nil, err
+	}
+
+	beforeQty := balance.AvailableQty
+	changeQty := afterQty - beforeQty
+	if changeQty == 0 {
+		return &openInventoryChangeResult{
+			WarehouseCode: warehouseCode,
+			BeforeQty:     beforeQty,
+			AfterQty:      afterQty,
+		}, nil
+	}
+
+	if err := tx.Model(&models.InventoryStockBalance{}).
+		Where("commodity_id = ? AND warehouse_code = ?", commodity.CommodityID, warehouseCode).
+		Updates(map[string]any{
+			"on_hand_qty":   afterQty,
+			"available_qty": afterQty,
+			"locked_qty":    0,
+			"version":       gorm.Expr("version + 1"),
+		}).Error; err != nil {
+		return nil, err
+	}
+
+	movement := models.InventoryStockMovement{
+		MovementNo:     openInventoryMovementNo(idempotencyKey),
+		CommodityID:    commodity.CommodityID,
+		StyleCode:      commodity.StyleCode,
+		WarehouseCode:  warehouseCode,
+		MovementType:   movementType,
+		BizType:        bizType,
+		BizID:          bizID,
+		IdempotencyKey: idempotencyKey,
+		BeforeQty:      beforeQty,
+		ChangeQty:      changeQty,
+		AfterQty:       afterQty,
+		OnHandDelta:    changeQty,
+		LockedDelta:    0,
+		AvailableDelta: changeQty,
+		OperatorID:     operatorID,
+		Remark:         remark,
+	}
+	if err := tx.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "idempotency_key"}},
+		DoNothing: true,
+	}).Create(&movement).Error; err != nil {
+		return nil, err
+	}
+
+	return &openInventoryChangeResult{
+		WarehouseCode: warehouseCode,
+		BeforeQty:     beforeQty,
+		AfterQty:      afterQty,
+	}, nil
+}
+
 func ensureOpenInventoryWarehouseTx(tx *gorm.DB) error {
 	now := time.Now()
 	warehouse := models.InventoryWarehouse{
