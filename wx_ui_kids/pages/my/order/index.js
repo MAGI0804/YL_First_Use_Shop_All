@@ -507,6 +507,32 @@ Page({
     }
   },
 
+  copyOrderNumber(e) {
+    const orderNumber = e.currentTarget.dataset.orderNumber || '';
+    if (!orderNumber) {
+      wx.showToast({
+        title: '订单号为空',
+        icon: 'none'
+      });
+      return;
+    }
+    wx.setClipboardData({
+      data: orderNumber,
+      success: () => {
+        wx.showToast({
+          title: '订单号已复制',
+          icon: 'success'
+        });
+      },
+      fail: () => {
+        wx.showToast({
+          title: '复制失败',
+          icon: 'none'
+        });
+      }
+    });
+  },
+
   /**
    * 跳转到首页
    */
