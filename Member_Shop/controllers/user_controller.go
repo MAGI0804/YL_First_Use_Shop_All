@@ -335,6 +335,12 @@ func (uc *UserController) WechatLogin(c *gin.Context) {
 		avatarURL = avatarVal
 	}
 
+	var existingMember models.Member
+	firstPhoneLogin := false
+	if err := db.DB.Where("mobile = ?", mobile).First(&existingMember).Error; err == nil {
+		firstPhoneLogin = strings.TrimSpace(existingMember.OpenID) == ""
+	}
+
 	stepStartedAt = time.Now()
 	member, err := method.BindWechatPhone(requestbody.BindWechatPhoneRequest{
 		OpenID:    openid,
@@ -376,11 +382,12 @@ func (uc *UserController) WechatLogin(c *gin.Context) {
 				"access":  accessToken,
 				"refresh": refreshToken,
 			},
-			"user_id":     user.UserID,
-			"member_no":   member.MemberNo,
-			"mobile":      member.Mobile,
-			"phone_bound": true,
-			"nickname":    user.Nickname,
+			"user_id":              user.UserID,
+			"member_no":            member.MemberNo,
+			"mobile":               member.Mobile,
+			"phone_bound":          true,
+			"is_first_phone_login": firstPhoneLogin,
+			"nickname":             user.Nickname,
 		},
 	}
 

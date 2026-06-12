@@ -5,7 +5,6 @@ const request = require('../../api/request').default
 
 const LOGIN_REQUEST_TIMEOUT = 20000
 const WX_LOGIN_TIMEOUT = 8000
-const PROFILE_SYNC_PROMPT_PREFIX = 'profile_sync_prompted_'
 
 const getMiniProgramInfo = () => {
   try {
@@ -15,8 +14,6 @@ const getMiniProgramInfo = () => {
     return {}
   }
 }
-
-const getProfileSyncPromptKey = (userId) => `${PROFILE_SYNC_PROMPT_PREFIX}${userId}`
 
 Page({
   data: {
@@ -162,11 +159,10 @@ Page({
         })
         if (httpRes.statusCode >= 200 && httpRes.statusCode < 300 && res.code === 200 && res.data) {
           this.persistLogin(res.data)
-          if (this.hasProfileSyncPrompted(res.data.user_id)) {
+          if (!this.shouldShowProfileSetup(res.data)) {
             this.redirectAfterLogin()
             return
           }
-          this.markProfileSyncPrompted(res.data.user_id)
           this.setData({
             phoneAuthed: true,
             nickname: res.data.nickname || '',
@@ -217,17 +213,15 @@ Page({
     app.globalData.user_id = data.user_id
   },
 
-  hasProfileSyncPrompted(userId) {
-    if (!userId) {
+  shouldShowProfileSetup(data) {
+    if (!data) {
       return false
     }
-    return !!wx.getStorageSync(getProfileSyncPromptKey(userId))
-  },
-
-  markProfileSyncPrompted(userId) {
-    if (userId) {
-      wx.setStorageSync(getProfileSyncPromptKey(userId), true)
-    }
+    return data.is_first_phone_login === true ||
+      data.first_phone_login === true ||
+      data.first_login === true ||
+      data.is_new_user === true ||
+      data.new_user === true
   },
 
   saveProfileAndEnter() {
@@ -335,7 +329,7 @@ Page({
       })
       return
     }
-    app.switchTab('/pages/index/index')
+    app.switchTab('/pages/my/index/index')
   },
 
   onLoad(options) {

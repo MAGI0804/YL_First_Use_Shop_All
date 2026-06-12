@@ -35,13 +35,18 @@
 .label-two-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   flex-wrap: nowrap;
   gap: 12rpx;
   min-width: 0;
+  position: relative;
+  box-sizing: border-box;
 }
 
 .filter-button {
+  position: absolute;
+  right: 0;
+  top: 50%;
   display: flex;
   align-items: center;
   padding: 10rpx 16rpx;
@@ -50,11 +55,12 @@
   color: #68B9FA;
   transition: all 0.3s ease;
   flex-shrink: 0;
-  margin-left: auto;
+  margin-left: 0;
+  transform: translateY(-50%);
 }
 
 .filter-button:active {
-  transform: scale(0.95);
+  transform: translateY(-50%) scale(0.95);
 }
 
 /* 筛选模态框 */
@@ -246,11 +252,12 @@
 .label-two-list {
   display: flex;
   flex-wrap: nowrap;
-  justify-content: flex-start;
+  justify-content: center;
   align-items: center;
   gap: 12rpx;
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
+  max-width: calc(100% - 96rpx);
   padding: 0;
   overflow-x: auto;
   white-space: nowrap;

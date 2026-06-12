@@ -1,5 +1,6 @@
 // index.js
 const app = getApp()
+const IMAGE_PRELOAD_TIMEOUT = 8000
 
 Page({
   data: {
@@ -54,10 +55,13 @@ Page({
               return (a.id || 0) - (b.id || 0);
             })
 
-          that.setData({
-            imageList: onlineImages,
-            loading: false,
-            error: false
+          that.preloadActivityImages(onlineImages).then(() => {
+            if (requestId !== that.requestId) return
+            that.setData({
+              imageList: onlineImages,
+              loading: false,
+              error: false
+            })
           })
         } else {
           that.setData({
@@ -84,6 +88,39 @@ Page({
       }
     )
   },
+
+  preloadActivityImages: function(images) {
+    if (!Array.isArray(images) || images.length === 0) {
+      return Promise.resolve()
+    }
+    return Promise.all(images.map(item => this.preloadImage(item.image))).then(() => {})
+  },
+
+  preloadImage: function(src) {
+    return new Promise(resolve => {
+      if (!src) {
+        resolve()
+        return
+      }
+      let settled = false
+      let timer = null
+      const done = () => {
+        if (settled) return
+        settled = true
+        if (timer) {
+          clearTimeout(timer)
+        }
+        resolve()
+      }
+      timer = setTimeout(done, IMAGE_PRELOAD_TIMEOUT)
+      wx.getImageInfo({
+        src,
+        success: done,
+        fail: done
+      })
+    })
+  },
+
   onRetry: function() {
     this.fetchActivityImages()
   },
