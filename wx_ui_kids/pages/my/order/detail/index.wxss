@@ -296,20 +296,47 @@
   word-break: break-all;
 }
 
-.copy-order-btn {
-  width: 88rpx;
-  height: 44rpx;
-  line-height: 44rpx;
+.copy-order-icon-btn {
+  width: 40rpx;
+  height: 40rpx;
+  line-height: 40rpx;
   padding: 0;
-  margin: 0 0 0 16rpx;
-  border-radius: 22rpx;
-  background: #f5f5f5;
-  color: #333;
-  font-size: 22rpx;
+  margin: 0 0 0 12rpx;
+  background: transparent;
+  border-radius: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.copy-order-btn::after {
+.copy-order-icon-btn::after {
   border: 0;
+}
+
+.copy-icon {
+  position: relative;
+  width: 28rpx;
+  height: 28rpx;
+}
+
+.copy-icon-back,
+.copy-icon-front {
+  position: absolute;
+  width: 18rpx;
+  height: 20rpx;
+  border: 2rpx solid #777;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.copy-icon-back {
+  left: 3rpx;
+  top: 2rpx;
+}
+
+.copy-icon-front {
+  left: 8rpx;
+  top: 7rpx;
 }
 
 /* 价格信息区域 */

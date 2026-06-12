@@ -90,7 +90,17 @@
         <text class="info-label">订单编号</text>
         <view class="info-value-with-action">
           <text class="info-value order-number">{{orderDetail.orderNumber}}</text>
-          <button class="copy-order-btn" catchtap="copyOrderNumber" data-order-number="{{orderDetail.orderNumber}}">复制</button>
+          <button
+            class="copy-order-icon-btn"
+            catchtap="copyOrderNumber"
+            data-order-number="{{orderDetail.orderNumber}}"
+            aria-label="复制订单编号"
+          >
+            <view class="copy-icon">
+              <view class="copy-icon-back"></view>
+              <view class="copy-icon-front"></view>
+            </view>
+          </button>
         </view>
       </view>
       <view class="info-item">
