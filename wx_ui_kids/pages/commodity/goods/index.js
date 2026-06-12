@@ -61,6 +61,9 @@ Page({
     actionType: '',        // 操作类型：cart 或 buy
     quantity: 1,           // 选择的数量，默认为1
     currentStyleCode: '',
+    customerServiceTitle: '咨询商品',
+    customerServicePath: 'pages/commodity/goods/index',
+    customerServiceImage: PLACEHOLDER_IMAGE,
     reviewStats: {
       total: 0,
       averageRating: '0.00',
@@ -198,6 +201,8 @@ Page({
             error: false,
             items: items,
             displayPicturesList: displayPicturesList // 保存display_pictures列表，用于下方纵向展示
+          }, () => {
+            that.updateCustomerServiceCard(goodsId);
           });
           that.loadOpenInventory(goodsId);
         } else {
@@ -387,6 +392,8 @@ Page({
       goodsImages: nextGoodsImages, // 更新轮播图第一张图片为选中颜色的图片
       goodsImageItems: nextGoodsImageItems,
       selectedColorImage: selectedImage // 更新选择界面显示的图片
+    }, () => {
+      this.updateCustomerServiceCard();
     });
   },
 
@@ -717,26 +724,37 @@ Page({
   },
 
   /**
-   * 联系客服
+   * 更新客服会话商品卡片
    */
-  contactService() {
-    wx.openCustomerServiceChat({
-      success: function(res) {
-        console.log('进入客服聊天成功', res)
-      },
-      fail: function(res) {
-        console.error('进入客服聊天失败', res)
-      }
-    })
+  updateCustomerServiceCard(styleCode) {
+    const options = this.options || {};
+    const currentStyleCode = styleCode || this.data.currentStyleCode || options.style_code || options.id || '';
+    const title = this.data.goodsTitle ? `咨询商品：${this.data.goodsTitle}` : '咨询商品';
+    const image = this.data.selectedColorImage || this.data.goodsImages[0] || PLACEHOLDER_IMAGE;
+    const path = currentStyleCode
+      ? `pages/commodity/goods/index?style_code=${encodeURIComponent(currentStyleCode)}&from=customer_service`
+      : 'pages/commodity/goods/index';
+
+    this.setData({
+      customerServiceTitle: title.length > 60 ? `${title.slice(0, 57)}...` : title,
+      customerServicePath: path,
+      customerServiceImage: image
+    });
+  },
+
+  handleCustomerServiceContact(e) {
+    console.log('商品客服会话事件:', e.detail);
   },
 
   /**
    * 用户点击右上角分享
    */
   onShareAppMessage() {
+    const options = this.options || {};
+    const styleCode = this.data.currentStyleCode || options.style_code || options.id || '';
     return {
       title: this.data.goodsTitle,
-      path: '/pages/commodity/goods/index'
+      path: styleCode ? `/pages/commodity/goods/index?style_code=${encodeURIComponent(styleCode)}` : '/pages/commodity/goods/index'
     };
   }
 })

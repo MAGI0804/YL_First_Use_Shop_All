@@ -467,6 +467,18 @@
   width: auto;
 }
 
+.customer-service-btn {
+  padding: 0;
+  line-height: 1;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.customer-service-btn::after {
+  border: 0;
+}
+
 /* 按钮图标样式 */
 .btn-icon {
   width: 50rpx;

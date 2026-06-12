@@ -88,7 +88,10 @@
     <view class="info-list">
       <view class="info-item">
         <text class="info-label">订单编号</text>
-        <text class="info-value">{{orderDetail.orderNumber}}</text>
+        <view class="info-value-with-action">
+          <text class="info-value order-number">{{orderDetail.orderNumber}}</text>
+          <button class="copy-order-btn" catchtap="copyOrderNumber" data-order-number="{{orderDetail.orderNumber}}">复制</button>
+        </view>
       </view>
       <view class="info-item">
         <text class="info-label">支付状态</text>
