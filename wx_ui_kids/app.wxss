@@ -1,10 +1,122 @@
 /**app.wxss**/
+page {
+  color: #222;
+  background: #f6f6f6;
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
 .container {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-  padding: 200rpx 0;
+  min-height: 100%;
   box-sizing: border-box;
-} 
+}
+
+button {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+button::after {
+  border-radius: 0 !important;
+}
+
+.search-box,
+.retry-btn,
+.error-btn,
+.login-btn,
+.skip-btn,
+.checkout-btn,
+.go-shopping,
+.action-button,
+.empty-button,
+.submit-button,
+.confirm-btn,
+.cancel-btn,
+.filter-button,
+.filter-option,
+.reset-button,
+.confirm-button,
+.label-two-item,
+.tag,
+.review-tag,
+.review-item,
+.review-reply,
+.item-image,
+.product-image,
+.goods-image,
+.display-picture,
+.display-picture-item,
+.modal-image,
+.modal-content,
+.filter-content,
+.address-card,
+.order-section,
+.function-list,
+.section,
+.form-section,
+.address-section,
+.product-section,
+.order-card,
+.order-item,
+.goods-item,
+.review-card,
+.info-card,
+.detail-card,
+.logistics-card,
+.return-card,
+.reason-option,
+.type-option,
+.upload-button,
+.save-btn,
+.submit-btn,
+.sync-btn,
+.edit-btn,
+.delete-btn,
+.add-address-btn,
+.wechat-sync-btn,
+.default-tag,
+.status-tag,
+.goods-image-container,
+.product-image-container,
+.image-wrapper,
+.empty-state,
+.empty-card {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.cart-footer,
+.buy-container,
+.search-container,
+.cart-header,
+.user-info-container {
+  box-shadow: none !important;
+}
+
+.primary,
+.action-button.primary,
+.submit-button,
+.save-btn,
+.submit-btn,
+.checkout-btn,
+.empty-button,
+.add-address-btn,
+.wechat-sync-btn {
+  background: #68B9FA !important;
+  border-color: #68B9FA !important;
+  color: #fff !important;
+}
+
+.secondary,
+.action-button.secondary,
+.cancel-btn {
+  background: #fff !important;
+  border-color: #d8d8d8 !important;
+  color: #444 !important;
+}
+
+.avatar-container,
+.avatar-button,
+.avatar-preview,
+.avatar {
+  border-radius: 12rpx !important;
+}

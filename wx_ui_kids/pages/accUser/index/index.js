@@ -35,13 +35,13 @@ Page({
   },
 
   navigateToAgreement() {
-    wx.navigateTo({
+    app.navigateTo({
       url: '/pages/accUser/privacy/index?type=agreement'
     })
   },
 
   navigateToPrivacy() {
-    wx.navigateTo({
+    app.navigateTo({
       url: '/pages/accUser/privacy/index?type=privacy'
     })
   },
@@ -309,17 +309,12 @@ Page({
 
   redirectAfterLogin() {
     if (this.returnPath === 'goods' && this.id) {
-      wx.redirectTo({
-        url: `/pages/commodity/goods/index?id=${this.id}`,
-        fail: () => {
-          wx.switchTab({ url: '/pages/index/index' })
-        }
+      app.redirectTo({
+        url: `/pages/commodity/goods/index?id=${this.id}`
       })
       return
     }
-    wx.switchTab({
-      url: '/pages/index/index'
-    })
+    app.switchTab('/pages/index/index')
   },
 
   onLoad(options) {

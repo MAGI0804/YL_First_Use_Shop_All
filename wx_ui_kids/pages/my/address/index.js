@@ -190,7 +190,7 @@ Page({
    * 跳转到添加地址页面
    */
   navigateToAddAddress() {
-    wx.navigateTo({
+    app.navigateTo({
       url: '/pages/my/address/add/index'
     });
   },
@@ -334,7 +334,7 @@ Page({
         // 存储选中的地址并返回来源页面
         wx.setStorageSync('selectedAddress', formattedAddress);
         console.log('已存储选中的地址到缓存');
-        wx.navigateBack();
+        app.navigateBack();
         console.log('已返回', this.fromPage, '页面');
       } else {
         console.warn('未找到选中的地址，addressId:', addressId);
@@ -349,7 +349,7 @@ Page({
    */
   editAddress(e) {
     const id = e.currentTarget.dataset.id;
-    wx.navigateTo({
+    app.navigateTo({
       url: `/pages/my/address/edit/index?id=${id}`
     });
   },

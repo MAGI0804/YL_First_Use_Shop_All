@@ -1,5 +1,6 @@
 // app.js
 import request from './api/request'
+import router from './utils/router'
 App({
   bindGetUserInfo (e) {
     console.log(e.detail.userInfo)
@@ -55,6 +56,11 @@ App({
     getHost: () => request.getHost(),
     getAccessToken: (success, fail) => request.getAccessToken(success, fail),
   },
+  router,
+  navigateTo: router.navigateTo,
+  switchTab: router.switchTab,
+  redirectTo: router.redirectTo,
+  navigateBack: router.navigateBack,
   parseTime(time, cFormat) {
     if (arguments.length === 0) {
       return null

@@ -495,13 +495,13 @@ Page({
     // 如果订单状态为售后中，跳转到售后订单详情页面
     if (orderStatus === 'processing' && processNum) {
       console.log('订单状态为售后中，跳转到售后订单详情页面');
-      wx.navigateTo({
+      app.navigateTo({
         url: `/pages/my/order/return_detail/index?returnOrderId=${processNum}&orderId=${orderId}`
       });
     } else {
       console.log('订单状态不是售后中，跳转到普通订单详情页面');
       // 其他状态跳转到普通订单详情页面
-      wx.navigateTo({
+      app.navigateTo({
         url: `/pages/my/order/detail/index?id=${orderId}`
       });
     }
@@ -511,9 +511,7 @@ Page({
    * 跳转到首页
    */
   navigateToHome() {
-    wx.switchTab({
-      url: '/pages/index/index'
-    });
+    app.switchTab('/pages/index/index');
   },
 
   /**
@@ -626,7 +624,7 @@ Page({
     const orderStatus = e.currentTarget.dataset.status;
     // 跳转到售后申请页面
     console.log('申请售后，订单ID:', orderId, '订单状态:', orderStatus);
-    wx.navigateTo({
+    app.navigateTo({
       url: `/pages/my/order/return/index?id=${orderId}&order_status=${orderStatus}`
     });
   },

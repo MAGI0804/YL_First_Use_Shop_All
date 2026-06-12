@@ -74,7 +74,7 @@ Page({
 
       if (apiRes.code === 200) {
         // 跳转到搜索结果页面
-        wx.navigateTo({
+        app.navigateTo({
           url: `/pages/search/display/index?keyword=${encodeURIComponent(searchValue)}`,
           success: function(navRes) {
             // 传递搜索结果数据
@@ -140,7 +140,7 @@ Page({
    * 取消搜索
    */
   onCancel() {
-    wx.navigateBack();
+    app.navigateBack();
   },
 
   /**

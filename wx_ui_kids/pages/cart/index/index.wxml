@@ -53,7 +53,7 @@
       <image class="empty-icon" src="../../../images/cart.png"/>
       <text class="empty-text">购物车还是空的</text>
       <text class="empty-subtext">快去挑选心仪的商品吧</text>
-      <navigator class="go-shopping" url="/pages/index/index">去逛逛</navigator>
+      <view class="go-shopping" bindtap="goShopping">去逛逛</view>
     </view>
   </view>
 

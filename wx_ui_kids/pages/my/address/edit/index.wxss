@@ -1,6 +1,6 @@
 /* pages/my/address/edit/index.wxss */
 .address-form-container {
-  background-color: #f8f8f8;
+  background-color: #f6f6f6;
   min-height: 100vh;
   padding-bottom: 20rpx;
 }
@@ -13,7 +13,7 @@
   height: 90rpx;
   background-color: #fff;
   padding: 0 30rpx;
-  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.1);
+  box-shadow: none;
   position: fixed;
   top: 0;
   left: 0;
@@ -101,8 +101,8 @@
 .save-btn {
   margin: 50rpx 30rpx;
   height: 90rpx;
-  background-color: #FF6B6B;
-  border-radius: 45rpx;
+  background-color: #68B9FA;
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;

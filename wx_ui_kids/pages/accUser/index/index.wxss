@@ -73,7 +73,7 @@ page {
   height: 92rpx;
   line-height: 92rpx;
   border-radius: 8rpx;
-  background: #4aa3f0;
+  background: #68B9FA;
   color: #ffffff;
   font-size: 31rpx;
   font-weight: 600;
@@ -88,11 +88,11 @@ page {
 }
 
 .login-btn:active {
-  background: #2f92df;
+  background: #5AAEFA;
 }
 
 .login-btn[disabled] {
-  background: #9ccdec;
+  background: #9AD0FB;
   color: #ffffff;
 }
 
@@ -160,8 +160,8 @@ page {
 }
 
 .checkbox.checked {
-  background: #4aa3f0;
-  border-color: #4aa3f0;
+  background: #68B9FA;
+  border-color: #68B9FA;
 }
 
 .check-mark {

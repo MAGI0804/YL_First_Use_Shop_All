@@ -200,14 +200,14 @@ Page({
       case 'Order':
         // 跳转到订单详情页
         console.log('跳转到订单详情页，订单号:', message.relatedNum);
-        wx.navigateTo({
+        app.navigateTo({
           url: `/pages/my/order/detail/index?order_no=${message.relatedNum}`
         });
         break;
       case 'return_order':
         // 跳转到售后详情页
         console.log('跳转到售后详情页，售后单号:', message.relatedNum);
-        wx.navigateTo({
+        app.navigateTo({
           url: `/pages/my/order/return_detail/index?return_order_no=${message.relatedNum}`
         });
         break;

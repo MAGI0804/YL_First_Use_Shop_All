@@ -191,7 +191,7 @@ Page({
     const { id, style_code } = e.currentTarget.dataset
     const targetId = style_code || id
     if (targetId) {
-      wx.navigateTo({
+      app.navigateTo({
         url: `/pages/commodity/goods/index?id=${targetId}`
       })
     }

@@ -323,7 +323,7 @@ Page({
     const { productId } = e.currentTarget.dataset;
     console.log('跳转到商品详情页面，商品ID:', productId, '事件数据:', e.currentTarget.dataset);
     if (productId) {
-      wx.navigateTo({
+      app.navigateTo({
         url: `/pages/commodity/goods/index?id=${productId}`
       });
     }
@@ -347,7 +347,7 @@ Page({
    * 返回上一页
    */
   navigateBack() {
-    wx.navigateBack({
+    app.navigateBack({
       delta: 1
     });
   },
@@ -359,7 +359,7 @@ Page({
     const { returnOrderInfo } = this.data;
     console.log('跳转到售后物流详情页面，售后订单详情:', returnOrderInfo);
     if (returnOrderInfo && returnOrderInfo.express_company && returnOrderInfo.express_number) {
-      wx.navigateTo({
+      app.navigateTo({
         url: `/pages/my/order/logistics/index?company=${returnOrderInfo.express_company}&trackingNumber=${returnOrderInfo.express_number}&type=return`
       });
     } else {
@@ -377,7 +377,7 @@ Page({
     const { originalOrderInfo } = this.data;
     console.log('跳转到原订单物流详情页面，原订单详情:', originalOrderInfo);
     if (originalOrderInfo && originalOrderInfo.express_company && originalOrderInfo.express_number) {
-      wx.navigateTo({
+      app.navigateTo({
         url: `/pages/my/order/logistics/index?company=${originalOrderInfo.express_company}&trackingNumber=${originalOrderInfo.express_number}&type=original`
       });
     } else {

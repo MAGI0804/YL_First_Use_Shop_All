@@ -156,7 +156,7 @@ Page({
   navigateToLogin() {
     this.clearUserInfo();
     
-    wx.navigateTo({
+    app.navigateTo({
       url: '/pages/accUser/index'
     })
   },
@@ -165,7 +165,7 @@ Page({
    * 跳转到编辑资料页面
    */
   navigateToEditProfile() {
-    wx.navigateTo({
+    app.navigateTo({
       url: '/pages/my/modify/index'
     })
   },
@@ -174,7 +174,7 @@ Page({
    * 跳转到全部订单页面
    */
   navigateToAllOrders() {
-    wx.navigateTo({
+    app.navigateTo({
       url: '/pages/my/order/index?status=all'
     })
   },
@@ -184,7 +184,7 @@ Page({
    */
   navigateToOrderByStatus(e) {
     const status = e.currentTarget.dataset.status;
-    wx.navigateTo({
+    app.navigateTo({
       url: `/pages/my/order/index?status=${status}`
     })
   },
@@ -193,7 +193,7 @@ Page({
    * 跳转到地址管理页面
    */
   navigateToAddress() {
-    wx.navigateTo({
+    app.navigateTo({
       url: '/pages/my/address/index'
     })
   },
@@ -202,7 +202,7 @@ Page({
    * 跳转到消息页面
    */
   navigateToMessage() {
-    wx.navigateTo({
+    app.navigateTo({
       url: '/pages/my/message/index'
     })
   },
@@ -211,7 +211,7 @@ Page({
    * 跳转到我的评价页面
    */
   navigateToReviews() {
-    wx.navigateTo({
+    app.navigateTo({
       url: '/pages/my/reviews/index'
     })
   },
@@ -267,14 +267,7 @@ Page({
             icon: 'success'
           });
           setTimeout(() => {
-            wx.switchTab({
-              url: '/pages/index/index',
-              fail: () => {
-                wx.reLaunch({
-                  url: '/pages/index/index'
-                });
-              }
-            });
+            app.switchTab('/pages/index/index');
           }, 1500);
         }
       }

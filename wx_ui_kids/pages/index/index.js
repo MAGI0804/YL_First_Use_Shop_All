@@ -88,7 +88,7 @@ Page({
     this.fetchActivityImages()
   },
   onSearch: function() {
-    wx.navigateTo({
+    app.navigateTo({
       url: '/pages/search/index/index'
     })
   },
@@ -96,7 +96,7 @@ Page({
   onImageTap: function(e) {
     const item = e.currentTarget.dataset.item
     if (item && item.has_activity_detail === true && item.id) {
-      wx.navigateTo({
+      app.navigateTo({
         url: '/pages/activity/index/index?activity_id=' + item.id
       })
     }

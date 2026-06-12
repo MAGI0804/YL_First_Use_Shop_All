@@ -117,7 +117,7 @@ Page({
    * 返回上一页
    */
   navigateBack() {
-    wx.navigateBack({
+    app.navigateBack({
       delta: 1
     });
   },

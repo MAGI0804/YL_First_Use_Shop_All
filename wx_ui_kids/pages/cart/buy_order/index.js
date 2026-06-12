@@ -254,7 +254,7 @@ Page({
   selectAddress() {
     console.log('跳转到地址选择页面，传递from=order参数');
     // 跳转到地址选择页面，确保传递from=order参数
-    wx.navigateTo({
+    app.navigateTo({
       url: '/pages/my/address/index?from=order'
     })
   },
@@ -456,7 +456,7 @@ Page({
         title: '请先登录',
         icon: 'none'
       })
-      wx.navigateTo({
+      app.navigateTo({
         url: '/pages/accUser/index'
       })
       return
@@ -536,7 +536,7 @@ Page({
               setTimeout(() => {
                 try {
                   console.log('尝试跳转到订单详情页，路径: /pages/my/order/detail/index?id=' + orderId);
-                  wx.navigateTo({
+                  app.navigateTo({
                     url: '/pages/my/order/detail/index?id=' + orderId,
                     success: function(res) {
                       console.log('跳转成功');

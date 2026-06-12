@@ -143,7 +143,7 @@ Page({
     
     // 跳转到消息详情页面
     if (message) {
-      wx.navigateTo({
+      app.navigateTo({
         url: `/pages/my/message_details/index?type=${message.type}`
       });
     }

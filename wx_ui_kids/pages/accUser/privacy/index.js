@@ -1,4 +1,5 @@
 // pages/accUser/privacy/index.js
+const app = getApp()
 
 Page({
   /**
@@ -27,6 +28,6 @@ Page({
    * 返回上一页
    */
   navigateBack() {
-    wx.navigateBack();
+    app.navigateBack();
   }
 });

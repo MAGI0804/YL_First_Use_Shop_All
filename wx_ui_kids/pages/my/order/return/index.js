@@ -366,7 +366,7 @@ Page({
   selectAddress() {
     console.log('跳转到地址选择页面，传递from=return参数');
     // 跳转到地址选择页面，确保传递from=return参数
-    wx.navigateTo({
+    app.navigateTo({
       url: '/pages/my/address/index?from=return'
     });
   },
@@ -534,11 +534,11 @@ Page({
         // 跳转到售后详情页，展示审核和寄回进度
         setTimeout(() => {
           if (returnOrderId) {
-            wx.redirectTo({
+            app.redirectTo({
               url: `/pages/my/order/return_detail/index?returnOrderId=${returnOrderId}&orderId=${orderId}`
             });
           } else {
-            wx.navigateTo({
+            app.navigateTo({
               url: `/pages/my/order/detail/index?id=${orderId}`
             });
           }

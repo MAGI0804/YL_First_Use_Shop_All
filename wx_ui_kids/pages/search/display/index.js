@@ -115,7 +115,7 @@ Page({
     const { id } = e.currentTarget.dataset;
     if (id) {
       console.log('跳转到商品详情页，商品款号:', id);
-      wx.navigateTo({
+      app.navigateTo({
         url: `/pages/commodity/goods/index?id=${id}`
       });
     } else {

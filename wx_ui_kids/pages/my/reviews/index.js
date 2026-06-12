@@ -119,7 +119,7 @@ Page({
     if (!review || review.status !== 'pending') return
     const tags = encodeURIComponent(JSON.stringify(review.displayTags || []))
     const images = encodeURIComponent(JSON.stringify(review.displayImages || []))
-    wx.navigateTo({
+    app.navigateTo({
       url: `/pages/my/order/review/index?mode=edit&reviewId=${review.id}&rating=${review.rating || 5}&content=${encodeURIComponent(review.content || '')}&tags=${tags}&images=${images}&productName=${encodeURIComponent(review.commodity_id || '订单商品')}`
     })
   },

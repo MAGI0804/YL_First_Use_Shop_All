@@ -243,7 +243,7 @@ Page({
           console.log(isEdit ? '更新成功' : '添加成功');
           // 延迟返回上一页
           setTimeout(() => {
-            wx.navigateBack();
+            app.navigateBack();
           }, 1500);
         } else {
           console.error(res.message || (isEdit ? '更新失败' : '添加失败'));
@@ -259,6 +259,6 @@ Page({
    * 返回上一页
    */
   navigateBack() {
-    wx.navigateBack();
+    app.navigateBack();
   }
 })

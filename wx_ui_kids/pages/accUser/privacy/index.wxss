@@ -1,7 +1,7 @@
 /* pages/accUser/privacy/index.wxss */
 :root {
-  --primary: #4A90E2;
-  --primary-light: #6AA8F7;
+  --primary: #68B9FA;
+  --primary-light: #9AD0FB;
   --text-main: #333333;
   --text-secondary: #666666;
   --text-tertiary: #999999;

@@ -259,7 +259,7 @@ Page({
           icon: 'success'
         });
         setTimeout(() => {
-          wx.navigateBack();
+          app.navigateBack();
         }, 1200);
       } else {
         wx.showToast({

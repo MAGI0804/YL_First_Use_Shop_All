@@ -605,9 +605,13 @@ Page({
     const { style_code, id } = e.currentTarget.dataset
     // 优先使用style_code跳转，如果没有则回退到id
     const targetId = style_code || id
-    wx.navigateTo({
+    app.navigateTo({
       url: `/pages/commodity/goods/index?id=${targetId}`
     })
+  },
+
+  goShopping() {
+    app.switchTab('/pages/index/index')
   },
 
   /**
@@ -683,7 +687,7 @@ Page({
     
   navigateToBuyOrder(selectedItems) {
     // 将选中的商品信息传递给订单确认页面
-    wx.navigateTo({
+    app.navigateTo({
       url: '/pages/cart/buy_order/index',
       success: (res) => {
         res.eventChannel.emit('selectedItems', {

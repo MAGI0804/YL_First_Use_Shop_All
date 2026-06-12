@@ -3,14 +3,14 @@ page {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: #f7fafc;
+  background-color: #f6f6f6;
 }
 
 /* 搜索框样式 */
 .search-container {
-  padding: 18rpx 24rpx;
-  background-color: rgba(255, 255, 255, 0.96);
-  border-bottom: 1rpx solid #edf0f2;
+  padding: 16rpx 24rpx;
+  background-color: #fff;
+  border-bottom: 1rpx solid #e8e8e8;
   position: fixed;
   top: 0;
   left: 0;
@@ -22,11 +22,11 @@ page {
 .search-box {
   display: flex;
   align-items: center;
-  background-color: #f4f8fb;
-  border-radius: 8rpx;
+  background-color: #f7f7f7;
+  border-radius: 0;
   height: 72rpx;
   padding: 0 22rpx;
-  border: 1rpx solid #d8e8f5;
+  border: 1rpx solid #e2e2e2;
   box-sizing: border-box;
 }
 
@@ -44,7 +44,7 @@ page {
 
 .search-btn {
   font-size: 28rpx;
-  color: #1769aa;
+  color: #68B9FA;
   margin-left: auto;
   flex-shrink: 0;
   text-align: right;
@@ -79,8 +79,8 @@ page {
 .spinner {
   width: 48rpx;
   height: 48rpx;
-  border: 6rpx solid #d8e8f5;
-  border-left-color: #1769aa;
+  border: 6rpx solid #e1e1e1;
+  border-left-color: #68B9FA;
   border-radius: 50%;
   animation: spin 0.9s linear infinite;
   margin-bottom: 28rpx;
@@ -109,8 +109,8 @@ page {
   min-width: 220rpx;
   height: 72rpx;
   line-height: 72rpx;
-  border-radius: 8rpx;
-  background: #1769aa;
+  border-radius: 0;
+  background: #68B9FA;
   color: #fff;
   font-size: 28rpx;
 }
@@ -126,7 +126,7 @@ page {
 .image-item {
   width: 100%;
   overflow: hidden;
-  background-color: #eef5f8;
+  background-color: #eee;
 }
 .item-image {
   width: 100%;

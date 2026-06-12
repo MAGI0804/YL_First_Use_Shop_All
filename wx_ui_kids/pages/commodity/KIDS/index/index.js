@@ -64,7 +64,7 @@ Page({
    * 跳转到搜索页面
    */
   navigateToSearch() {
-    wx.navigateTo({
+    app.navigateTo({
       url: '/pages/search/index/index'
     });
   },
@@ -667,7 +667,7 @@ Page({
     const id = e.currentTarget.dataset.id
     if (!id) return
     this.navigating = true
-    wx.navigateTo({
+    app.navigateTo({
       url: `/pages/commodity/goods/index?id=${id}`,
       complete: () => {
         setTimeout(() => {

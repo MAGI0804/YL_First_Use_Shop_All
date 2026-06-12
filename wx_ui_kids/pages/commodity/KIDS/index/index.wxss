@@ -4,7 +4,7 @@
   height: 100vh;
   padding-top: 110rpx;
   box-sizing: border-box;
-  background-color: #f7fafc;
+  background-color: #f6f6f6;
   overflow: hidden;
   margin: 0;
 }
@@ -38,9 +38,9 @@
   display: flex;
   align-items: center;
   padding: 10rpx 16rpx;
-  background: #eef6fb;
-  border-radius: 8rpx;
-  color: #1769aa;
+  background: #f4f4f4;
+  border-radius: 0;
+  color: #68B9FA;
   transition: all 0.3s ease;
   flex-shrink: 0;
   margin-left: auto;
@@ -78,7 +78,7 @@
   max-width: 600rpx;
   max-height: 80%;
   background: white;
-  border-radius: 8rpx;
+  border-radius: 0;
   overflow: hidden;
   animation: modalSlideUp 0.3s ease;
   display: flex;
@@ -124,7 +124,7 @@
   justify-content: center;
   font-size: 40rpx;
   color: #999;
-  border-radius: 50%;
+  border-radius: 0;
   background: #f5f5f5;
   transition: all 0.3s ease;
 }
@@ -160,7 +160,7 @@
 .filter-option {
   padding: 16rpx 28rpx;
   font-size: 28rpx;
-  border-radius: 8rpx;
+  border-radius: 0;
   border: 2rpx solid #e0e0e0;
   background: #f8f8f8;
   color: #666;
@@ -170,8 +170,8 @@
 }
 
 .filter-option.active {
-  background: #1769aa;
-  border-color: #1769aa;
+  background: #68B9FA;
+  border-color: #68B9FA;
   color: white;
   font-weight: bold;
 }
@@ -196,7 +196,7 @@
   align-items: center;
   justify-content: center;
   font-size: 32rpx;
-  border-radius: 8rpx;
+  border-radius: 0;
   transition: all 0.3s ease;
 }
 
@@ -212,21 +212,21 @@
 }
 
 .confirm-button {
-  background: #1769aa;
+  background: #68B9FA;
   color: white;
-  border: 2rpx solid #1769aa;
+  border: 2rpx solid #68B9FA;
   font-weight: bold;
 }
 
 .confirm-button:active {
-  background: #13598f;
+  background: #444;
   transform: scale(0.95);
 }
 /* 搜索框样式 */
 .search-container {
   padding: 18rpx 24rpx;
-  background-color: rgba(255, 255, 255, 0.96);
-  border-bottom: 1rpx solid #edf0f2;
+  background-color: #fff;
+  border-bottom: 1rpx solid #e8e8e8;
   position: fixed;
   top: 0;
   left: 0;
@@ -239,11 +239,11 @@
 .label-two-list {
   display: flex;
   flex-wrap: nowrap;
-  justify-content: flex-start;
+  justify-content: center;
   align-items: center;
   gap: 12rpx;
   flex: 1;
-  padding-right: 20rpx;
+  padding: 0 20rpx;
   overflow-x: auto;
   white-space: nowrap;
 }
@@ -253,7 +253,7 @@
   padding: 12rpx 20rpx;
   margin: 0;
   font-size: 24rpx;
-  border-radius: 8rpx;
+  border-radius: 0;
   transition: all 0.3s ease;
   background: #f5f7f9;
   border: 2rpx solid #e2e8ee;
@@ -264,8 +264,8 @@
 }
 
 .label-two-item.active {
-  background: #1769aa !important;
-  border: 2rpx solid #1769aa !important;
+  background: #68B9FA !important;
+  border: 2rpx solid #68B9FA !important;
   color: white !important;
   font-weight: bold !important;
 }
@@ -282,11 +282,11 @@
 .search-box {
   display: flex;
   align-items: center;
-  background-color: #f4f8fb;
-  border-radius: 8rpx;
+  background-color: #f7f7f7;
+  border-radius: 0;
   height: 72rpx;
   padding: 0 22rpx;
-  border: 1rpx solid #d8e8f5;
+  border: 1rpx solid #e2e2e2;
   box-sizing: border-box;
 }
 
@@ -304,7 +304,7 @@
 
 .search-btn {
   font-size: 28rpx;
-  color: #1769aa;
+  color: #68B9FA;
   margin-left: auto;
   flex-shrink: 0;
   text-align: right;
@@ -314,7 +314,7 @@
 .category-container {
   width: 140rpx;
   height: 100%;
-  background-color: #eef6fb;
+  background-color: #f0f0f0;
   flex-shrink: 0;
   overflow-y: auto;
   margin: 0;
@@ -344,7 +344,7 @@
   width: 50rpx;
   height: 50rpx;
   border: 6rpx solid rgba(0, 0, 0, 0.1);
-  border-left-color: #1769aa;
+  border-left-color: #68B9FA;
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-bottom: 20rpx;
@@ -381,8 +381,8 @@
   text-align: center;
   font-size: 28rpx;
   color: #fff;
-  background-color: #1769aa;
-  border-radius: 8rpx;
+  background-color: #68B9FA;
+  border-radius: 0;
 }
 
 /* 类目列表样式 */
@@ -410,7 +410,7 @@
 }
 
 .category-item.active {
-  color: #1769aa;
+  color: #68B9FA;
   font-weight: bold;
   background-color: #fff;
 }
@@ -462,7 +462,7 @@
   width: 100%;
   height: 260rpx;
   display: block;
-  background-color: #eef5f8;
+  background-color: #eee;
 }
 
 .product-info {

@@ -284,7 +284,7 @@ Page({
           duration: 2000,
           success: () => {
             setTimeout(() => {
-              wx.navigateBack()
+              app.navigateBack()
             }, 1500)
           }
         })
