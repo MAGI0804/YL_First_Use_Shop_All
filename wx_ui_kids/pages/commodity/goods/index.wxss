@@ -460,6 +460,7 @@
 
 /* 图标按钮样式 */
 .icon-btn {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -467,15 +468,25 @@
   width: auto;
 }
 
-.customer-service-btn {
+.contact-hit-area {
+  position: absolute;
+  left: -12rpx;
+  right: -12rpx;
+  top: -8rpx;
+  bottom: -8rpx;
+  z-index: 2;
+  width: auto;
+  height: auto;
+  min-height: 0;
+  margin: 0;
   padding: 0;
-  line-height: 1;
-  background: transparent;
+  line-height: normal;
+  background: transparent !important;
+  opacity: 0;
   border: 0;
-  border-radius: 0;
 }
 
-.customer-service-btn::after {
+.contact-hit-area::after {
   border: 0;
 }
 

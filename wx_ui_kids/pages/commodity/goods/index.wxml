@@ -109,18 +109,19 @@
   <view class="buy-container">
     <!-- 左侧图标按钮：客服、购物车 -->
     <view class="left-buttons">
-      <button
-        class="icon-btn customer-service-btn"
-        open-type="contact"
-        show-message-card="true"
-        send-message-title="{{customerServiceTitle}}"
-        send-message-path="{{customerServicePath}}"
-        send-message-img="{{customerServiceImage}}"
-        bindcontact="handleCustomerServiceContact"
-      >
+      <view class="icon-btn contact-icon-btn">
+        <button
+          class="contact-hit-area"
+          open-type="contact"
+          show-message-card="true"
+          send-message-title="{{customerServiceTitle}}"
+          send-message-path="{{customerServicePath}}"
+          send-message-img="{{customerServiceImage}}"
+          bindcontact="handleCustomerServiceContact"
+        ></button>
         <image class="btn-icon" src="/images/to-kefu.png"></image>
         <text class="btn-text">客服</text>
-      </button>
+      </view>
       <view class="icon-btn" bindtap="goToCart">
         <image class="btn-icon" src="/images/to-cart.png"></image>
         <text class="btn-text">购物车</text>
