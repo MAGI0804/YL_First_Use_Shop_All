@@ -12,17 +12,23 @@
 /* 右侧容器 */
 .right-container {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+  background-color: #fff;
 }
 
 /* 右侧顶部的二级菜单 */
 .right-label-two-container {
-  padding: 10rpx 20rpx;
+  flex-shrink: 0;
+  padding: 10rpx 16rpx;
   background-color: #fff;
   border-bottom: 1rpx solid #edf0f2;
+  position: relative;
+  z-index: 2;
+  box-sizing: border-box;
 }
 
 /* 二级菜单头部 */
@@ -30,8 +36,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 20rpx;
+  flex-wrap: nowrap;
+  gap: 12rpx;
+  min-width: 0;
 }
 
 .filter-button {
@@ -239,11 +246,12 @@
 .label-two-list {
   display: flex;
   flex-wrap: nowrap;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
   gap: 12rpx;
   flex: 1;
-  padding: 0 20rpx;
+  min-width: 0;
+  padding: 0;
   overflow-x: auto;
   white-space: nowrap;
 }
@@ -319,6 +327,8 @@
   overflow-y: auto;
   margin: 0;
   padding: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .category-title {
@@ -431,9 +441,10 @@
 /* 右侧商品样式 */
 .product-container {
   flex: 1;
-  height: 100%;
-  padding: 0;
-  background-color: #fff;
+  min-height: 0;
+  height: auto;
+  padding: 12rpx 12rpx 24rpx;
+  background-color: #f6f6f6;
   box-sizing: border-box;
   margin: 0;
   overflow-y: auto;
@@ -444,18 +455,21 @@
   flex-wrap: wrap;
   justify-content: flex-start;
   align-items: flex-start;
+  gap: 12rpx;
   font-size: 0;
   line-height: 0;
 }
 
 .product-item {
-  width: 50%;
+  width: calc((100% - 12rpx) / 2);
   background-color: #fff;
   border-radius: 0;
   overflow: hidden;
   margin: 0;
   box-shadow: none;
   box-sizing: border-box;
+  position: relative;
+  z-index: 0;
 }
 
 .product-image {
