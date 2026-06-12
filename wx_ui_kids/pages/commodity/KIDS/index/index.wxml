@@ -112,7 +112,7 @@
     </view>
     
     <scroll-view 
-      class="product-container" 
+      class="product-container {{!loading && !error && products.length === 0 ? 'product-container-empty' : ''}}"
       scroll-y="true"
       enable-back-to-top="true"
       bindrefresherrefresh="onPullDownRefresh"
@@ -136,6 +136,14 @@
     <!-- 空状态 -->
     <view class="empty-container" wx:if="{{!loading && !error && products.length === 0}}">
       <text class="empty-text">暂无商品数据</text>
+      <text class="empty-desc">可切换分类或调整筛选条件</text>
+      <view
+        wx:if="{{selectedLabelTwo.length || selectedLabelOne.length || selectedLabelFour.length || selectedLabelSeven.length}}"
+        class="empty-action"
+        bindtap="resetAllListFilters"
+      >
+        重置筛选
+      </view>
     </view>
 
     <!-- 商品列表 -->
@@ -150,7 +158,7 @@
     </view>
 
     <!-- 加载更多 -->
-    <view class="load-more" wx:if="{{hasMore}}">
+    <view class="load-more" wx:if="{{products.length > 0 && (hasMore || loadingMore)}}">
       <view class="load-more-spinner" wx:if="{{loadingMore}}"></view>
       <text class="load-more-text" wx:else>上拉加载更多</text>
     </view>

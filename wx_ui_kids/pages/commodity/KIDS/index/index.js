@@ -263,7 +263,7 @@ Page({
       loading: true,
       products: [],
       page: 1,
-      hasMore: true
+      hasMore: false
     });
     
     // 重新加载当前分类的商品
@@ -336,7 +336,7 @@ Page({
       loading: true,
       products: [],
       page: 1, // 重置为第一页
-      hasMore: true
+      hasMore: false
     });
 
     // 构建请求数据，在原有参数基础上添加筛选条件
@@ -382,6 +382,13 @@ Page({
             
             resolve(res);
           } else {
+            this.setData({
+              loading: false,
+              loadingMore: false,
+              refresherTriggered: false,
+              hasMore: false,
+              error: true
+            });
             wx.showToast({
               title: '获取商品失败: ' + res.message,
               icon: 'none'
@@ -580,7 +587,7 @@ Page({
 
           that.setData({
             categories: categories,
-            loading: false
+            loading: categories.length === 0 ? false : that.data.loading
           })
 
           // 如果有类目，默认选中第一个
@@ -635,7 +642,9 @@ Page({
         selectedCategory: category,
         products: [],
         page: 1,
-        hasMore: true,
+        loading: true,
+        loadingMore: false,
+        hasMore: false,
         // 重置筛选状态
         currentFilters: null,
         selectedLabelOne: [],
@@ -700,7 +709,9 @@ Page({
       selectedLabelTwo: selectedLabelTwo,
       products: [],
       page: 1,
-      hasMore: true
+      loading: true,
+      loadingMore: false,
+      hasMore: false
     }, () => {
       // 更新菜单数据
       const menuItems = this.getProcessedMenuItems();
@@ -711,6 +722,29 @@ Page({
     
     // 重新加载商品数据
     this.fetchProductsByCategory(this.data.selectedCategory)
+  },
+
+  resetAllListFilters() {
+    this.setData({
+      selectedLabelOne: [],
+      selectedLabelFour: [],
+      selectedLabelSeven: [],
+      selectedLabelTwo: [],
+      currentFilters: null,
+      products: [],
+      page: 1,
+      loading: true,
+      loadingMore: false,
+      hasMore: false
+    }, () => {
+      const menuItems = this.getProcessedMenuItems();
+      const filterItems = this.getProcessedFilterItems();
+      this.setData({
+        menuItems: menuItems,
+        filterItems: filterItems
+      });
+      this.fetchProductsByCategory(this.data.selectedCategory);
+    })
   },
 
   /**

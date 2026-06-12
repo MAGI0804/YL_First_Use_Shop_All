@@ -252,12 +252,13 @@
 .label-two-list {
   display: flex;
   flex-wrap: nowrap;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
   gap: 12rpx;
   flex: 0 1 auto;
   min-width: 0;
   max-width: calc(100% - 96rpx);
+  margin: 0 auto;
   padding: 0;
   overflow-x: auto;
   white-space: nowrap;
@@ -333,7 +334,8 @@
   flex-shrink: 0;
   overflow-y: auto;
   margin: 0;
-  padding: 0;
+  padding: 82rpx 0 0;
+  box-sizing: border-box;
   position: relative;
   z-index: 1;
 }
@@ -435,14 +437,39 @@
 /* 空状态样式 */
 .empty-container {
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
-  height: 400rpx;
+  min-height: 520rpx;
+  padding: 120rpx 32rpx;
+  box-sizing: border-box;
+  text-align: center;
 }
 
 .empty-text {
-  font-size: 28rpx;
-  color: #999;
+  font-size: 30rpx;
+  color: #7f8b96;
+  line-height: 1.5;
+}
+
+.empty-desc {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: #a8b0b8;
+  line-height: 1.5;
+}
+
+.empty-action {
+  margin-top: 28rpx;
+  min-width: 160rpx;
+  height: 56rpx;
+  line-height: 56rpx;
+  padding: 0 24rpx;
+  box-sizing: border-box;
+  font-size: 24rpx;
+  color: #68B9FA;
+  background-color: #eef7ff;
+  border: 1rpx solid #cfe9ff;
 }
 
 /* 右侧商品样式 */
@@ -455,6 +482,10 @@
   box-sizing: border-box;
   margin: 0;
   overflow-y: auto;
+}
+
+.product-container-empty {
+  background-color: #fff;
 }
 
 .product-list {
