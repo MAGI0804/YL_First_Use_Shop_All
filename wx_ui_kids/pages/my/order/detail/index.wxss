@@ -288,7 +288,7 @@
   align-items: center;
   justify-content: flex-start;
   min-width: 0;
-  margin-left: 24rpx;
+  margin-left: 16rpx;
 }
 
 .order-number {
@@ -299,46 +299,39 @@
 }
 
 .copy-order-icon-btn {
-  width: 40rpx;
-  height: 40rpx;
-  line-height: 40rpx;
-  padding: 0;
-  margin: 0 0 0 12rpx;
-  background: transparent;
-  border-radius: 0;
+  width: 26rpx;
+  height: 26rpx;
+  margin-left: 8rpx;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.copy-order-icon-btn::after {
-  border: 0;
-}
-
 .copy-icon {
   position: relative;
-  width: 28rpx;
-  height: 28rpx;
+  width: 22rpx;
+  height: 22rpx;
+  opacity: 0.5;
 }
 
 .copy-icon-back,
 .copy-icon-front {
   position: absolute;
-  width: 18rpx;
-  height: 20rpx;
-  border: 2rpx solid #777;
+  width: 14rpx;
+  height: 16rpx;
+  border: 2rpx solid #666;
   background: #fff;
   box-sizing: border-box;
 }
 
 .copy-icon-back {
-  left: 3rpx;
-  top: 2rpx;
+  left: 2rpx;
+  top: 1rpx;
 }
 
 .copy-icon-front {
-  left: 8rpx;
-  top: 7rpx;
+  left: 7rpx;
+  top: 6rpx;
 }
 
 /* 价格信息区域 */

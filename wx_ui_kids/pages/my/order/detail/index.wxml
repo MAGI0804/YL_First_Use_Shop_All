@@ -90,7 +90,7 @@
         <text class="info-label">订单编号</text>
         <view class="info-value-with-action">
           <text class="info-value order-number">{{orderDetail.orderNumber}}</text>
-          <button
+          <view
             class="copy-order-icon-btn"
             catchtap="copyOrderNumber"
             data-order-number="{{orderDetail.orderNumber}}"
@@ -100,7 +100,7 @@
               <view class="copy-icon-back"></view>
               <view class="copy-icon-front"></view>
             </view>
-          </button>
+          </view>
         </view>
       </view>
       <view class="info-item">

@@ -149,6 +149,8 @@
   display: flex;
   align-items: center;
   min-width: 0;
+  align-self: flex-start;
+  max-width: 100%;
 }
 
 .order-number {
@@ -161,47 +163,40 @@
 }
 
 .copy-order-icon-btn {
-  width: 38rpx;
-  height: 38rpx;
-  line-height: 38rpx;
-  padding: 0;
-  margin: 0 0 0 10rpx;
-  background: transparent;
-  border-radius: 0;
+  width: 26rpx;
+  height: 26rpx;
+  margin-left: 8rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 
-.copy-order-icon-btn::after {
-  border: 0;
-}
-
 .copy-icon {
   position: relative;
-  width: 26rpx;
-  height: 26rpx;
+  width: 22rpx;
+  height: 22rpx;
+  opacity: 0.5;
 }
 
 .copy-icon-back,
 .copy-icon-front {
   position: absolute;
-  width: 17rpx;
-  height: 19rpx;
-  border: 2rpx solid #777;
+  width: 14rpx;
+  height: 16rpx;
+  border: 2rpx solid #666;
   background: #fff;
   box-sizing: border-box;
 }
 
 .copy-icon-back {
-  left: 3rpx;
-  top: 2rpx;
+  left: 2rpx;
+  top: 1rpx;
 }
 
 .copy-icon-front {
-  left: 8rpx;
-  top: 7rpx;
+  left: 7rpx;
+  top: 6rpx;
 }
 
 .order-time {
